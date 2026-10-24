@@ -1,0 +1,23 @@
+{
+	"id": "np_brainrot",
+	"name": "Brainrot Edition",
+	"version": "0.2.2",
+	"author": "NescapePlan",
+	"description": "Game object inspector for Batomon Showdown - Phase 2.2: Monster Types and Shop Refresh",
+	"settings": [
+		{
+			"key": "debug_logging",
+			"label": "Debug Logging",
+			"type": "bool",
+			"default": true,
+			"description": "Include timestamps, change reasons, and additional context in logs"
+		},
+		{
+			"key": "deep_inspection",
+			"label": "Deep Inspection",
+			"type": "bool",
+			"default": true,
+			"description": "Discover and log additional properties of game objects (types, keywords, abilities)"
+		}
+	]
+}
