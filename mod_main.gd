@@ -582,29 +582,6 @@ func _infer_event_type(run_changes: Array, shop_changes: Array, team_changes: Ar
 	return " + ".join(parts) if not parts.is_empty() else "STATE CHANGED"
 
 
-func _get_shop_item_name(item_id) -> String:
-	# item_id is either an instance ID (int) or an object
-	if item_id is int:
-		# This is from old state, we can't retrieve the object
-		return "Item"
-	
-	var item = item_id
-	if item == null:
-		return "Empty"
-	
-	# Check if it's a creature
-	if item.has_method("get_gold_cost") and _has_property(item, "data"):
-		var data = item.data
-		if data != null and _has_property(data, "name_key"):
-			return str(data.name_key)
-	
-	# Check if it's an item
-	if _has_property(item, "id"):
-		return str(item.id)
-	
-	return "Unknown"
-
-
 func _get_monster_name(monster_id) -> String:
 	# monster_id is either an instance ID (int) or an object
 	if monster_id is int:
