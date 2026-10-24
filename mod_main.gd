@@ -1,8 +1,8 @@
 extends Node
-## Brainrot Edition - Phase 2.2: Monster Types and Shop Refresh Detection
+## Brainrot Edition - Phase 2.3: Refactored Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.2.2"
+const VERSION := "0.2.3"
 const OUTPUT_DIR := "user://np_brainrot"
 const LOG_FILE := "inspect.log"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
@@ -20,11 +20,6 @@ var _battle_logged := false
 var _initialization_started := false
 var _initialized := false
 
-# Notice tracking for duplicate suppression
-var _last_scavenger_notice := ""
-var _last_blackbelt_shop_notice := ""
-var _last_blackbelt_team_warning := ""
-
 # Settings (defaults match mod.json)
 var _debug_logging := true
 var _deep_inspection := true
@@ -35,6 +30,11 @@ var _diagnostic_logged := false
 # Logging
 var _log_path := ""
 var _formatter = null
+
+# Trainer advice system
+var _advisor = null
+var _advice_context_script = null
+var _advice_context_builder = null
 
 
 func _init() -> void:
@@ -93,6 +93,9 @@ func _initialize_mod() -> void:
 	var LogFormatter = load("res://mods/NP_Brainrot/log_formatter.gd")
 	_formatter = LogFormatter.new(_has_property)
 	
+	# Create advisor and register rules
+	_setup_advisor()
+	
 	# Create output directory
 	var dir_path := ProjectSettings.globalize_path(OUTPUT_DIR)
 	var dir_result := DirAccess.make_dir_recursive_absolute(dir_path)
@@ -114,13 +117,65 @@ func _initialize_mod() -> void:
 	_initialized = true
 	
 	_log_message("=".repeat(80))
-	_log_message("Brainrot Edition %s - Configurable Diagnostic Logger" % VERSION)
+	_log_message("Brainrot Edition %s - Refactored Trainer Advice System" % VERSION)
 	_log_message("Initialized at %s" % _formatter.get_timestamp())
 	_log_message("Debug Logging: %s | Deep Inspection: %s" % [_debug_logging, _deep_inspection])
 	_log_message("Log file: %s" % abs_log_path)
 	_log_message("=".repeat(80))
 	
 	print("Brainrot Edition %s loaded - logging to %s" % [VERSION, abs_log_path])
+
+
+func _setup_advisor() -> void:
+	"""Initialize advisor and register all rules."""
+	var TrainerAdvisor = load("res://mods/NP_Brainrot/trainer_advisor.gd")
+	var TrainerRules = load("res://mods/NP_Brainrot/trainer_rules.gd")
+	
+	_advisor = TrainerAdvisor.new()
+	
+	# Cache AdviceContext script and builder
+	_advice_context_script = load("res://mods/NP_Brainrot/advice_context.gd")
+	_advice_context_builder = _advice_context_script.new()
+	
+	# Scavenger shop targets rule
+	var scavenger_rule = TrainerRules.ShopTargetsRule.new(
+		"scavenger_targets",
+		"scavenger",
+		["monster.name.lamplet", "monster.name.swoonet"],
+		["basic_bait"],
+		"NOTICE",
+		"Shop targets: %s | Level-up/trinket opportunities"
+	)
+	_advisor.register_rule(scavenger_rule)
+	
+	# Black Belt Beetbud shop rule
+	var blackbelt_beetbud_rule = TrainerRules.ShopTargetsRule.new(
+		"blackbelt_beetbud",
+		"black_belt",
+		["monster.name.beetbud"],
+		[],
+		"NOTICE",
+		"Beetbud available: shop %s"
+	)
+	_advisor.register_rule(blackbelt_beetbud_rule)
+	
+	# Black Belt Beetdown company rule
+	var beetdown_company_rule = TrainerRules.BeetdownCompanyRule.new(
+		"beetdown_company",
+		"black_belt",
+		"WARNING"
+	)
+	_advisor.register_rule(beetdown_company_rule)
+	
+	# *** TEMPORARY TEST: Day 6 reminder (no trainer filter) ***
+	var day6_test_rule = TrainerRules.DayReminderRule.new(
+		"day6_test",
+		"",  # No trainer filter - matches any trainer
+		6,
+		"NOTICE",
+		"*** BRAINROT TEST | DayReminderRule matched Day 6"
+	)
+	_advisor.register_rule(day6_test_rule)
 
 
 func _process(_delta: float) -> void:
@@ -146,122 +201,52 @@ func _inspect_current_phase() -> void:
 		if _last_phase != "":
 			_last_phase = ""
 			_battle_logged = false
-			_reset_trainer_notice_signatures()
+			if _advisor != null:
+				_advisor.reset_suppression()
 
 
-func _reset_trainer_notice_signatures() -> void:
-	"""Reset all trainer notice signatures for a new shop visit."""
-	_last_scavenger_notice = ""
-	_last_blackbelt_shop_notice = ""
-	_last_blackbelt_team_warning = ""
-
-
-func _check_scavenger_targets(manager) -> void:
-	"""Check for Scavenger target items in shop."""
-	if not _has_property(manager, "current_shop_items"):
+func _evaluate_trainer_advice(run, manager) -> void:
+	"""Evaluate trainer advice using the advisor system."""
+	if _advisor == null or _advice_context_builder == null:
 		return
 	
-	var matches := []
-	var items: Array = manager.current_shop_items
+	# Create context from game state using cached builder
+	var context = _advice_context_builder.from_game_state(run, manager, _has_property, _formatter)
 	
-	for i in range(items.size()):
-		var item = items[i]
-		if item == null:
-			continue
+	# Evaluate all rules
+	var result: Dictionary = _advisor.evaluate(context)
+	var new_or_changed: Array = result.get("new_or_changed", [])
+	
+	# Emit new or changed advice
+	for advice in new_or_changed:
+		var severity: String = advice.get("severity", "NOTICE")
+		var message: String = advice.get("message", "")
+		var rule_id: String = advice.get("rule_id", "")
 		
-		# Check for Lamplet/Swoonet creatures
-		if item.has_method("get_gold_cost") and _has_property(item, "data"):
-			var data = item.data
-			if data != null and _has_property(data, "name_key"):
-				var name_key: String = str(data.name_key)
-				if name_key == "monster.name.lamplet":
-					matches.append("[%d] Lamplet" % i)
-				elif name_key == "monster.name.swoonet":
-					matches.append("[%d] Swoonet" % i)
-		
-		# Check for Basic Bait item
-		if _has_property(item, "id") and str(item.id) == "basic_bait":
-			matches.append("[%d] Basic Bait" % i)
+		if not message.is_empty():
+			# Format trainer-specific prefix based on rule_id
+			var prefix := ""
+			if rule_id.begins_with("scavenger"):
+				prefix = "Scavenger"
+			elif rule_id.begins_with("blackbelt") or rule_id.begins_with("beetdown"):
+				prefix = "Black Belt"
+			
+			var full_message := ""
+			if not prefix.is_empty():
+				full_message = "*** BRAINROT %s | %s | %s" % [severity, prefix, message]
+			else:
+				full_message = "*** BRAINROT %s | %s" % [severity, message]
+			
+			_print_notice(full_message)
 	
-	if not matches.is_empty():
-		var notice := "*** BRAINROT NOTICE | Scavenger | Shop targets: %s | Level-up/trinket opportunities" % ", ".join(matches)
-		if notice != _last_scavenger_notice:
-			_print_notice(notice)
-			_last_scavenger_notice = notice
-	else:
-		_last_scavenger_notice = ""
-
-
-func _check_blackbelt_beetbud(manager) -> void:
-	"""Check for Beetbud creatures in shop for Black Belt trainer."""
-	if not _has_property(manager, "current_shop_items"):
-		return
-	
-	var matches := []
-	var items: Array = manager.current_shop_items
-	
-	for i in range(items.size()):
-		var item = items[i]
-		if item == null:
-			continue
-		
-		# Check for Beetbud creatures
-		if item.has_method("get_gold_cost") and _has_property(item, "data"):
-			var data = item.data
-			if data != null and _has_property(data, "name_key"):
-				var name_key: String = str(data.name_key)
-				if name_key == "monster.name.beetbud":
-					matches.append("[%d]" % i)
-	
-	if not matches.is_empty():
-		var notice := "*** BRAINROT NOTICE | Black Belt | Beetbud available: shop %s" % ", ".join(matches)
-		if notice != _last_blackbelt_shop_notice:
-			_print_notice(notice)
-			_last_blackbelt_shop_notice = notice
-	else:
-		_last_blackbelt_shop_notice = ""
-
-
-func _evaluate_trainer_notices(run, manager) -> void:
-	"""Evaluate and emit trainer-specific notices."""
-	if not _has_property(run, "trainer_id"):
-		return
-	
-	var trainer_id: String = str(run.get("trainer_id"))
-	
-	if trainer_id == "scavenger":
-		_check_scavenger_targets(manager)
-	elif trainer_id == "black_belt" or trainer_id == "blackbelt":
-		_check_blackbelt_beetbud(manager)
-		_check_blackbelt_fighter_warning(run)
-	
-	# Diagnostic: Log unknown trainer IDs once
-	if trainer_id not in ["scavenger", "chemist", "black_belt", "blackbelt", "shopkeeper", ""]:
-		if _debug_logging and not _diagnostic_logged:
-			_log_message("[DIAGNOSTIC] Unknown trainer_id: %s" % trainer_id)
-			_diagnostic_logged = true
-
-
-func _check_blackbelt_fighter_warning(run) -> void:
-	"""Check Black Belt team for multiple Fighter types (diagnostic mode)."""
-	# Diagnostic mode: discover Fighter identifiers (once per shop entry)
+	# Diagnostic: Log Fighting type identifier once per shop entry
 	if _debug_logging and not _diagnostic_logged:
-		# Check team for Fighter types
-		if _has_property(run, "team"):
-			var team: Array = run.team
-			for i in range(team.size()):
-				var monster = team[i]
-				if monster != null and _has_property(monster, "data"):
-					var data = monster.data
-					if data != null and _has_property(data, "types"):
-						var types = data.types
-						if types is Array:
-							for type_resource in types:
-								var type_name: String = _formatter.resolve_type_name(type_resource)
-								if "fight" in type_name.to_lower():
-									_log_message("[DIAGNOSTIC] Fighter candidate type: %s (resolved from %s)" % [type_name, _formatter.get_object_info(type_resource)])
-		
-		_diagnostic_logged = true
+		if context.trainer_id == "black_belt" or context.trainer_id == "blackbelt":
+			for monster in context.team_monsters:
+				if "fighting" in monster.types:
+					_log_message("[DIAGNOSTIC] Fighting type detected in team slot %d: %s" % [monster.slot, monster.name_key])
+					_diagnostic_logged = true
+					break
 
 
 func _handle_shop_phase(state) -> void:
@@ -285,18 +270,28 @@ func _handle_shop_phase(state) -> void:
 	var team_changed := not _states_equal(team_state, _last_team_state)
 	var bench_changed := not _states_equal(bench_state, _last_bench_state)
 	
+	# Check for trainer/run identity changes (not just gold/shop offers)
+	var trainer_changed := false
+	if run_changed and _last_run_state.has("trainer_id") and run_state.has("trainer_id"):
+		trainer_changed = _last_run_state.get("trainer_id") != run_state.get("trainer_id")
+	
 	if phase_changed:
 		_battle_logged = false
 		_diagnostic_logged = false  # Reset for new shop entry
-		_reset_trainer_notice_signatures()  # Reset for new shop visit
+		if _advisor != null:
+			_advisor.reset_suppression()  # Reset for new shop visit
 		_log_phase_entry("SHOP", run, manager)
 		if _deep_inspection:
 			_log_lines(_formatter.format_deep_inspect_shop(manager, run))
 	elif run_changed or shop_changed or team_changed or bench_changed:
 		_log_lines(_formatter.format_shop_changes(run, manager, _last_run_state, _last_shop_state, _last_team_state, _last_bench_state, _debug_logging))
 	
-	# Evaluate trainer notices (after logging, before updating snapshots)
-	_evaluate_trainer_notices(run, manager)
+	# Reset suppression only on trainer identity changes (not gold/shop/freeze changes)
+	if trainer_changed and _advisor != null:
+		_advisor.reset_suppression()
+	
+	# Evaluate trainer advice (after logging, before updating snapshots)
+	_evaluate_trainer_advice(run, manager)
 	
 	_last_phase = "shop"
 	_last_run_state = run_state
@@ -369,13 +364,22 @@ func _capture_team_state(run) -> Dictionary:
 	var state := {}
 	if _has_property(run, "team"):
 		var team: Array = run.team
-		var team_ids := []
+		var team_fingerprint := []
 		for monster in team:
 			if monster != null:
-				team_ids.append(monster.get_instance_id())
+				var fp := {
+					"id": monster.get_instance_id(),
+					"level": monster.get("level") if _has_property(monster, "level") else 1
+				}
+				# Include species for detecting evolutions
+				if _has_property(monster, "data"):
+					var data = monster.data
+					if data != null and _has_property(data, "name_key"):
+						fp["species"] = str(data.name_key)
+				team_fingerprint.append(fp)
 			else:
-				team_ids.append(0)
-		state["monsters"] = team_ids
+				team_fingerprint.append(0)
+		state["monsters"] = team_fingerprint
 	return state
 
 

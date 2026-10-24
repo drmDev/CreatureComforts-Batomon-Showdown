@@ -39,6 +39,26 @@ func format_monster_name(monster) -> String:
 	return name_key.capitalize()
 
 
+func _format_species_name(species_key: String) -> String:
+	"""Format a species name from captured name_key string."""
+	if species_key.is_empty():
+		return "Unknown"
+	
+	# Try TranslationServer if available
+	if TranslationServer.has_method("translate"):
+		var translated := TranslationServer.translate(species_key)
+		if translated != species_key:
+			return translated
+	
+	# Fallback: capitalize the name_key
+	# "monster.name.lamplet" -> "Lamplet"
+	var name_key := species_key
+	if "." in name_key:
+		name_key = name_key.split(".")[-1]
+	
+	return name_key.capitalize()
+
+
 func format_monster_compact(monster) -> String:
 	var parts := []
 	
@@ -426,7 +446,7 @@ func detect_shop_changes(manager, old_state: Dictionary) -> Array:
 		var old_fingerprint: Array = old_state.get("fingerprint", [])
 		
 		# Compare fingerprints - check through larger array
-		var max_size := max(new_fingerprint.size(), old_fingerprint.size())
+		var max_size: int = max(new_fingerprint.size(), old_fingerprint.size())
 		for i in range(max_size):
 			var new_slot: Dictionary = new_fingerprint[i] if i < new_fingerprint.size() else {}
 			var old_slot: Dictionary = old_fingerprint[i] if i < old_fingerprint.size() else {}
@@ -458,14 +478,21 @@ func detect_team_changes(run, old_state: Dictionary) -> Array:
 	
 	# Team is stored bottom-right to top-left, reverse for visual order
 	# Check through larger array to detect additions/removals
-	var max_size := max(team.size(), old_monsters.size())
+	var max_size: int = max(team.size(), old_monsters.size())
 	for i in range(max_size):
 		var visual_slot := team.size() - 1 - i if i < team.size() else old_monsters.size() - 1 - i
 		var new_id = team[i].get_instance_id() if i < team.size() and team[i] != null else 0
-		var old_id = old_monsters[i] if i < old_monsters.size() else 0
+		
+		# old_monsters contains dictionaries with {id, level, species}, not integers
+		var old_fp = old_monsters[i] if i < old_monsters.size() else 0
+		var old_id = old_fp.get("id", 0) if old_fp is Dictionary else 0
 		
 		if new_id != old_id:
-			var old_name := get_monster_name(old_monsters[i]) if i < old_monsters.size() and old_monsters[i] != 0 else "Empty"
+			# Extract old name from captured species, not from object
+			var old_name := "Empty"
+			if old_fp is Dictionary and old_fp.has("species"):
+				old_name = _format_species_name(old_fp.get("species", ""))
+			
 			var new_name := get_monster_name(team[i]) if i < team.size() and team[i] != null else "Empty"
 			if old_name != new_name:
 				changes.append("Team[%d]: %s -> %s" % [visual_slot, old_name, new_name])
@@ -484,7 +511,7 @@ func detect_bench_changes(run, old_state: Dictionary) -> Array:
 	
 	# Bench is also stored bottom-right to top-left
 	# Check through larger array to detect additions/removals
-	var max_size := max(bench.size(), old_monsters.size())
+	var max_size: int = max(bench.size(), old_monsters.size())
 	for i in range(max_size):
 		var visual_slot := bench.size() - 1 - i if i < bench.size() else old_monsters.size() - 1 - i
 		var new_id = bench[i].get_instance_id() if i < bench.size() and bench[i] != null else 0
