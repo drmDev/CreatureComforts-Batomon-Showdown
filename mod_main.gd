@@ -12,10 +12,7 @@ const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 const POLL_INTERVAL_MS := 500
 var _next_poll := 0
 var _last_phase := ""
-var _last_run_state := {}
-var _last_shop_state := {}
-var _last_team_state := {}
-var _last_bench_state := {}
+var _last_snapshot = null  # ShopSnapshot from previous poll
 var _battle_logged := false
 var _initialization_started := false
 var _initialized := false
@@ -35,6 +32,11 @@ var _formatter = null
 var _advisor = null
 var _advice_context_script = null
 var _advice_context_builder = null
+
+# Snapshot system
+var _snapshot_script = null
+var _snapshot_builder = null
+var _changes_comparer = null
 
 
 func _init() -> void:
@@ -92,6 +94,15 @@ func _initialize_mod() -> void:
 	# Create formatter
 	var LogFormatter = load("res://mods/NP_Brainrot/log_formatter.gd")
 	_formatter = LogFormatter.new(_has_property)
+	
+	# Create snapshot builder
+	var ShopSnapshot = load("res://mods/NP_Brainrot/shop_snapshot.gd")
+	_snapshot_script = ShopSnapshot
+	_snapshot_builder = ShopSnapshot.new()
+	
+	# Create changes comparer
+	var ShopChanges = load("res://mods/NP_Brainrot/shop_changes.gd")
+	_changes_comparer = ShopChanges.new()
 	
 	# Create advisor and register rules
 	_setup_advisor()
@@ -205,13 +216,13 @@ func _inspect_current_phase() -> void:
 				_advisor.reset_suppression()
 
 
-func _evaluate_trainer_advice(run, manager) -> void:
+func _evaluate_trainer_advice(snapshot) -> void:
 	"""Evaluate trainer advice using the advisor system."""
 	if _advisor == null or _advice_context_builder == null:
 		return
 	
-	# Create context from game state using cached builder
-	var context = _advice_context_builder.from_game_state(run, manager, _has_property, _formatter)
+	# Create context from snapshot using cached builder
+	var context = _advice_context_builder.from_snapshot(snapshot)
 	
 	# Evaluate all rules
 	var result: Dictionary = _advisor.evaluate(context)
@@ -257,23 +268,16 @@ func _handle_shop_phase(state) -> void:
 	if run == null or manager == null:
 		return
 	
-	# Build current state snapshots
-	var run_state := _capture_run_state(run)
-	var shop_state := _capture_shop_state(manager)
-	var team_state := _capture_team_state(run)
-	var bench_state := _capture_bench_state(run)
+	# Capture current snapshot once per poll
+	var current_snapshot = _snapshot_builder.capture(run, manager, _has_property, _formatter.resolve_type_name)
 	
 	# Detect changes
 	var phase_changed := _last_phase != "shop"
-	var run_changed := not _states_equal(run_state, _last_run_state)
-	var shop_changed := not _states_equal(shop_state, _last_shop_state)
-	var team_changed := not _states_equal(team_state, _last_team_state)
-	var bench_changed := not _states_equal(bench_state, _last_bench_state)
 	
-	# Check for trainer/run identity changes (not just gold/shop offers)
+	# Check for trainer identity changes (not just gold/shop offers)
 	var trainer_changed := false
-	if run_changed and _last_run_state.has("trainer_id") and run_state.has("trainer_id"):
-		trainer_changed = _last_run_state.get("trainer_id") != run_state.get("trainer_id")
+	if _last_snapshot != null:
+		trainer_changed = _last_snapshot.trainer_id != current_snapshot.trainer_id
 	
 	if phase_changed:
 		_battle_logged = false
@@ -283,21 +287,21 @@ func _handle_shop_phase(state) -> void:
 		_log_phase_entry("SHOP", run, manager)
 		if _deep_inspection:
 			_log_lines(_formatter.format_deep_inspect_shop(manager, run))
-	elif run_changed or shop_changed or team_changed or bench_changed:
-		_log_lines(_formatter.format_shop_changes(run, manager, _last_run_state, _last_shop_state, _last_team_state, _last_bench_state, _debug_logging))
+	elif _last_snapshot != null:
+		# Compare snapshots and log changes
+		var comparison = _changes_comparer.compare(_last_snapshot, current_snapshot)
+		if comparison.has_changes():
+			_log_lines(_formatter.format_snapshot_changes(comparison, run, manager, _debug_logging))
 	
 	# Reset suppression only on trainer identity changes (not gold/shop/freeze changes)
 	if trainer_changed and _advisor != null:
 		_advisor.reset_suppression()
 	
-	# Evaluate trainer advice (after logging, before updating snapshots)
-	_evaluate_trainer_advice(run, manager)
+	# Evaluate trainer advice (after logging, before updating snapshot)
+	_evaluate_trainer_advice(current_snapshot)
 	
 	_last_phase = "shop"
-	_last_run_state = run_state
-	_last_shop_state = shop_state
-	_last_team_state = team_state
-	_last_bench_state = bench_state
+	_last_snapshot = current_snapshot
 
 
 func _handle_battle_phase(state) -> void:
@@ -339,73 +343,125 @@ func _log_lines(lines: Array) -> void:
 		_log_message(line)
 
 
-# State capture functions
+# Snapshot comparison and conversion functions
 
-func _capture_run_state(run) -> Dictionary:
-	var state := {}
-	var props := ["trainer_id", "current_round", "current_wins", "lives", "gold", "shop_rank", "player_hp"]
-	for prop in props:
-		if _has_property(run, prop):
-			state[prop] = run.get(prop)
-	return state
-
-
-func _capture_shop_state(manager) -> Dictionary:
-	var state := {}
-	if _has_property(manager, "current_shop_items"):
-		var items: Array = manager.current_shop_items
-		state["fingerprint"] = _formatter.create_shop_fingerprint(items)
-	if _has_property(manager, "is_shop_frozen"):
-		state["frozen"] = manager.is_shop_frozen
-	return state
-
-
-func _capture_team_state(run) -> Dictionary:
-	var state := {}
-	if _has_property(run, "team"):
-		var team: Array = run.team
-		var team_fingerprint := []
-		for monster in team:
-			if monster != null:
-				var fp := {
-					"id": monster.get_instance_id(),
-					"level": monster.get("level") if _has_property(monster, "level") else 1
-				}
-				# Include species for detecting evolutions
-				if _has_property(monster, "data"):
-					var data = monster.data
-					if data != null and _has_property(data, "name_key"):
-						fp["species"] = str(data.name_key)
-				team_fingerprint.append(fp)
-			else:
-				team_fingerprint.append(0)
-		state["monsters"] = team_fingerprint
-	return state
-
-
-func _capture_bench_state(run) -> Dictionary:
-	var state := {}
-	if _has_property(run, "bench"):
-		var bench: Array = run.bench
-		var bench_ids := []
-		for monster in bench:
-			if monster != null:
-				bench_ids.append(monster.get_instance_id())
-			else:
-				bench_ids.append(0)
-		state["monsters"] = bench_ids
-	return state
-
-
-func _states_equal(a: Dictionary, b: Dictionary) -> bool:
-	if a.size() != b.size():
+func _snapshots_equal(a, b) -> bool:
+	"""Compare two snapshots for equality."""
+	if a == null or b == null:
 		return false
-	for key in a:
-		if not b.has(key):
+	
+	# Compare run state
+	if a.trainer_id != b.trainer_id or a.day != b.day or a.shop_rank != b.shop_rank:
+		return false
+	if a.lives != b.lives or a.player_hp != b.player_hp or a.gold != b.gold or a.wins != b.wins:
+		return false
+	
+	# Compare shop state
+	if a.shop_frozen != b.shop_frozen:
+		return false
+	if a.shop_offers.size() != b.shop_offers.size():
+		return false
+	for i in range(a.shop_offers.size()):
+		if not _shop_offers_equal(a.shop_offers[i], b.shop_offers[i]):
 			return false
-		if a[key] != b[key]:
+	
+	# Compare team state
+	if a.team_monsters.size() != b.team_monsters.size():
+		return false
+	for i in range(a.team_monsters.size()):
+		if not _monsters_equal(a.team_monsters[i], b.team_monsters[i]):
 			return false
+	
+	# Compare bench state
+	if a.bench_monsters.size() != b.bench_monsters.size():
+		return false
+	for i in range(a.bench_monsters.size()):
+		if not _monsters_equal(a.bench_monsters[i], b.bench_monsters[i]):
+			return false
+	
 	return true
+
+
+func _shop_offers_equal(a, b) -> bool:
+	"""Compare two shop offers for equality."""
+	if a == null and b == null:
+		return true
+	if a == null or b == null:
+		return false
+	return a.type == b.type and a.species_key == b.species_key and a.item_id == b.item_id and a.level == b.level and a.is_shiny == b.is_shiny
+
+
+func _monsters_equal(a, b) -> bool:
+	"""Compare two monsters for equality."""
+	if a == null and b == null:
+		return true
+	if a == null or b == null:
+		return false
+	return a.instance_id == b.instance_id and a.species_key == b.species_key and a.level == b.level
+
+
+func _snapshot_to_run_state(snapshot) -> Dictionary:
+	"""Convert snapshot to legacy run state format for formatter."""
+	return {
+		"trainer_id": snapshot.trainer_id,
+		"current_round": snapshot.day,
+		"current_wins": snapshot.wins,
+		"lives": snapshot.lives,
+		"gold": snapshot.gold,
+		"shop_rank": snapshot.shop_rank,
+		"player_hp": snapshot.player_hp
+	}
+
+
+func _snapshot_to_shop_state(snapshot) -> Dictionary:
+	"""Convert snapshot to legacy shop state format for formatter."""
+	var fingerprint := []
+	for offer in snapshot.shop_offers:
+		var slot_data := {"slot": offer.slot}
+		if offer.is_empty():
+			slot_data["type"] = "empty"
+		elif offer.is_monster():
+			slot_data["type"] = "creature"
+			slot_data["id"] = offer.species_key
+			slot_data["level"] = offer.level
+			slot_data["shiny"] = offer.is_shiny
+		elif offer.is_item():
+			slot_data["type"] = "item"
+			slot_data["id"] = offer.item_id
+		else:
+			slot_data["type"] = "unknown"
+		fingerprint.append(slot_data)
+	
+	return {
+		"fingerprint": fingerprint,
+		"frozen": snapshot.shop_frozen
+	}
+
+
+func _snapshot_to_team_state(snapshot) -> Dictionary:
+	"""Convert snapshot to legacy team state format for formatter."""
+	var team_fingerprint := []
+	for monster in snapshot.team_monsters:
+		if monster == null:
+			team_fingerprint.append(0)
+		else:
+			team_fingerprint.append({
+				"id": monster.instance_id,
+				"level": monster.level,
+				"species": monster.species_key
+			})
+	return {"monsters": team_fingerprint}
+
+
+func _snapshot_to_bench_state(snapshot) -> Dictionary:
+	"""Convert snapshot to legacy bench state format for formatter."""
+	var bench_ids := []
+	for monster in snapshot.bench_monsters:
+		if monster == null:
+			bench_ids.append(0)
+		else:
+			bench_ids.append(monster.instance_id)
+	return {"monsters": bench_ids}
 
 
 # Utility functions

@@ -1,6 +1,7 @@
 extends RefCounted
 ## AdviceContext - Safe game data extraction into plain-value records
 ## Provides stable data snapshots for rule evaluation without retaining live game objects.
+## Now consumes ShopSnapshot instead of reading game objects directly.
 
 class_name AdviceContext
 
@@ -41,7 +42,50 @@ var team_monsters: Array = []
 # bench_monsters removed - no rules currently use bench data
 
 
-## Create context from game objects
+## Create context from ShopSnapshot
+func from_snapshot(snapshot) -> AdviceContext:
+	var context = get_script().new()
+	
+	# Extract trainer ID and day from snapshot
+	context.trainer_id = snapshot.trainer_id
+	context.day = snapshot.day
+	
+	# Convert shop offers to ShopItem format
+	for offer in snapshot.shop_offers:
+		if offer.is_empty():
+			continue
+		
+		var name_key := ""
+		var item_id := ""
+		var is_monster := false
+		
+		if offer.is_monster():
+			name_key = offer.species_key
+			is_monster = true
+		elif offer.is_item():
+			item_id = offer.item_id
+		
+		if not name_key.is_empty() or not item_id.is_empty():
+			context.shop_items.append(ShopItem.new(offer.slot, name_key, item_id, is_monster))
+	
+	# Convert team monsters to Monster format
+	for i in range(snapshot.team_monsters.size()):
+		var monster_data = snapshot.team_monsters[i]
+		if monster_data == null:
+			continue
+		
+		context.team_monsters.append(Monster.new(
+			monster_data.slot,
+			monster_data.species_key,
+			monster_data.level,
+			monster_data.types
+		))
+	
+	return context
+
+
+## DEPRECATED: Legacy method for backward compatibility during migration
+## Use from_snapshot() instead
 func from_game_state(run, manager, has_property_func: Callable, formatter):
 	var context = get_script().new()
 	
@@ -91,12 +135,10 @@ func from_game_state(run, manager, has_property_func: Callable, formatter):
 			if monster_data != null:
 				context.team_monsters.append(monster_data)
 	
-	# Bench extraction removed - no rules currently use bench data
-	
 	return context
 
 
-## Extract monster data into plain values
+## DEPRECATED: Legacy helper for backward compatibility
 func _extract_monster_data(monster, slot: int, has_property_func: Callable, formatter):
 	if not has_property_func.call(monster, "data"):
 		return null

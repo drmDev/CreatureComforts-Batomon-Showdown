@@ -376,6 +376,82 @@ func format_deep_inspect_battle(state, player, opponent) -> Array[String]:
 	return lines
 
 
+func format_snapshot_changes(comparison, run, manager, debug_logging: bool) -> Array[String]:
+	"""Format changes from ShopChanges comparison result."""
+	var lines := []
+	var timestamp := "[%s] " % get_time_short() if debug_logging else ""
+	
+	if not comparison.has_changes():
+		return lines
+	
+	# Log event type and changes
+	lines.append("\n%s%s" % [timestamp, comparison.event_type])
+	
+	# Format each change
+	for change in comparison.changes:
+		var change_text := ""
+		if change.area == "run":
+			# Run changes: "Gold: 10 -> 5"
+			change_text = "%s: %s -> %s" % [change.label, change.before, change.after]
+		elif change.area == "shop":
+			if change.property == "frozen":
+				# Freeze change: "Shop Locked" or "Shop Unlocked"
+				change_text = change.label
+			else:
+				# Slot change: "Slot 0: Lamplet -> Empty"
+				var old_desc := _describe_snapshot_offer(change.before)
+				var new_desc := _describe_snapshot_offer(change.after)
+				change_text = "%s: %s -> %s" % [change.label, old_desc, new_desc]
+		elif change.area == "team" or change.area == "bench":
+			# Team/bench change: "Team[2]: Lamplet Lv2 -> Swoonet"
+			var old_desc := _describe_snapshot_monster(change.before)
+			var new_desc := _describe_snapshot_monster(change.after)
+			change_text = "%s: %s -> %s" % [change.label, old_desc, new_desc]
+		
+		if not change_text.is_empty():
+			lines.append("  %s" % change_text)
+	
+	# If shop changed, log current offers
+	var shop_changes: Array = comparison.get_shop_changes()
+	if not shop_changes.is_empty():
+		lines.append("")
+		lines.append_array(format_shop_offers(manager, run, true))
+	
+	return lines
+
+
+func _describe_snapshot_offer(offer) -> String:
+	"""Describe a shop offer from snapshot for display."""
+	if offer == null or offer.is_empty():
+		return "Empty"
+	
+	if offer.is_monster():
+		var name := _format_species_name(offer.species_key)
+		if offer.level > 1:
+			name += " Lv%d" % offer.level
+		if offer.is_shiny:
+			name += " Shiny"
+		return name
+	elif offer.is_item():
+		return "%s (Item)" % offer.item_id
+	
+	return "Unknown"
+
+
+func _describe_snapshot_monster(monster) -> String:
+	"""Describe a monster from snapshot for display."""
+	if monster == null:
+		return "Empty"
+	
+	var name := _format_species_name(monster.species_key)
+	if monster.level > 1:
+		name += " Lv%d" % monster.level
+	
+	return name
+
+
+## DEPRECATED: Legacy method for backward compatibility
+## Use format_snapshot_changes() instead
 func format_shop_changes(run, manager, old_run: Dictionary, old_shop: Dictionary, old_team: Dictionary, old_bench: Dictionary, debug_logging: bool) -> Array[String]:
 	var lines := []
 	var changes := []
