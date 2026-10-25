@@ -42,6 +42,8 @@ var _changes_comparer = null
 # Reminder label system (compact top-bar)
 var _reminder_label = null
 var _reminder_layer: CanvasLayer = null
+var _pika_player: AudioStreamPlayer = null
+var _last_reminder_text := ""  # Track last displayed text to detect new reminders
 
 
 func _init() -> void:
@@ -117,8 +119,11 @@ func _initialize_mod() -> void:
 	# Create advisor and register rules
 	_setup_advisor()
 	
-	# Create reminder panel system
+	# Create reminder label system
 	_setup_reminder_panel()
+	
+	# Setup notification sound
+	_setup_pika_sound()
 	
 	# Create output directory
 	var dir_path := ProjectSettings.globalize_path(OUTPUT_DIR)
@@ -285,6 +290,26 @@ func _setup_reminder_panel() -> void:
 	_reminder_layer.add_child(_reminder_label)
 
 
+func _setup_pika_sound() -> void:
+	"""Initialize notification sound for new reminders."""
+	var base_dir := str(get_script().resource_path).get_base_dir()
+	var path := base_dir.path_join("assets/sounds/pika.ogg")
+	
+	_pika_player = AudioStreamPlayer.new()
+	_pika_player.stream = AudioStreamOggVorbis.load_from_file(path)
+	_pika_player.volume_db = -6.0
+	add_child(_pika_player)
+	
+	if _pika_player.stream == null:
+		push_warning("Brainrot Edition: Failed to load notification sound: " + path)
+
+
+func _play_pika() -> void:
+	"""Play notification sound for new reminders."""
+	if _pika_player != null and _pika_player.stream != null:
+		_pika_player.play()
+
+
 func _process(_delta: float) -> void:
 	if not _initialized:
 		return
@@ -312,6 +337,7 @@ func _inspect_current_phase() -> void:
 				_advisor.reset_suppression()
 			if _reminder_label != null:
 				_reminder_label.hide_all_reminders()
+				_last_reminder_text = ""  # Reset sound trigger
 
 
 func _evaluate_trainer_advice(snapshot) -> void:
@@ -364,7 +390,7 @@ func _evaluate_trainer_advice(snapshot) -> void:
 			if not simplified_message.is_empty():
 				_reminder_label.show_reminder(rule_id, simplified_message)
 	
-	# Hide reminders for inactive rules
+	# Hide reminders for inactive rules and check for new reminders
 	if _reminder_label != null:
 		var active_rule_ids: Array = []
 		for advice in result.get("all_active", []):
@@ -373,6 +399,15 @@ func _evaluate_trainer_advice(snapshot) -> void:
 			if rule_id.ends_with("_day6") or rule_id.ends_with("_day8") or rule_id.ends_with("_day3") or rule_id.contains("_day") or rule_id.ends_with("_targets") or rule_id == "blackbelt_beetbud" or rule_id == "beetdown_company":
 				active_rule_ids.append(rule_id)
 		_reminder_label.hide_inactive_reminders(active_rule_ids)
+		
+		# Play notification sound if reminder text changed (new reminder appeared)
+		if _enable_trainer_reminders and _reminder_label.visible:
+			var current_text: String = _reminder_label.get_current_text()
+			if not current_text.is_empty() and current_text != _last_reminder_text:
+				_play_pika()
+				_last_reminder_text = current_text
+		elif not _reminder_label.visible:
+			_last_reminder_text = ""  # Reset when no reminders active
 	
 	# Diagnostic: Log Fighting type identifier once per shop entry
 	if _debug_logging and not _diagnostic_logged:
