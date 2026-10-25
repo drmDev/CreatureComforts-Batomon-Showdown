@@ -20,6 +20,7 @@ var _initialized := false
 # Settings (defaults match mod.json)
 var _debug_logging := true
 var _deep_inspection := true
+var _enable_trainer_reminders := true
 var _settings_load_attempted := false
 var _settings_warning_shown := false
 var _diagnostic_logged := false
@@ -37,6 +38,10 @@ var _advice_context_builder = null
 var _snapshot_script = null
 var _snapshot_builder = null
 var _changes_comparer = null
+
+# Reminder panel system
+var _reminder_panel = null
+var _reminder_layer: CanvasLayer = null
 
 
 func _init() -> void:
@@ -77,6 +82,7 @@ func _load_settings() -> void:
 	if mod_loader.has_method("get_config"):
 		_debug_logging = mod_loader.get_config("np_brainrot", "debug_logging", true)
 		_deep_inspection = mod_loader.get_config("np_brainrot", "deep_inspection", true)
+		_enable_trainer_reminders = mod_loader.get_config("np_brainrot", "enable_trainer_reminders", true)
 		
 		# Connect to config_changed signal for live updates
 		if mod_loader.has_signal("config_changed") and not mod_loader.is_connected("config_changed", _on_config_changed):
@@ -111,6 +117,9 @@ func _initialize_mod() -> void:
 	# Create advisor and register rules
 	_setup_advisor()
 	
+	# Create reminder panel system
+	_setup_reminder_panel()
+	
 	# Create output directory
 	var dir_path := ProjectSettings.globalize_path(OUTPUT_DIR)
 	var dir_result := DirAccess.make_dir_recursive_absolute(dir_path)
@@ -134,7 +143,7 @@ func _initialize_mod() -> void:
 	_log_message("=".repeat(80))
 	_log_message("Brainrot Edition %s - Refactored Trainer Advice System" % VERSION)
 	_log_message("Initialized at %s" % _formatter.get_timestamp())
-	_log_message("Settings: Debug Logging: %s | Deep Inspection: %s" % [_debug_logging, _deep_inspection])
+	_log_message("Settings: Debug Logging: %s | Deep Inspection: %s | Trainer Reminders: %s" % [_debug_logging, _deep_inspection, _enable_trainer_reminders])
 	_log_message("Log file: %s" % abs_log_path)
 	_log_message("=".repeat(80))
 	
@@ -155,6 +164,12 @@ func _on_config_changed(mod_id: String, key: String, value) -> void:
 			if value is bool:
 				_deep_inspection = value
 				_log_message("Setting changed: Deep Inspection = %s" % _deep_inspection)
+		"enable_trainer_reminders":
+			if value is bool:
+				_enable_trainer_reminders = value
+				_log_message("Setting changed: Trainer Reminders = %s" % _enable_trainer_reminders)
+				if not _enable_trainer_reminders and _reminder_panel != null:
+					_reminder_panel.hide_all_reminders()
 
 
 func _setup_advisor() -> void:
@@ -201,15 +216,29 @@ func _setup_advisor() -> void:
 	)
 	_advisor.register_rule(beetdown_company_rule)
 	
-	# *** TEMPORARY TEST: Day 6 reminder (no trainer filter) ***
-	var day6_test_rule = TrainerRules.DayReminderRule.new(
-		"day6_test",
-		"",  # No trainer filter - matches any trainer
+	# Mad Scientist Day 6 reminder
+	var mad_scientist_day6_rule = TrainerRules.DayReminderRule.new(
+		"mad_scientist_day6",
+		"mad_scientist",
 		6,
-		"NOTICE",
-		"*** BRAINROT TEST | DayReminderRule matched Day 6"
+		"WARNING",
+		"🧪 MAD SCIENTIST: Your active team transforms into random Legendaries on Day 7!"
 	)
-	_advisor.register_rule(day6_test_rule)
+	_advisor.register_rule(mad_scientist_day6_rule)
+
+
+func _setup_reminder_panel() -> void:
+	"""Initialize reminder panel UI layer."""
+	var ReminderPanel = load("res://mods/NP_Brainrot/reminder_panel.gd")
+	
+	_reminder_layer = CanvasLayer.new()
+	_reminder_layer.layer = 100  # Above game UI but below debug overlays
+	_reminder_layer.name = "NP_Brainrot_Reminders"
+	add_child(_reminder_layer)
+	
+	_reminder_panel = ReminderPanel.new()
+	_reminder_panel.name = "ReminderPanel"
+	_reminder_layer.add_child(_reminder_panel)
 
 
 func _process(_delta: float) -> void:
@@ -237,6 +266,8 @@ func _inspect_current_phase() -> void:
 			_battle_logged = false
 			if _advisor != null:
 				_advisor.reset_suppression()
+			if _reminder_panel != null:
+				_reminder_panel.hide_all_reminders()
 
 
 func _evaluate_trainer_advice(snapshot) -> void:
@@ -264,6 +295,8 @@ func _evaluate_trainer_advice(snapshot) -> void:
 				prefix = "Scavenger"
 			elif rule_id.begins_with("blackbelt") or rule_id.begins_with("beetdown"):
 				prefix = "Black Belt"
+			elif rule_id.begins_with("mad_scientist"):
+				prefix = "Mad Scientist"
 			
 			var full_message := ""
 			if not prefix.is_empty():
@@ -272,6 +305,25 @@ func _evaluate_trainer_advice(snapshot) -> void:
 				full_message = "*** BRAINROT %s | %s" % [severity, message]
 			
 			_print_notice(full_message)
+		
+		# Handle reminder panel display for day reminder rules and shop target rules
+		if _enable_trainer_reminders and _reminder_panel != null:
+			# Day reminders (Mad Scientist, etc.)
+			if rule_id.ends_with("_day6") or rule_id.contains("_day"):
+				_reminder_panel.show_reminder(rule_id, message)
+			# Shop target rules (Scavenger, Black Belt Beetbud)
+			elif rule_id.ends_with("_targets") or rule_id == "blackbelt_beetbud":
+				_reminder_panel.show_reminder(rule_id, message)
+	
+	# Hide reminders for inactive rules
+	if _reminder_panel != null:
+		var active_rule_ids: Array = []
+		for advice in result.get("all_active", []):
+			var rule_id: String = advice.get("rule_id", "")
+			# Include day reminders and shop target rules
+			if rule_id.ends_with("_day6") or rule_id.contains("_day") or rule_id.ends_with("_targets") or rule_id == "blackbelt_beetbud":
+				active_rule_ids.append(rule_id)
+		_reminder_panel.hide_inactive_reminders(active_rule_ids)
 	
 	# Diagnostic: Log Fighting type identifier once per shop entry
 	if _debug_logging and not _diagnostic_logged:
@@ -345,6 +397,10 @@ func _handle_battle_phase(state) -> void:
 			_log_lines(_formatter.format_deep_inspect_battle(state, player, opponent))
 		
 		_battle_logged = true
+	
+	# Hide reminders during battle
+	if _reminder_panel != null:
+		_reminder_panel.hide_all_reminders()
 	
 	_last_phase = "battle"
 
