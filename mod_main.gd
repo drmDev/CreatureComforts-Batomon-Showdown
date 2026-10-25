@@ -2,7 +2,7 @@ extends Node
 ## Brainrot Edition - Phase 2.3: Refactored Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.2.3"
+const VERSION := "0.9001"
 const OUTPUT_DIR := "user://np_brainrot"
 const LOG_FILE := "inspect.log"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
@@ -64,6 +64,9 @@ var _reminder_label = null
 var _reminder_layer: CanvasLayer = null
 var _pika_player: AudioStreamPlayer = null
 var _last_reminder_text := ""  # Track last displayed text to detect new reminders
+
+# Trinket panel system
+var _trinket_panel = null
 
 
 func _init() -> void:
@@ -282,6 +285,7 @@ func _register_shop_target_rule(trainer_id: String) -> void:
 func _setup_reminder_panel() -> void:
 	"""Initialize reminder label UI layer."""
 	var ReminderLabel = load("res://mods/NP_Brainrot/reminder_label.gd")
+	var TrinketPanel = load("res://mods/NP_Brainrot/trinket_panel.gd")
 	
 	_reminder_layer = CanvasLayer.new()
 	_reminder_layer.layer = 100  # Above game UI but below debug overlays
@@ -291,6 +295,10 @@ func _setup_reminder_panel() -> void:
 	_reminder_label = ReminderLabel.new()
 	_reminder_label.name = "ReminderLabel"
 	_reminder_layer.add_child(_reminder_label)
+	
+	_trinket_panel = TrinketPanel.new()
+	_trinket_panel.name = "TrinketPanel"
+	_reminder_layer.add_child(_trinket_panel)
 
 
 func _setup_pika_sound() -> void:
@@ -341,6 +349,8 @@ func _inspect_current_phase() -> void:
 			if _reminder_label != null:
 				_reminder_label.hide_all_reminders()
 				_last_reminder_text = ""  # Reset sound trigger
+			if _trinket_panel != null:
+				_trinket_panel.visible = false
 
 
 func _evaluate_trainer_advice(snapshot) -> void:
@@ -495,6 +505,9 @@ func _handle_shop_phase(state) -> void:
 	# Evaluate trainer advice (after logging, before updating snapshot)
 	_evaluate_trainer_advice(current_snapshot)
 	
+	# Update trinket panel with current trinkets
+	_update_trinket_panel(run)
+	
 	_last_phase = "shop"
 	_last_snapshot = current_snapshot
 
@@ -518,11 +531,32 @@ func _handle_battle_phase(state) -> void:
 		
 		_battle_logged = true
 	
-	# Hide reminders during battle
+	# Hide reminders and trinket panel during battle
 	if _reminder_label != null:
 		_reminder_label.hide_all_reminders()
+	if _trinket_panel != null:
+		_trinket_panel.visible = false
 	
 	_last_phase = "battle"
+
+
+func _update_trinket_panel(run) -> void:
+	"""Update trinket panel with current owned trinkets."""
+	if _trinket_panel == null:
+		return
+	
+	# Get trinket_ids from run object
+	if not _has_property(run, "trinket_ids"):
+		_trinket_panel.visible = false
+		return
+	
+	var trinket_ids = run.get("trinket_ids")
+	if trinket_ids == null or not trinket_ids is Array:
+		_trinket_panel.visible = false
+		return
+	
+	# Update panel with trinket array
+	_trinket_panel.set_trinkets(trinket_ids)
 
 
 func _log_phase_entry(phase: String, run, manager = null) -> void:

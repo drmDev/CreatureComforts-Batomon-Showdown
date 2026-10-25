@@ -1,9 +1,9 @@
 {
 	"id": "np_brainrot",
 	"name": "Brainrot Edition",
-	"version": "0.2.3",
+	"version": "0.9001",
 	"author": "NescapePlan",
-	"description": "Game object inspector for Batomon Showdown - Phase 2.3: Trainer Reminders and Advice",
+	"description": "QoL and Fun",
 	"settings": [
 		{
 			"key": "debug_logging",

@@ -327,6 +327,9 @@ func format_deep_inspect_shop(manager, run) -> Array[String]:
 			if item != null:
 				lines.append("  [%d] %s" % [i, inspect_shop_item_deep(item)])
 	
+	# Trinket discovery
+	lines.append_array(_discover_trinkets(run, manager))
+	
 	return lines
 
 
@@ -414,5 +417,340 @@ func _describe_snapshot_monster(monster) -> String:
 		name += " Lv%d" % monster.level
 	
 	return name
+
+
+# --- Trinket Discovery (Diagnostic) ---
+
+func _discover_trinkets(run, manager) -> Array[String]:
+	"""Discover owned trinket collection through bounded property inspection."""
+	var lines := []
+	lines.append("\n--- OWNED TRINKETS DISCOVERY ---")
+	
+	# Try run object first
+	var result := _inspect_for_trinkets(run, "run")
+	if result.found:
+		lines.append_array(result.lines)
+		return lines
+	
+	# Fallback to manager object
+	result = _inspect_for_trinkets(manager, "manager")
+	if result.found:
+		lines.append_array(result.lines)
+		return lines
+	
+	# Report inconclusive
+	lines.append("\nStatus: No trinket collection found in run or manager objects")
+	if result.has("inspected_properties"):
+		lines.append("Inspected properties: %s" % ", ".join(result.inspected_properties))
+	
+	return lines
+
+
+func _inspect_for_trinkets(obj, obj_name: String) -> Dictionary:
+	"""Inspect an object for trinket/inventory collections."""
+	var result := {"found": false, "lines": [], "inspected_properties": []}
+	var lines := []
+	
+	if obj == null or not is_instance_valid(obj):
+		return result
+	
+	# Get property list
+	var props: Array = obj.get_property_list()
+	var candidates: Array = []
+	
+	# First pass: identify Array/Dictionary properties
+	lines.append("\n%s properties:" % obj_name.capitalize())
+	for prop in props:
+		var prop_name: String = str(prop.name)
+		var prop_type: int = int(prop.type)
+		
+		# Skip internal properties
+		if prop_name.begins_with("_"):
+			continue
+		
+		# Log property with type
+		var type_name := _type_to_string(prop_type)
+		
+		# Check if it's a candidate (Array or Dictionary with suggestive name)
+		if prop_type == TYPE_ARRAY or prop_type == TYPE_DICTIONARY:
+			var is_candidate := _is_trinket_candidate(prop_name)
+			if is_candidate:
+				candidates.append(prop_name)
+				lines.append("  %s: %s [CANDIDATE]" % [prop_name, type_name])
+			else:
+				# Still log it but check size
+				if _has_prop.call(obj, prop_name):
+					var value = obj.get(prop_name)
+					if value is Array:
+						lines.append("  %s: %s (size: %d)" % [prop_name, type_name, value.size()])
+					elif value is Dictionary:
+						lines.append("  %s: %s (keys: %d)" % [prop_name, type_name, value.size()])
+					else:
+						lines.append("  %s: %s" % [prop_name, type_name])
+		else:
+			# Log other properties briefly
+			if prop_type in [TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_BOOL]:
+				if _has_prop.call(obj, prop_name):
+					var value = obj.get(prop_name)
+					lines.append("  %s: %s = %s" % [prop_name, type_name, str(value)])
+	
+	# Second pass: inspect candidates
+	for candidate_name in candidates:
+		result.inspected_properties.append(candidate_name)
+		
+		if not _has_prop.call(obj, candidate_name):
+			continue
+		
+		var collection = obj.get(candidate_name)
+		if collection == null:
+			lines.append("\n%s.%s: null" % [obj_name, candidate_name])
+			continue
+		
+		# Verify it's actually a collection
+		if not (collection is Array or collection is Dictionary):
+			lines.append("\n%s.%s: Unexpected type %s" % [obj_name, candidate_name, typeof(collection)])
+			continue
+		
+		# Found a candidate! Inspect it
+		result.found = true
+		lines.append_array(_inspect_collection(collection, "%s.%s" % [obj_name, candidate_name]))
+		break  # Only inspect first candidate
+	
+	result.lines = lines
+	return result
+
+
+func _is_trinket_candidate(prop_name: String) -> bool:
+	"""Check if property name suggests trinket/inventory collection."""
+	var lower := prop_name.to_lower()
+	var keywords := ["trinket", "item", "inventory", "owned", "collected", "player_item", "run_item", "consumable", "artifact"]
+	for keyword in keywords:
+		if keyword in lower:
+			return true
+	return false
+
+
+func _inspect_collection(collection, path: String) -> Array[String]:
+	"""Inspect a collection with bounded sampling (max 3 entries)."""
+	var lines := []
+	
+	var size := 0
+	if collection is Array:
+		size = collection.size()
+	elif collection is Dictionary:
+		size = collection.size()
+	
+	lines.append("\nSource: %s (%s, %d entries)" % [path, "Array" if collection is Array else "Dictionary", size])
+	
+	if size == 0:
+		lines.append("  (empty collection)")
+		return lines
+	
+	# Sample first 3 entries
+	var max_sample := mini(3, size)
+	lines.append("Sample (first %d of %d):" % [max_sample, size])
+	
+	var count := 0
+	if collection is Array:
+		for i in range(max_sample):
+			var entry = collection[i]
+			lines.append("\n  [%d]" % i)
+			lines.append_array(_inspect_entry(entry, 1))
+			count += 1
+	elif collection is Dictionary:
+		for key in collection.keys():
+			if count >= max_sample:
+				break
+			var entry = collection[key]
+			lines.append("\n  [%s]" % str(key))
+			lines.append_array(_inspect_entry(entry, 1))
+			count += 1
+	
+	if size > max_sample:
+		lines.append("\n... (%d more entries)" % (size - max_sample))
+	
+	return lines
+
+
+func _inspect_entry(entry, depth: int) -> Array[String]:
+	"""Inspect a single entry (primitive, Dictionary, or Object)."""
+	var lines := []
+	var indent := "    " + "  ".repeat(depth - 1)
+	
+	# Handle null
+	if entry == null:
+		lines.append("%snull" % indent)
+		return lines
+	
+	# Handle primitives
+	if entry is String or entry is int or entry is float or entry is bool:
+		lines.append("%s%s: %s" % [indent, typeof(entry), str(entry)])
+		return lines
+	
+	# Handle Dictionary
+	if entry is Dictionary:
+		lines.append("%sDictionary (keys: %d)" % [indent, entry.size()])
+		var key_count := 0
+		for key in entry.keys():
+			if key_count >= 3:
+				lines.append("%s  ... (%d more keys)" % [indent, entry.size() - 3])
+				break
+			var value = entry[key]
+			var value_desc := _describe_value(value)
+			lines.append("%s  %s: %s" % [indent, str(key), value_desc])
+			key_count += 1
+		return lines
+	
+	# Handle Object
+	if entry is Object:
+		if not is_instance_valid(entry):
+			lines.append("%sinvalid Object" % indent)
+			return lines
+		
+		lines.append("%s%s" % [indent, get_object_info(entry)])
+		
+		# Get properties
+		var props: Array = entry.get_property_list()
+		var prop_names: Array = []
+		for prop in props:
+			var prop_name: String = str(prop.name)
+			if not prop_name.begins_with("_"):
+				prop_names.append("%s (%s)" % [prop_name, _type_to_string(int(prop.type))])
+		
+		if not prop_names.is_empty():
+			lines.append("%s  Properties: %s" % [indent, ", ".join(prop_names)])
+		
+		# Extract identity fields
+		var identity := _extract_identity_fields(entry)
+		for field_name in identity.keys():
+			var value = identity[field_name]
+			lines.append("%s  %s: %s" % [indent, field_name, str(value)])
+		
+		# Inspect nested data (one level only)
+		if depth < 2:
+			for nested_prop in ["data", "resource", "item_data", "trinket_data"]:
+				if _has_prop.call(entry, nested_prop):
+					var nested = entry.get(nested_prop)
+					if nested != null and nested is Object and is_instance_valid(nested):
+						lines.append("%s  %s:" % [indent, nested_prop])
+						lines.append_array(_inspect_entry(nested, depth + 1))
+						break  # Only inspect first nested object
+		
+		return lines
+	
+	# Unknown type
+	lines.append("%sUnknown type: %s" % [indent, typeof(entry)])
+	return lines
+
+
+func _extract_identity_fields(obj) -> Dictionary:
+	"""Extract likely identity fields from an object."""
+	var fields := {}
+	
+	if obj == null or not is_instance_valid(obj):
+		return fields
+	
+	# Identity fields
+	var id_fields := ["id", "item_id", "trinket_id", "identifier", "key"]
+	for field in id_fields:
+		if _has_prop.call(obj, field):
+			var value = obj.get(field)
+			if value is String or value is int:
+				fields[field] = value
+				break
+	
+	# Name fields
+	var name_fields := ["name", "display_name", "item_name", "name_key"]
+	for field in name_fields:
+		if _has_prop.call(obj, field):
+			var value = obj.get(field)
+			if value is String:
+				fields[field] = value
+				break
+	
+	# Description fields
+	var desc_fields := ["description", "desc", "tooltip", "description_key"]
+	for field in desc_fields:
+		if _has_prop.call(obj, field):
+			var value = obj.get(field)
+			if value is String:
+				fields[field] = value
+				break
+	
+	# Quantity fields
+	var qty_fields := ["quantity", "count", "amount", "stack_size"]
+	for field in qty_fields:
+		if _has_prop.call(obj, field):
+			var value = obj.get(field)
+			if value is int or value is float:
+				fields[field] = value
+				break
+	
+	return fields
+
+
+func _describe_value(value) -> String:
+	"""Describe a value for compact display."""
+	if value == null:
+		return "null"
+	elif value is String:
+		return '"%s"' % value
+	elif value is int or value is float or value is bool:
+		return str(value)
+	elif value is Array:
+		return "Array[%d]" % value.size()
+	elif value is Dictionary:
+		return "Dictionary[%d]" % value.size()
+	elif value is Object:
+		if is_instance_valid(value):
+			return get_object_info(value)
+		else:
+			return "invalid Object"
+	else:
+		return "type %s" % typeof(value)
+
+
+func _type_to_string(type_id: int) -> String:
+	"""Convert TYPE_* constant to readable string."""
+	match type_id:
+		TYPE_NIL: return "null"
+		TYPE_BOOL: return "bool"
+		TYPE_INT: return "int"
+		TYPE_FLOAT: return "float"
+		TYPE_STRING: return "String"
+		TYPE_VECTOR2: return "Vector2"
+		TYPE_VECTOR2I: return "Vector2i"
+		TYPE_RECT2: return "Rect2"
+		TYPE_RECT2I: return "Rect2i"
+		TYPE_VECTOR3: return "Vector3"
+		TYPE_VECTOR3I: return "Vector3i"
+		TYPE_TRANSFORM2D: return "Transform2D"
+		TYPE_VECTOR4: return "Vector4"
+		TYPE_VECTOR4I: return "Vector4i"
+		TYPE_PLANE: return "Plane"
+		TYPE_QUATERNION: return "Quaternion"
+		TYPE_AABB: return "AABB"
+		TYPE_BASIS: return "Basis"
+		TYPE_TRANSFORM3D: return "Transform3D"
+		TYPE_PROJECTION: return "Projection"
+		TYPE_COLOR: return "Color"
+		TYPE_STRING_NAME: return "StringName"
+		TYPE_NODE_PATH: return "NodePath"
+		TYPE_RID: return "RID"
+		TYPE_OBJECT: return "Object"
+		TYPE_CALLABLE: return "Callable"
+		TYPE_SIGNAL: return "Signal"
+		TYPE_DICTIONARY: return "Dictionary"
+		TYPE_ARRAY: return "Array"
+		TYPE_PACKED_BYTE_ARRAY: return "PackedByteArray"
+		TYPE_PACKED_INT32_ARRAY: return "PackedInt32Array"
+		TYPE_PACKED_INT64_ARRAY: return "PackedInt64Array"
+		TYPE_PACKED_FLOAT32_ARRAY: return "PackedFloat32Array"
+		TYPE_PACKED_FLOAT64_ARRAY: return "PackedFloat64Array"
+		TYPE_PACKED_STRING_ARRAY: return "PackedStringArray"
+		TYPE_PACKED_VECTOR2_ARRAY: return "PackedVector2Array"
+		TYPE_PACKED_VECTOR3_ARRAY: return "PackedVector3Array"
+		TYPE_PACKED_COLOR_ARRAY: return "PackedColorArray"
+		_: return "Unknown(%d)" % type_id
 
 
