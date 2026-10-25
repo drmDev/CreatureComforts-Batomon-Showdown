@@ -23,6 +23,14 @@ const TRAINER_PREFIXES := {
 	"burglar": "Burglar"
 }
 
+# Reminder message templates for day-based and team composition rules
+const REMINDER_TEMPLATES := {
+	"mad_scientist_day6": "Tomorrow: Legendary transformation!",
+	"gamer_day8": "Tomorrow: Mythical monster!",
+	"gentleman_day3": "Tomorrow: No Common/Uncommon shops!",
+	"beetdown_company": "Black Belt: 2+ Fighters active!"
+}
+
 var _next_poll := 0
 var _last_phase := ""
 var _last_snapshot = null  # ShopSnapshot from previous poll
@@ -413,44 +421,38 @@ func _get_trainer_prefix(rule_id: String) -> String:
 func _simplify_reminder_message(rule_id: String, original_message: String, advice: Dictionary) -> String:
 	"""Convert full reminder messages to compact single-line format."""
 	
+	# Check templates first (day reminders and team composition rules)
+	if rule_id in REMINDER_TEMPLATES:
+		return REMINDER_TEMPLATES[rule_id]
+	
 	# Shop target rules - extract unique monster names
 	if rule_id.ends_with("_targets") or rule_id == "blackbelt_beetbud":
 		var matched_slots: Array = advice.get("matched_slots", [])
 		if matched_slots.is_empty():
 			return ""
 		
-		# Extract unique monster names from matched slots
-		var unique_names: Array = []
-		var seen_names := {}
-		
-		for slot_text in matched_slots:
-			# slot_text format: "[0] Lamplet" or "[1] Basic Bait"
-			var parts: PackedStringArray = str(slot_text).split("] ", false, 1)
-			if parts.size() >= 2:
-				var name: String = parts[1].strip_edges()
-				if not seen_names.has(name):
-					seen_names[name] = true
-					unique_names.append(name)
-		
-		if unique_names.is_empty():
-			return ""
-		
-		return "Reminders: " + ", ".join(unique_names)
-	
-	# Day reminder rules - shorten messages
-	elif rule_id == "mad_scientist_day6":
-		return "Tomorrow: Legendary transformation!"
-	elif rule_id == "gamer_day8":
-		return "Tomorrow: Mythical monster!"
-	elif rule_id == "gentleman_day3":
-		return "Tomorrow: No Common/Uncommon shops!"
-	
-	# Team composition rules - shorten messages
-	elif rule_id == "beetdown_company":
-		return "Black Belt: 2+ Fighters active!"
+		var unique_names := _extract_unique_names(matched_slots)
+		return "Reminders: " + ", ".join(unique_names) if not unique_names.is_empty() else ""
 	
 	# Default: use original message (shouldn't happen for displayed reminders)
 	return original_message
+
+
+func _extract_unique_names(matched_slots: Array) -> Array:
+	"""Extract unique monster/item names from matched slot strings."""
+	var unique_names: Array = []
+	var seen_names := {}
+	
+	for slot_text in matched_slots:
+		# slot_text format: "[0] Lamplet" or "[1] Basic Bait"
+		var parts: PackedStringArray = str(slot_text).split("] ", false, 1)
+		if parts.size() >= 2:
+			var name: String = parts[1].strip_edges()
+			if not seen_names.has(name):
+				seen_names[name] = true
+				unique_names.append(name)
+	
+	return unique_names
 
 
 func _handle_shop_phase(state) -> void:

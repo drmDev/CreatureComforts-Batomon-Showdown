@@ -41,6 +41,11 @@ func format_monster_name(monster) -> String:
 
 func format_species_name(species_key: String) -> String:
 	"""Format a species name from captured name_key string."""
+	return format_species_name_static(species_key)
+
+
+static func format_species_name_static(species_key: String) -> String:
+	"""Static version for use without instance. Format a species name from captured name_key string."""
 	if species_key.is_empty():
 		return "Unknown"
 	

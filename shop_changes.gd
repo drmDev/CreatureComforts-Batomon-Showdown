@@ -2,6 +2,9 @@ extends RefCounted
 ## ShopChanges - Compare shop snapshots and return structured changes
 ## Moves change detection and event classification out of log_formatter.gd
 
+# Load formatter for consistent name formatting
+const LogFormatter = preload("log_formatter.gd")
+
 ## Represents a single change with area, slot/property, before, and after values
 class Change:
 	var area: String = ""  # "run", "shop", "team", "bench"
@@ -178,15 +181,12 @@ func _describe_offer(offer) -> String:
 		return "Empty"
 	
 	if offer.is_monster():
-		var name: String = offer.species_key.capitalize()
-		if "." in name:
-			name = name.split(".")[-1].capitalize()
-		var desc: String = name
+		var name: String = LogFormatter.format_species_name_static(offer.species_key)
 		if offer.level > 1:
-			desc += " Lv%d" % offer.level
+			name += " Lv%d" % offer.level
 		if offer.is_shiny:
-			desc += " Shiny"
-		return desc
+			name += " Shiny"
+		return name
 	elif offer.is_item():
 		return "%s (Item)" % offer.item_id
 	
@@ -198,15 +198,11 @@ func _describe_monster(monster) -> String:
 	if monster == null:
 		return "Empty"
 	
-	var name: String = monster.species_key.capitalize()
-	if "." in name:
-		name = name.split(".")[-1].capitalize()
-	
-	var desc: String = name
+	var name: String = LogFormatter.format_species_name_static(monster.species_key)
 	if monster.level > 1:
-		desc += " Lv%d" % monster.level
+		name += " Lv%d" % monster.level
 	
-	return desc
+	return name
 
 
 ## Classify event type based on changes
