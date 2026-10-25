@@ -3,7 +3,6 @@ extends RefCounted
 ## Manages active advice keyed by stable rule IDs.
 
 const AdviceContext = preload("advice_context.gd")
-const TrainerRules = preload("trainer_rules.gd")
 
 
 ## Registered rules
@@ -19,11 +18,6 @@ var _last_emitted: Dictionary = {}
 ## Register a rule for evaluation
 func register_rule(rule) -> void:
 	_rules.append(rule)
-
-
-## Clear all registered rules
-func clear_rules() -> void:
-	_rules.clear()
 
 
 ## Evaluate all rules against context
@@ -73,11 +67,3 @@ func reset_suppression() -> void:
 	_last_emitted.clear()
 
 
-## Get all currently active advice
-func get_active_advice() -> Array:
-	return _active_advice.values()
-
-
-## Check if a specific rule is currently active
-func is_rule_active(rule_id: String) -> bool:
-	return _active_advice.has(rule_id)

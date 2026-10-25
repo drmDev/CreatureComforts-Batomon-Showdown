@@ -56,7 +56,6 @@ var _advice_context_script = null
 var _advice_context_builder = null
 
 # Snapshot system
-var _snapshot_script = null
 var _snapshot_builder = null
 var _changes_comparer = null
 
@@ -130,7 +129,6 @@ func _initialize_mod() -> void:
 	
 	# Create snapshot builder
 	var ShopSnapshot = load("res://mods/NP_Brainrot/shop_snapshot.gd")
-	_snapshot_script = ShopSnapshot
 	_snapshot_builder = ShopSnapshot.new()
 	
 	# Create changes comparer

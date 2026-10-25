@@ -2,9 +2,6 @@ extends RefCounted
 ## ShopChanges - Compare shop snapshots and return structured changes
 ## Moves change detection and event classification out of log_formatter.gd
 
-# Load formatter for consistent name formatting
-const LogFormatter = preload("log_formatter.gd")
-
 ## Represents a single change with area, slot/property, before, and after values
 class Change:
 	var area: String = ""  # "run", "shop", "team", "bench"
@@ -97,8 +94,6 @@ func _detect_shop_changes(previous, current, result: ComparisonResult) -> void:
 		var new_offer: Variant = current.shop_offers[i] if i < current.shop_offers.size() else null
 		
 		if not _offers_equal(old_offer, new_offer):
-			var old_desc: String = _describe_offer(old_offer)
-			var new_desc: String = _describe_offer(new_offer)
 			var change: Change = Change.new("shop", "slot_%d" % i, old_offer, new_offer, "Slot %d" % i)
 			result.changes.append(change)
 	
@@ -120,8 +115,6 @@ func _detect_team_changes(previous, current, result: ComparisonResult) -> void:
 		var visual_slot: int = previous.team_monsters.size() - 1 - i if old_monster != null else current.team_monsters.size() - 1 - i
 		
 		if not _monsters_equal(old_monster, new_monster):
-			var old_desc: String = _describe_monster(old_monster)
-			var new_desc: String = _describe_monster(new_monster)
 			var change: Change = Change.new("team", "slot_%d" % i, old_monster, new_monster, "Team[%d]" % visual_slot)
 			result.changes.append(change)
 
@@ -137,8 +130,6 @@ func _detect_bench_changes(previous, current, result: ComparisonResult) -> void:
 		var visual_slot: int = previous.bench_monsters.size() - 1 - i if old_monster != null else current.bench_monsters.size() - 1 - i
 		
 		if not _monsters_equal(old_monster, new_monster):
-			var old_desc: String = _describe_monster(old_monster)
-			var new_desc: String = _describe_monster(new_monster)
 			var change: Change = Change.new("bench", "slot_%d" % i, old_monster, new_monster, "Bench[%d]" % visual_slot)
 			result.changes.append(change)
 
@@ -175,36 +166,6 @@ func _monsters_equal(a, b) -> bool:
 	return a.instance_id == b.instance_id and a.species_key == b.species_key and a.level == b.level
 
 
-## Describe a shop offer for display
-func _describe_offer(offer) -> String:
-	if offer == null or offer.is_empty():
-		return "Empty"
-	
-	if offer.is_monster():
-		var name: String = LogFormatter.format_species_name_static(offer.species_key)
-		if offer.level > 1:
-			name += " Lv%d" % offer.level
-		if offer.is_shiny:
-			name += " Shiny"
-		return name
-	elif offer.is_item():
-		return "%s (Item)" % offer.item_id
-	
-	return "Unknown"
-
-
-## Describe a monster for display
-func _describe_monster(monster) -> String:
-	if monster == null:
-		return "Empty"
-	
-	var name: String = LogFormatter.format_species_name_static(monster.species_key)
-	if monster.level > 1:
-		name += " Lv%d" % monster.level
-	
-	return name
-
-
 ## Classify event type based on changes
 ## Documents the existing reroll heuristic: 4+ slot changes = reroll
 func _classify_event(result: ComparisonResult) -> String:
@@ -219,12 +180,9 @@ func _classify_event(result: ComparisonResult) -> String:
 	
 	# Check for day change
 	var has_day_change := false
-	var has_gold_change := false
 	for change in run_changes:
 		if change.property == "current_round":
 			has_day_change = true
-		if change.property == "gold":
-			has_gold_change = true
 	
 	if has_day_change:
 		parts.append("DAY CHANGED")

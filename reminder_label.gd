@@ -56,12 +56,6 @@ func show_reminder(rule_id: String, simplified_text: String) -> void:
 	_update_display()
 
 
-func hide_reminder(rule_id: String) -> void:
-	"""Hide a specific reminder by ID."""
-	_active_reminders.erase(rule_id)
-	_update_display()
-
-
 func hide_inactive_reminders(active_rule_ids: Array) -> void:
 	"""Hide all reminders except those in the active list."""
 	var to_remove: Array = []

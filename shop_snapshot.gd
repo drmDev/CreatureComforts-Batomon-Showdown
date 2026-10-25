@@ -193,21 +193,3 @@ func _extract_monster(monster_obj, slot: int, has_property_func: Callable, type_
 	return monster
 
 
-## Get team size (including empty slots)
-func get_team_size() -> int:
-	return team_monsters.size()
-
-
-## Get bench size (including empty slots)
-func get_bench_size() -> int:
-	return bench_monsters.size()
-
-
-## Get shop offer count
-func get_shop_offer_count() -> int:
-	return shop_offers.size()
-
-
-## Get visual slot number (reversed from storage order)
-func get_visual_slot(storage_slot: int, total_size: int) -> int:
-	return total_size - 1 - storage_slot

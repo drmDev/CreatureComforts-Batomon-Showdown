@@ -115,25 +115,6 @@ func format_array_contents(arr: Array) -> String:
 	return "[%s]" % ", ".join(items)
 
 
-func format_slot_name(slot: Dictionary) -> String:
-	"""Format a shop slot fingerprint into a readable name."""
-	if slot.is_empty() or slot.get("type") == "empty":
-		return "Empty"
-	
-	var slot_type: String = slot.get("type", "unknown")
-	if slot_type == "creature":
-		var name: String = str(slot.get("id", "Unknown")).capitalize()
-		if slot.has("level"):
-			name += " Lv%s" % slot.get("level")
-		if slot.get("shiny", false):
-			name += " Shiny"
-		return name
-	elif slot_type == "item":
-		return "%s (Item)" % str(slot.get("id", "Unknown"))
-	
-	return "Unknown"
-
-
 func resolve_type_name(type_resource) -> String:
 	"""Resolve a monster type Resource into a readable name."""
 	if type_resource == null or not is_instance_valid(type_resource):
@@ -213,26 +194,6 @@ func inspect_shop_item_deep(item) -> String:
 						lines.append("  %s: %s" % [prop, str(value)])
 	
 	return "\n    ".join(lines) if not lines.is_empty() else "Unknown item"
-
-
-func get_monster_name(monster_id) -> String:
-	# monster_id is either an instance ID (int) or an object
-	if monster_id is int:
-		return "Monster"
-	
-	var monster = monster_id
-	if monster == null:
-		return "Empty"
-	
-	if _has_prop.call(monster, "data"):
-		var data = monster.data
-		if data != null and _has_prop.call(data, "name_key"):
-			var name := str(data.name_key)
-			if _has_prop.call(monster, "level"):
-				name += " Lv%s" % monster.level
-			return name
-	
-	return "Unknown"
 
 
 # --- Multi-line formatters (return Array[String]) ---
