@@ -354,8 +354,9 @@ func _evaluate_trainer_advice(snapshot) -> void:
 	# Evaluate all rules
 	var result: Dictionary = _advisor.evaluate(context)
 	var new_or_changed: Array = result.get("new_or_changed", [])
+	var all_active: Array = result.get("all_active", [])
 	
-	# Emit new or changed advice
+	# Emit new or changed advice to console (suppression works here)
 	for advice in new_or_changed:
 		var severity: String = advice.get("severity", "NOTICE")
 		var message: String = advice.get("message", "")
@@ -372,30 +373,31 @@ func _evaluate_trainer_advice(snapshot) -> void:
 				full_message = "*** BRAINROT %s | %s" % [severity, message]
 			
 			_print_notice(full_message)
-		
-		# Handle reminder label display with simplified messages
-		if _enable_trainer_reminders and _reminder_label != null:
-			var simplified_message := _simplify_reminder_message(rule_id, message, advice)
-			if not simplified_message.is_empty():
-				_reminder_label.show_reminder(rule_id, simplified_message)
 	
-	# Hide reminders for inactive rules and check for new reminders
-	if _reminder_label != null:
-		var active_rule_ids: Array = []
-		for advice in result.get("all_active", []):
+	# Update reminder panel with ALL active advice (no suppression for display)
+	if _enable_trainer_reminders and _reminder_label != null:
+		var reminders_to_show: Dictionary = {}
+		
+		for advice in all_active:
 			var rule_id: String = advice.get("rule_id", "")
+			var message: String = advice.get("message", "")
+			
 			# Include day reminders, shop target rules, and team composition rules
-			if rule_id.ends_with("_day6") or rule_id.ends_with("_day8") or rule_id.ends_with("_day3") or rule_id.contains("_day") or rule_id.ends_with("_targets") or rule_id == "blackbelt_beetbud" or rule_id == "beetdown_company":
-				active_rule_ids.append(rule_id)
-		_reminder_label.hide_inactive_reminders(active_rule_ids)
+			if rule_id.contains("_day") or rule_id.ends_with("_targets") or rule_id == "blackbelt_beetbud" or rule_id == "beetdown_company":
+				var simplified_message := _simplify_reminder_message(rule_id, message, advice)
+				if not simplified_message.is_empty():
+					reminders_to_show[rule_id] = simplified_message
+		
+		# Replace all reminders at once (single update, single render)
+		_reminder_label.set_reminders(reminders_to_show)
 		
 		# Play notification sound if reminder text changed (new reminder appeared)
-		if _enable_trainer_reminders and _reminder_label.visible:
+		if _reminder_label.visible:
 			var current_text: String = _reminder_label.get_current_text()
 			if not current_text.is_empty() and current_text != _last_reminder_text:
 				_play_pika()
 				_last_reminder_text = current_text
-		elif not _reminder_label.visible:
+		else:
 			_last_reminder_text = ""  # Reset when no reminders active
 	
 	# Diagnostic: Log Fighting type identifier once per shop entry

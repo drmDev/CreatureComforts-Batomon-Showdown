@@ -56,6 +56,12 @@ func show_reminder(rule_id: String, simplified_text: String) -> void:
 	_update_display()
 
 
+func set_reminders(reminders: Dictionary) -> void:
+	"""Replace all reminders with the provided dictionary. Single update, single render."""
+	_active_reminders = reminders.duplicate()
+	_update_display()
+
+
 func hide_inactive_reminders(active_rule_ids: Array) -> void:
 	"""Hide all reminders except those in the active list."""
 	var to_remove: Array = []
