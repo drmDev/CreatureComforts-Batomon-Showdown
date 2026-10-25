@@ -10,6 +10,19 @@ const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 
 # Polling and state tracking
 const POLL_INTERVAL_MS := 500
+
+# Trainer display name mapping
+const TRAINER_PREFIXES := {
+	"scavenger": "Scavenger",
+	"blackbelt": "Black Belt",
+	"beetdown": "Black Belt",
+	"mad_scientist": "Mad Scientist",
+	"gamer": "Gamer",
+	"gentleman": "Gentleman",
+	"treasure_hunter": "Treasure Hunter",
+	"burglar": "Burglar"
+}
+
 var _next_poll := 0
 var _last_phase := ""
 var _last_snapshot = null  # ShopSnapshot from previous poll
@@ -188,17 +201,10 @@ func _setup_advisor() -> void:
 	_advice_context_script = load("res://mods/NP_Brainrot/advice_context.gd")
 	_advice_context_builder = _advice_context_script.new()
 	
-	# Scavenger shop targets rule
-	var scavenger_rule = TrainerRules.ShopTargetsRule.new(
-		"scavenger_targets",
-		"scavenger",
-		["monster.name.lamplet", "monster.name.swoonet"],
-		["basic_bait"],
-		"NOTICE",
-		"Shop targets: %s | Level-up/trinket opportunities",
-		_formatter
-	)
-	_advisor.register_rule(scavenger_rule)
+	# Register shop target rules for trainers with same targets
+	_register_shop_target_rule("scavenger")
+	_register_shop_target_rule("treasure_hunter")
+	_register_shop_target_rule("burglar")
 	
 	# Black Belt Beetbud shop rule
 	var blackbelt_beetbud_rule = TrainerRules.ShopTargetsRule.new(
@@ -250,30 +256,21 @@ func _setup_advisor() -> void:
 		"🎩 GENTLEMAN: Common and Uncommon monsters stop appearing in shops starting Day 4!"
 	)
 	_advisor.register_rule(gentleman_day3_rule)
-	
-	# Treasure Hunter shop targets rule (same as Scavenger)
-	var treasure_hunter_rule = TrainerRules.ShopTargetsRule.new(
-		"treasure_hunter_targets",
-		"treasure_hunter",
+
+
+func _register_shop_target_rule(trainer_id: String) -> void:
+	"""Register a shop target rule for trainers that share the same targets."""
+	var TrainerRules = load("res://mods/NP_Brainrot/trainer_rules.gd")
+	var rule = TrainerRules.ShopTargetsRule.new(
+		"%s_targets" % trainer_id,
+		trainer_id,
 		["monster.name.lamplet", "monster.name.swoonet"],
 		["basic_bait"],
 		"NOTICE",
 		"Shop targets: %s | Level-up/trinket opportunities",
 		_formatter
 	)
-	_advisor.register_rule(treasure_hunter_rule)
-	
-	# Burglar shop targets rule (same as Scavenger)
-	var burglar_rule = TrainerRules.ShopTargetsRule.new(
-		"burglar_targets",
-		"burglar",
-		["monster.name.lamplet", "monster.name.swoonet"],
-		["basic_bait"],
-		"NOTICE",
-		"Shop targets: %s | Level-up/trinket opportunities",
-		_formatter
-	)
-	_advisor.register_rule(burglar_rule)
+	_advisor.register_rule(rule)
 
 
 func _setup_reminder_panel() -> void:
@@ -360,21 +357,7 @@ func _evaluate_trainer_advice(snapshot) -> void:
 		
 		if not message.is_empty():
 			# Format trainer-specific prefix based on rule_id
-			var prefix := ""
-			if rule_id.begins_with("scavenger"):
-				prefix = "Scavenger"
-			elif rule_id.begins_with("blackbelt") or rule_id.begins_with("beetdown"):
-				prefix = "Black Belt"
-			elif rule_id.begins_with("mad_scientist"):
-				prefix = "Mad Scientist"
-			elif rule_id.begins_with("gamer"):
-				prefix = "Gamer"
-			elif rule_id.begins_with("gentleman"):
-				prefix = "Gentleman"
-			elif rule_id.begins_with("treasure_hunter"):
-				prefix = "Treasure Hunter"
-			elif rule_id.begins_with("burglar"):
-				prefix = "Burglar"
+			var prefix := _get_trainer_prefix(rule_id)
 			
 			var full_message := ""
 			if not prefix.is_empty():
@@ -417,6 +400,14 @@ func _evaluate_trainer_advice(snapshot) -> void:
 					_log_message("[DIAGNOSTIC] Fighting type detected in team slot %d: %s" % [monster.slot, monster.name_key])
 					_diagnostic_logged = true
 					break
+
+
+func _get_trainer_prefix(rule_id: String) -> String:
+	"""Get trainer display name from rule ID using prefix matching."""
+	for key in TRAINER_PREFIXES:
+		if rule_id.begins_with(key):
+			return TRAINER_PREFIXES[key]
+	return ""
 
 
 func _simplify_reminder_message(rule_id: String, original_message: String, advice: Dictionary) -> String:
