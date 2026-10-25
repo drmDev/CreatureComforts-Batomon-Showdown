@@ -2,18 +2,18 @@ extends PanelContainer
 ## ReminderLabel - Compact single-line reminder display for top bar
 ## Positioned between Backpack icon and Heart/lives indicator.
 
-const FONT_SIZE := 10
+const FONT_SIZE := 9
 const TEXT_COLOR := Color("#ecf0f1")
 const SHADOW_COLOR := Color("#2c3e50")
 const SHADOW_OFFSET := Vector2(1, 1)
-const MAX_WIDTH := 120.0  # Reduced by 60% from 300
-const TOP_BAR_Y := 8.0
+const MAX_WIDTH := 130.0
+const TOP_BAR_Y := 2.0 
 const LEFT_MARGIN := 55.0  # Just right of backpack icon
 
 const BG_COLOR := Color("#1a2332")  # Dark navy
 const BORDER_COLOR := Color("#f39c12")  # Gold/yellow
 const BORDER_WIDTH := 1
-const PADDING := 4
+const PADDING := 3
 
 var _active_reminders: Dictionary = {}  # rule_id -> simplified text
 var _label: Label
@@ -33,17 +33,17 @@ func _init() -> void:
 	_panel_style.set_content_margin_all(PADDING)
 	add_theme_stylebox_override("panel", _panel_style)
 	
-	# Create label for text
+	# Create label for text with multi-line support
 	_label = Label.new()
 	_label.add_theme_color_override("font_color", TEXT_COLOR)
 	_label.add_theme_color_override("font_shadow_color", SHADOW_COLOR)
 	_label.add_theme_constant_override("shadow_offset_x", int(SHADOW_OFFSET.x))
 	_label.add_theme_constant_override("shadow_offset_y", int(SHADOW_OFFSET.y))
 	_label.add_theme_font_size_override("font_size", FONT_SIZE)
-	_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-	_label.clip_text = true
-	_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	_label.custom_minimum_size = Vector2(MAX_WIDTH, 16)
+	_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_label.clip_text = false
+	_label.custom_minimum_size = Vector2(MAX_WIDTH, 12)
+	_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	add_child(_label)
 	
 	# Position in top-left area
