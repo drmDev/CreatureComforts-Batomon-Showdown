@@ -39,7 +39,7 @@ func format_monster_name(monster) -> String:
 	return name_key.capitalize()
 
 
-func _format_species_name(species_key: String) -> String:
+func format_species_name(species_key: String) -> String:
 	"""Format a species name from captured name_key string."""
 	if species_key.is_empty():
 		return "Unknown"
@@ -426,7 +426,7 @@ func _describe_snapshot_offer(offer) -> String:
 		return "Empty"
 	
 	if offer.is_monster():
-		var name := _format_species_name(offer.species_key)
+		var name := format_species_name(offer.species_key)
 		if offer.level > 1:
 			name += " Lv%d" % offer.level
 		if offer.is_shiny:
@@ -443,235 +443,10 @@ func _describe_snapshot_monster(monster) -> String:
 	if monster == null:
 		return "Empty"
 	
-	var name := _format_species_name(monster.species_key)
+	var name := format_species_name(monster.species_key)
 	if monster.level > 1:
 		name += " Lv%d" % monster.level
 	
 	return name
 
 
-## DEPRECATED: Legacy method for backward compatibility
-## Use format_snapshot_changes() instead
-func format_shop_changes(run, manager, old_run: Dictionary, old_shop: Dictionary, old_team: Dictionary, old_bench: Dictionary, debug_logging: bool) -> Array[String]:
-	var lines := []
-	var changes := []
-	var timestamp := "[%s] " % get_time_short() if debug_logging else ""
-	
-	# Detect run state changes
-	var run_changes := detect_run_changes(run, old_run)
-	if not run_changes.is_empty():
-		changes.append_array(run_changes)
-	
-	# Detect shop changes
-	var shop_changes := detect_shop_changes(manager, old_shop)
-	if not shop_changes.is_empty():
-		changes.append_array(shop_changes)
-	
-	# Detect team changes
-	var team_changes := detect_team_changes(run, old_team)
-	if not team_changes.is_empty():
-		changes.append_array(team_changes)
-	
-	# Detect bench changes
-	var bench_changes := detect_bench_changes(run, old_bench)
-	if not bench_changes.is_empty():
-		changes.append_array(bench_changes)
-	
-	if changes.is_empty():
-		return lines
-	
-	# Determine event type
-	var event_type := infer_event_type(run_changes, shop_changes, team_changes, bench_changes)
-	
-	lines.append("\n%s%s" % [timestamp, event_type])
-	for change in changes:
-		lines.append("  %s" % change)
-	
-	# If shop changed, log current offers
-	if not shop_changes.is_empty():
-		lines.append("")
-		lines.append_array(format_shop_offers(manager, run, true))
-	
-	return lines
-
-
-func detect_run_changes(run, old_state: Dictionary) -> Array:
-	var changes := []
-	
-	var props := ["current_round", "shop_rank", "lives", "player_hp", "gold", "current_wins"]
-	var labels := {"current_round": "Day", "shop_rank": "Rank", "lives": "Lives", 
-		"player_hp": "HP", "gold": "Gold", "current_wins": "Wins"}
-	
-	for prop in props:
-		if not _has_prop.call(run, prop):
-			continue
-		var new_val = run.get(prop)
-		var old_val = old_state.get(prop, null)
-		if old_val != null and new_val != old_val:
-			changes.append("%s: %s -> %s" % [labels.get(prop, prop), old_val, new_val])
-	
-	return changes
-
-
-func detect_shop_changes(manager, old_state: Dictionary) -> Array:
-	var changes := []
-	
-	if _has_prop.call(manager, "current_shop_items"):
-		var items: Array = manager.current_shop_items
-		var new_fingerprint: Array = create_shop_fingerprint(items)
-		var old_fingerprint: Array = old_state.get("fingerprint", [])
-		
-		# Compare fingerprints - check through larger array
-		var max_size: int = max(new_fingerprint.size(), old_fingerprint.size())
-		for i in range(max_size):
-			var new_slot: Dictionary = new_fingerprint[i] if i < new_fingerprint.size() else {}
-			var old_slot: Dictionary = old_fingerprint[i] if i < old_fingerprint.size() else {}
-			
-			# Compare slot data
-			if new_slot != old_slot:
-				var old_name := format_slot_name(old_slot)
-				var new_name := format_slot_name(new_slot)
-				if old_name != new_name:
-					changes.append("Slot %d: %s -> %s" % [i, old_name, new_name])
-	
-	if _has_prop.call(manager, "is_shop_frozen"):
-		var new_frozen: bool = manager.is_shop_frozen
-		var old_frozen: bool = old_state.get("frozen", false)
-		if new_frozen != old_frozen:
-			changes.append("Shop %s" % ("Locked" if new_frozen else "Unlocked"))
-	
-	return changes
-
-
-func detect_team_changes(run, old_state: Dictionary) -> Array:
-	var changes := []
-	
-	if not _has_prop.call(run, "team"):
-		return changes
-	
-	var team: Array = run.team
-	var old_monsters: Array = old_state.get("monsters", [])
-	
-	# Team is stored bottom-right to top-left, reverse for visual order
-	# Check through larger array to detect additions/removals
-	var max_size: int = max(team.size(), old_monsters.size())
-	for i in range(max_size):
-		var visual_slot := team.size() - 1 - i if i < team.size() else old_monsters.size() - 1 - i
-		var new_id = team[i].get_instance_id() if i < team.size() and team[i] != null else 0
-		
-		# old_monsters contains dictionaries with {id, level, species}, not integers
-		var old_fp = old_monsters[i] if i < old_monsters.size() else 0
-		var old_id = old_fp.get("id", 0) if old_fp is Dictionary else 0
-		
-		if new_id != old_id:
-			# Extract old name from captured species, not from object
-			var old_name := "Empty"
-			if old_fp is Dictionary and old_fp.has("species"):
-				old_name = _format_species_name(old_fp.get("species", ""))
-			
-			var new_name := get_monster_name(team[i]) if i < team.size() and team[i] != null else "Empty"
-			if old_name != new_name:
-				changes.append("Team[%d]: %s -> %s" % [visual_slot, old_name, new_name])
-	
-	return changes
-
-
-func detect_bench_changes(run, old_state: Dictionary) -> Array:
-	var changes := []
-	
-	if not _has_prop.call(run, "bench"):
-		return changes
-	
-	var bench: Array = run.bench
-	var old_monsters: Array = old_state.get("monsters", [])
-	
-	# Bench is also stored bottom-right to top-left
-	# Check through larger array to detect additions/removals
-	var max_size: int = max(bench.size(), old_monsters.size())
-	for i in range(max_size):
-		var visual_slot := bench.size() - 1 - i if i < bench.size() else old_monsters.size() - 1 - i
-		var new_id = bench[i].get_instance_id() if i < bench.size() and bench[i] != null else 0
-		var old_id = old_monsters[i] if i < old_monsters.size() else 0
-		
-		if new_id != old_id:
-			var old_name := get_monster_name(old_monsters[i]) if i < old_monsters.size() and old_monsters[i] != 0 else "Empty"
-			var new_name := get_monster_name(bench[i]) if i < bench.size() and bench[i] != null else "Empty"
-			if old_name != new_name:
-				changes.append("Bench[%d]: %s -> %s" % [visual_slot, old_name, new_name])
-	
-	return changes
-
-
-func infer_event_type(run_changes: Array, shop_changes: Array, team_changes: Array, bench_changes: Array) -> String:
-	# Don't try to be too clever - just describe what changed
-	var parts := []
-	
-	if not run_changes.is_empty():
-		# Check for specific run changes
-		var has_day_change := false
-		var has_gold_change := false
-		for change in run_changes:
-			if "Day:" in change:
-				has_day_change = true
-			if "Gold:" in change:
-				has_gold_change = true
-		
-		if has_day_change:
-			parts.append("DAY CHANGED")
-		elif has_gold_change and shop_changes.is_empty():
-			# Gold changed but shop didn't - might be sell or other action
-			pass
-	
-	if not shop_changes.is_empty():
-		# Check if all slots changed (likely reroll) or specific slots
-		var slot_changes := 0
-		for change in shop_changes:
-			if "Slot" in change:
-				slot_changes += 1
-		
-		if slot_changes >= 4:
-			parts.append("SHOP REROLL")
-		elif slot_changes > 0:
-			parts.append("SHOP CHANGED")
-		else:
-			parts.append("SHOP CHANGED")
-	
-	if not team_changes.is_empty():
-		parts.append("TEAM CHANGED")
-	
-	if not bench_changes.is_empty():
-		parts.append("BENCH CHANGED")
-	
-	return " + ".join(parts) if not parts.is_empty() else "STATE CHANGED"
-
-
-func create_shop_fingerprint(items: Array) -> Array:
-	"""Create a deterministic fingerprint of shop offers."""
-	var fingerprint := []
-	
-	for i in range(items.size()):
-		var item = items[i]
-		var slot_data := {"slot": i}
-		
-		if item == null:
-			slot_data["type"] = "empty"
-		elif item.has_method("get_gold_cost") and _has_prop.call(item, "data"):
-			# Creature
-			slot_data["type"] = "creature"
-			if _has_prop.call(item, "data") and item.data != null:
-				if _has_prop.call(item.data, "id"):
-					slot_data["id"] = str(item.data.id)
-			if _has_prop.call(item, "level"):
-				slot_data["level"] = item.level
-			if _has_prop.call(item, "is_shiny"):
-				slot_data["shiny"] = item.is_shiny
-		elif _has_prop.call(item, "id"):
-			# Item
-			slot_data["type"] = "item"
-			slot_data["id"] = str(item.id)
-		else:
-			slot_data["type"] = "unknown"
-		
-		fingerprint.append(slot_data)
-	
-	return fingerprint

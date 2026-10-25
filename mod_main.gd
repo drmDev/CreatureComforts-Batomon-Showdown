@@ -74,13 +74,17 @@ func _load_settings() -> void:
 	
 	_settings_load_attempted = true
 	
-	if mod_loader.has_method("get_setting"):
-		_debug_logging = mod_loader.get_setting("np_brainrot", "debug_logging", true)
-		_deep_inspection = mod_loader.get_setting("np_brainrot", "deep_inspection", true)
+	if mod_loader.has_method("get_config"):
+		_debug_logging = mod_loader.get_config("np_brainrot", "debug_logging", true)
+		_deep_inspection = mod_loader.get_config("np_brainrot", "deep_inspection", true)
+		
+		# Connect to config_changed signal for live updates
+		if mod_loader.has_signal("config_changed") and not mod_loader.is_connected("config_changed", _on_config_changed):
+			mod_loader.connect("config_changed", _on_config_changed)
 	elif not _settings_warning_shown:
-		# Fallback if ModLoader doesn't support settings - keep defaults
+		# Fallback if ModLoader doesn't support config API - keep defaults
 		_settings_warning_shown = true
-		push_warning("Brainrot Edition: ModLoader.get_setting() not available, using defaults")
+		push_warning("Brainrot Edition: ModLoader.get_config() not available, using defaults")
 
 
 func _initialize_mod() -> void:
@@ -130,11 +134,27 @@ func _initialize_mod() -> void:
 	_log_message("=".repeat(80))
 	_log_message("Brainrot Edition %s - Refactored Trainer Advice System" % VERSION)
 	_log_message("Initialized at %s" % _formatter.get_timestamp())
-	_log_message("Debug Logging: %s | Deep Inspection: %s" % [_debug_logging, _deep_inspection])
+	_log_message("Settings: Debug Logging: %s | Deep Inspection: %s" % [_debug_logging, _deep_inspection])
 	_log_message("Log file: %s" % abs_log_path)
 	_log_message("=".repeat(80))
 	
 	print("Brainrot Edition %s loaded - logging to %s" % [VERSION, abs_log_path])
+
+
+func _on_config_changed(mod_id: String, key: String, value) -> void:
+	"""Handle live config changes from ModLoader."""
+	if mod_id != "np_brainrot":
+		return
+	
+	match key:
+		"debug_logging":
+			if value is bool:
+				_debug_logging = value
+				_log_message("Setting changed: Debug Logging = %s" % _debug_logging)
+		"deep_inspection":
+			if value is bool:
+				_deep_inspection = value
+				_log_message("Setting changed: Deep Inspection = %s" % _deep_inspection)
 
 
 func _setup_advisor() -> void:
@@ -155,7 +175,8 @@ func _setup_advisor() -> void:
 		["monster.name.lamplet", "monster.name.swoonet"],
 		["basic_bait"],
 		"NOTICE",
-		"Shop targets: %s | Level-up/trinket opportunities"
+		"Shop targets: %s | Level-up/trinket opportunities",
+		_formatter
 	)
 	_advisor.register_rule(scavenger_rule)
 	
@@ -166,7 +187,8 @@ func _setup_advisor() -> void:
 		["monster.name.beetbud"],
 		[],
 		"NOTICE",
-		"Beetbud available: shop %s"
+		"Beetbud available: shop %s",
+		_formatter
 	)
 	_advisor.register_rule(blackbelt_beetbud_rule)
 	
@@ -174,7 +196,8 @@ func _setup_advisor() -> void:
 	var beetdown_company_rule = TrainerRules.BeetdownCompanyRule.new(
 		"beetdown_company",
 		"black_belt",
-		"WARNING"
+		"WARNING",
+		_formatter
 	)
 	_advisor.register_rule(beetdown_company_rule)
 	
@@ -341,127 +364,6 @@ func _log_lines(lines: Array) -> void:
 	"""Log multiple lines from formatter."""
 	for line in lines:
 		_log_message(line)
-
-
-# Snapshot comparison and conversion functions
-
-func _snapshots_equal(a, b) -> bool:
-	"""Compare two snapshots for equality."""
-	if a == null or b == null:
-		return false
-	
-	# Compare run state
-	if a.trainer_id != b.trainer_id or a.day != b.day or a.shop_rank != b.shop_rank:
-		return false
-	if a.lives != b.lives or a.player_hp != b.player_hp or a.gold != b.gold or a.wins != b.wins:
-		return false
-	
-	# Compare shop state
-	if a.shop_frozen != b.shop_frozen:
-		return false
-	if a.shop_offers.size() != b.shop_offers.size():
-		return false
-	for i in range(a.shop_offers.size()):
-		if not _shop_offers_equal(a.shop_offers[i], b.shop_offers[i]):
-			return false
-	
-	# Compare team state
-	if a.team_monsters.size() != b.team_monsters.size():
-		return false
-	for i in range(a.team_monsters.size()):
-		if not _monsters_equal(a.team_monsters[i], b.team_monsters[i]):
-			return false
-	
-	# Compare bench state
-	if a.bench_monsters.size() != b.bench_monsters.size():
-		return false
-	for i in range(a.bench_monsters.size()):
-		if not _monsters_equal(a.bench_monsters[i], b.bench_monsters[i]):
-			return false
-	
-	return true
-
-
-func _shop_offers_equal(a, b) -> bool:
-	"""Compare two shop offers for equality."""
-	if a == null and b == null:
-		return true
-	if a == null or b == null:
-		return false
-	return a.type == b.type and a.species_key == b.species_key and a.item_id == b.item_id and a.level == b.level and a.is_shiny == b.is_shiny
-
-
-func _monsters_equal(a, b) -> bool:
-	"""Compare two monsters for equality."""
-	if a == null and b == null:
-		return true
-	if a == null or b == null:
-		return false
-	return a.instance_id == b.instance_id and a.species_key == b.species_key and a.level == b.level
-
-
-func _snapshot_to_run_state(snapshot) -> Dictionary:
-	"""Convert snapshot to legacy run state format for formatter."""
-	return {
-		"trainer_id": snapshot.trainer_id,
-		"current_round": snapshot.day,
-		"current_wins": snapshot.wins,
-		"lives": snapshot.lives,
-		"gold": snapshot.gold,
-		"shop_rank": snapshot.shop_rank,
-		"player_hp": snapshot.player_hp
-	}
-
-
-func _snapshot_to_shop_state(snapshot) -> Dictionary:
-	"""Convert snapshot to legacy shop state format for formatter."""
-	var fingerprint := []
-	for offer in snapshot.shop_offers:
-		var slot_data := {"slot": offer.slot}
-		if offer.is_empty():
-			slot_data["type"] = "empty"
-		elif offer.is_monster():
-			slot_data["type"] = "creature"
-			slot_data["id"] = offer.species_key
-			slot_data["level"] = offer.level
-			slot_data["shiny"] = offer.is_shiny
-		elif offer.is_item():
-			slot_data["type"] = "item"
-			slot_data["id"] = offer.item_id
-		else:
-			slot_data["type"] = "unknown"
-		fingerprint.append(slot_data)
-	
-	return {
-		"fingerprint": fingerprint,
-		"frozen": snapshot.shop_frozen
-	}
-
-
-func _snapshot_to_team_state(snapshot) -> Dictionary:
-	"""Convert snapshot to legacy team state format for formatter."""
-	var team_fingerprint := []
-	for monster in snapshot.team_monsters:
-		if monster == null:
-			team_fingerprint.append(0)
-		else:
-			team_fingerprint.append({
-				"id": monster.instance_id,
-				"level": monster.level,
-				"species": monster.species_key
-			})
-	return {"monsters": team_fingerprint}
-
-
-func _snapshot_to_bench_state(snapshot) -> Dictionary:
-	"""Convert snapshot to legacy bench state format for formatter."""
-	var bench_ids := []
-	for monster in snapshot.bench_monsters:
-		if monster == null:
-			bench_ids.append(0)
-		else:
-			bench_ids.append(monster.instance_id)
-	return {"monsters": bench_ids}
 
 
 # Utility functions

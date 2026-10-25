@@ -24,14 +24,16 @@ class ShopTargetsRule extends BaseRule:
 	var target_items: Array  # item IDs
 	var severity: String
 	var message_template: String
+	var formatter  # Reference to log formatter for name formatting
 	
-	func _init(p_rule_id: String, p_trainer_filter: String, p_target_monsters: Array, p_target_items: Array, p_severity: String, p_message_template: String) -> void:
+	func _init(p_rule_id: String, p_trainer_filter: String, p_target_monsters: Array, p_target_items: Array, p_severity: String, p_message_template: String, p_formatter) -> void:
 		super._init(p_rule_id)
 		trainer_filter = p_trainer_filter
 		target_monsters = p_target_monsters
 		target_items = p_target_items
 		severity = p_severity
 		message_template = p_message_template
+		formatter = p_formatter
 	
 	func evaluate(context: AdviceContext) -> Dictionary:
 		# Check trainer filter
@@ -43,7 +45,7 @@ class ShopTargetsRule extends BaseRule:
 		# Check for target monsters
 		for shop_item in context.shop_items:
 			if shop_item.is_monster and shop_item.name_key in target_monsters:
-				var monster_name := _format_monster_name(shop_item.name_key)
+				var monster_name: String = formatter.format_species_name(shop_item.name_key)
 				matches.append("[%d] %s" % [shop_item.slot, monster_name])
 			elif not shop_item.item_id.is_empty() and shop_item.item_id in target_items:
 				var item_name := _format_item_name(shop_item.item_id)
@@ -59,13 +61,6 @@ class ShopTargetsRule extends BaseRule:
 			"matched_slots": matches
 		}
 	
-	func _format_monster_name(name_key: String) -> String:
-		# Extract readable name from name_key (e.g., "monster.name.lamplet" -> "Lamplet")
-		var parts := name_key.split(".")
-		if parts.size() > 0:
-			return parts[-1].capitalize()
-		return name_key
-	
 	func _format_item_name(item_id: String) -> String:
 		# Format item ID (e.g., "basic_bait" -> "Basic Bait")
 		return item_id.replace("_", " ").capitalize()
@@ -75,11 +70,13 @@ class ShopTargetsRule extends BaseRule:
 class BeetdownCompanyRule extends BaseRule:
 	var trainer_filter: String
 	var severity: String
+	var formatter  # Reference to log formatter for name formatting
 	
-	func _init(p_rule_id: String, p_trainer_filter: String, p_severity: String) -> void:
+	func _init(p_rule_id: String, p_trainer_filter: String, p_severity: String, p_formatter) -> void:
 		super._init(p_rule_id)
 		trainer_filter = p_trainer_filter
 		severity = p_severity
+		formatter = p_formatter
 	
 	func evaluate(context: AdviceContext) -> Dictionary:
 		# Check trainer filter
@@ -107,7 +104,7 @@ class BeetdownCompanyRule extends BaseRule:
 				continue
 			
 			if "fighting" in monster.types:
-				var monster_name := _format_monster_name(monster.name_key)
+				var monster_name: String = formatter.format_species_name(monster.name_key)
 				other_fighters.append("[%d] %s" % [monster.slot, monster_name])
 		
 		if other_fighters.is_empty():
@@ -119,12 +116,6 @@ class BeetdownCompanyRule extends BaseRule:
 			"message": "Beetdown needs to be your only fighter. Other fighters: %s" % ", ".join(other_fighters),
 			"matched_slots": other_fighters
 		}
-	
-	func _format_monster_name(name_key: String) -> String:
-		var parts := name_key.split(".")
-		if parts.size() > 0:
-			return parts[-1].capitalize()
-		return name_key
 
 
 ## Rule that triggers on specific days
