@@ -39,8 +39,8 @@ var _snapshot_script = null
 var _snapshot_builder = null
 var _changes_comparer = null
 
-# Reminder panel system
-var _reminder_panel = null
+# Reminder label system (compact top-bar)
+var _reminder_label = null
 var _reminder_layer: CanvasLayer = null
 
 
@@ -168,8 +168,8 @@ func _on_config_changed(mod_id: String, key: String, value) -> void:
 			if value is bool:
 				_enable_trainer_reminders = value
 				_log_message("Setting changed: Trainer Reminders = %s" % _enable_trainer_reminders)
-				if not _enable_trainer_reminders and _reminder_panel != null:
-					_reminder_panel.hide_all_reminders()
+				if not _enable_trainer_reminders and _reminder_label != null:
+					_reminder_label.hide_all_reminders()
 
 
 func _setup_advisor() -> void:
@@ -225,20 +225,64 @@ func _setup_advisor() -> void:
 		"🧪 MAD SCIENTIST: Your active team transforms into random Legendaries on Day 7!"
 	)
 	_advisor.register_rule(mad_scientist_day6_rule)
+	
+	# Gamer Day 8 reminder
+	var gamer_day8_rule = TrainerRules.DayReminderRule.new(
+		"gamer_day8",
+		"gamer",
+		8,
+		"NOTICE",
+		"🎮 GAMER: A Mythical monster arrives on Day 9!"
+	)
+	_advisor.register_rule(gamer_day8_rule)
+	
+	# Gentleman Day 3 reminder
+	var gentleman_day3_rule = TrainerRules.DayReminderRule.new(
+		"gentleman_day3",
+		"gentleman",
+		3,
+		"NOTICE",
+		"🎩 GENTLEMAN: Common and Uncommon monsters stop appearing in shops starting Day 4!"
+	)
+	_advisor.register_rule(gentleman_day3_rule)
+	
+	# Treasure Hunter shop targets rule (same as Scavenger)
+	var treasure_hunter_rule = TrainerRules.ShopTargetsRule.new(
+		"treasure_hunter_targets",
+		"treasure_hunter",
+		["monster.name.lamplet", "monster.name.swoonet"],
+		["basic_bait"],
+		"NOTICE",
+		"Shop targets: %s | Level-up/trinket opportunities",
+		_formatter
+	)
+	_advisor.register_rule(treasure_hunter_rule)
+	
+	# Burglar shop targets rule (same as Scavenger)
+	var burglar_rule = TrainerRules.ShopTargetsRule.new(
+		"burglar_targets",
+		"burglar",
+		["monster.name.lamplet", "monster.name.swoonet"],
+		["basic_bait"],
+		"NOTICE",
+		"Shop targets: %s | Level-up/trinket opportunities",
+		_formatter
+	)
+	_advisor.register_rule(burglar_rule)
 
 
 func _setup_reminder_panel() -> void:
-	"""Initialize reminder panel UI layer."""
-	var ReminderPanel = load("res://mods/NP_Brainrot/reminder_panel.gd")
+	"""Initialize reminder label UI layer."""
+	var ReminderLabel = load("res://mods/NP_Brainrot/reminder_label.gd")
 	
 	_reminder_layer = CanvasLayer.new()
 	_reminder_layer.layer = 100  # Above game UI but below debug overlays
 	_reminder_layer.name = "NP_Brainrot_Reminders"
 	add_child(_reminder_layer)
 	
-	_reminder_panel = ReminderPanel.new()
-	_reminder_panel.name = "ReminderPanel"
-	_reminder_layer.add_child(_reminder_panel)
+	_reminder_label = ReminderLabel.new()
+	_reminder_label.name = "ReminderLabel"
+	_reminder_layer.add_child(_reminder_label)
 
 
 func _process(_delta: float) -> void:
@@ -266,8 +310,8 @@ func _inspect_current_phase() -> void:
 			_battle_logged = false
 			if _advisor != null:
 				_advisor.reset_suppression()
-			if _reminder_panel != null:
-				_reminder_panel.hide_all_reminders()
+			if _reminder_label != null:
+				_reminder_label.hide_all_reminders()
 
 
 func _evaluate_trainer_advice(snapshot) -> void:
@@ -297,6 +341,14 @@ func _evaluate_trainer_advice(snapshot) -> void:
 				prefix = "Black Belt"
 			elif rule_id.begins_with("mad_scientist"):
 				prefix = "Mad Scientist"
+			elif rule_id.begins_with("gamer"):
+				prefix = "Gamer"
+			elif rule_id.begins_with("gentleman"):
+				prefix = "Gentleman"
+			elif rule_id.begins_with("treasure_hunter"):
+				prefix = "Treasure Hunter"
+			elif rule_id.begins_with("burglar"):
+				prefix = "Burglar"
 			
 			var full_message := ""
 			if not prefix.is_empty():
@@ -306,24 +358,21 @@ func _evaluate_trainer_advice(snapshot) -> void:
 			
 			_print_notice(full_message)
 		
-		# Handle reminder panel display for day reminder rules and shop target rules
-		if _enable_trainer_reminders and _reminder_panel != null:
-			# Day reminders (Mad Scientist, etc.)
-			if rule_id.ends_with("_day6") or rule_id.contains("_day"):
-				_reminder_panel.show_reminder(rule_id, message)
-			# Shop target rules (Scavenger, Black Belt Beetbud)
-			elif rule_id.ends_with("_targets") or rule_id == "blackbelt_beetbud":
-				_reminder_panel.show_reminder(rule_id, message)
+		# Handle reminder label display with simplified messages
+		if _enable_trainer_reminders and _reminder_label != null:
+			var simplified_message := _simplify_reminder_message(rule_id, message, advice)
+			if not simplified_message.is_empty():
+				_reminder_label.show_reminder(rule_id, simplified_message)
 	
 	# Hide reminders for inactive rules
-	if _reminder_panel != null:
+	if _reminder_label != null:
 		var active_rule_ids: Array = []
 		for advice in result.get("all_active", []):
 			var rule_id: String = advice.get("rule_id", "")
-			# Include day reminders and shop target rules
-			if rule_id.ends_with("_day6") or rule_id.contains("_day") or rule_id.ends_with("_targets") or rule_id == "blackbelt_beetbud":
+			# Include day reminders, shop target rules, and team composition rules
+			if rule_id.ends_with("_day6") or rule_id.ends_with("_day8") or rule_id.ends_with("_day3") or rule_id.contains("_day") or rule_id.ends_with("_targets") or rule_id == "blackbelt_beetbud" or rule_id == "beetdown_company":
 				active_rule_ids.append(rule_id)
-		_reminder_panel.hide_inactive_reminders(active_rule_ids)
+		_reminder_label.hide_inactive_reminders(active_rule_ids)
 	
 	# Diagnostic: Log Fighting type identifier once per shop entry
 	if _debug_logging and not _diagnostic_logged:
@@ -333,6 +382,49 @@ func _evaluate_trainer_advice(snapshot) -> void:
 					_log_message("[DIAGNOSTIC] Fighting type detected in team slot %d: %s" % [monster.slot, monster.name_key])
 					_diagnostic_logged = true
 					break
+
+
+func _simplify_reminder_message(rule_id: String, original_message: String, advice: Dictionary) -> String:
+	"""Convert full reminder messages to compact single-line format."""
+	
+	# Shop target rules - extract unique monster names
+	if rule_id.ends_with("_targets") or rule_id == "blackbelt_beetbud":
+		var matched_slots: Array = advice.get("matched_slots", [])
+		if matched_slots.is_empty():
+			return ""
+		
+		# Extract unique monster names from matched slots
+		var unique_names: Array = []
+		var seen_names := {}
+		
+		for slot_text in matched_slots:
+			# slot_text format: "[0] Lamplet" or "[1] Basic Bait"
+			var parts: PackedStringArray = str(slot_text).split("] ", false, 1)
+			if parts.size() >= 2:
+				var name: String = parts[1].strip_edges()
+				if not seen_names.has(name):
+					seen_names[name] = true
+					unique_names.append(name)
+		
+		if unique_names.is_empty():
+			return ""
+		
+		return "Reminders: " + ", ".join(unique_names)
+	
+	# Day reminder rules - shorten messages
+	elif rule_id == "mad_scientist_day6":
+		return "Tomorrow: Legendary transformation!"
+	elif rule_id == "gamer_day8":
+		return "Tomorrow: Mythical monster!"
+	elif rule_id == "gentleman_day3":
+		return "Tomorrow: No Common/Uncommon shops!"
+	
+	# Team composition rules - shorten messages
+	elif rule_id == "beetdown_company":
+		return "Black Belt: 2+ Fighters active!"
+	
+	# Default: use original message (shouldn't happen for displayed reminders)
+	return original_message
 
 
 func _handle_shop_phase(state) -> void:
@@ -399,8 +491,8 @@ func _handle_battle_phase(state) -> void:
 		_battle_logged = true
 	
 	# Hide reminders during battle
-	if _reminder_panel != null:
-		_reminder_panel.hide_all_reminders()
+	if _reminder_label != null:
+		_reminder_label.hide_all_reminders()
 	
 	_last_phase = "battle"
 
