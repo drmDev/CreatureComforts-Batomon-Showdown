@@ -31,6 +31,20 @@ const REMINDER_TEMPLATES := {
 	"beetdown_company": "Black Belt: 2+ Fighters active!"
 }
 
+# Shop card highlight overlay (outlines shop cards matching active shop-target advice)
+var _shop_highlight = null
+var _enable_shop_highlights := true
+
+# Overlay gate: hides reminders/highlights while the shop is not on screen or not interactive
+const GATE_NOT_SHOP := "not in shop"
+const GATE_SETTLING := "shop settling after transition"
+const GATE_SEARCH := "opponent search (CancelButton visible)"
+const GATE_BATTLE_STARTING := "battle starting (BattleButton hidden)"
+const SHOP_SETTLE_MS := 1200  # Overlay stays hidden this long after the shop state appears (transition fade-in)
+
+var _overlay_gate_reason := ""
+var _shop_since_ms := 0  # When the current shop state first appeared (0 = not in shop)
+
 var _next_poll := 0
 var _last_phase := ""
 var _last_snapshot = null  # ShopSnapshot from previous poll
@@ -44,7 +58,6 @@ var _deep_inspection := true
 var _enable_trainer_reminders := true
 var _settings_load_attempted := false
 var _settings_warning_shown := false
-var _diagnostic_logged := false
 
 # Logging
 var _log_path := ""
@@ -64,9 +77,6 @@ var _reminder_label = null
 var _reminder_layer: CanvasLayer = null
 var _pika_player: AudioStreamPlayer = null
 var _last_reminder_text := ""  # Track last displayed text to detect new reminders
-
-# Trinket panel system
-var _trinket_panel = null
 
 
 func _init() -> void:
@@ -108,6 +118,7 @@ func _load_settings() -> void:
 		_debug_logging = mod_loader.get_config("np_brainrot", "debug_logging", true)
 		_deep_inspection = mod_loader.get_config("np_brainrot", "deep_inspection", true)
 		_enable_trainer_reminders = mod_loader.get_config("np_brainrot", "enable_trainer_reminders", true)
+		_enable_shop_highlights = mod_loader.get_config("np_brainrot", "enable_shop_highlights", true)
 		
 		# Connect to config_changed signal for live updates
 		if mod_loader.has_signal("config_changed") and not mod_loader.is_connected("config_changed", _on_config_changed):
@@ -197,6 +208,14 @@ func _on_config_changed(mod_id: String, key: String, value) -> void:
 				_log_message("Setting changed: Trainer Reminders = %s" % _enable_trainer_reminders)
 				if not _enable_trainer_reminders and _reminder_label != null:
 					_reminder_label.hide_all_reminders()
+				if not _enable_trainer_reminders:
+					_clear_shop_highlights()
+		"enable_shop_highlights":
+			if value is bool:
+				_enable_shop_highlights = value
+				_log_message("Setting changed: Shop Highlights = %s" % _enable_shop_highlights)
+				if not _enable_shop_highlights:
+					_clear_shop_highlights()
 
 
 func _setup_advisor() -> void:
@@ -285,7 +304,6 @@ func _register_shop_target_rule(trainer_id: String) -> void:
 func _setup_reminder_panel() -> void:
 	"""Initialize reminder label UI layer."""
 	var ReminderLabel = load("res://mods/NP_Brainrot/reminder_label.gd")
-	var TrinketPanel = load("res://mods/NP_Brainrot/trinket_panel.gd")
 	
 	_reminder_layer = CanvasLayer.new()
 	_reminder_layer.layer = 100  # Above game UI but below debug overlays
@@ -296,9 +314,11 @@ func _setup_reminder_panel() -> void:
 	_reminder_label.name = "ReminderLabel"
 	_reminder_layer.add_child(_reminder_label)
 	
-	_trinket_panel = TrinketPanel.new()
-	_trinket_panel.name = "TrinketPanel"
-	_reminder_layer.add_child(_trinket_panel)
+	var ShopHighlight = load("res://mods/NP_Brainrot/shop_highlight.gd")
+	_shop_highlight = ShopHighlight.new()
+	_shop_highlight.name = "ShopHighlight"
+	_shop_highlight.setup(_resolve_highlight_rects)
+	_reminder_layer.add_child(_shop_highlight)
 
 
 func _setup_pika_sound() -> void:
@@ -324,6 +344,7 @@ func _play_pika() -> void:
 func _process(_delta: float) -> void:
 	if not _initialized:
 		return
+	_update_overlay_gate()
 	
 	var now := Time.get_ticks_msec()
 	if now < _next_poll:
@@ -344,13 +365,12 @@ func _inspect_current_phase() -> void:
 		if _last_phase != "":
 			_last_phase = ""
 			_battle_logged = false
+			_clear_shop_highlights()
 			if _advisor != null:
 				_advisor.reset_suppression()
 			if _reminder_label != null:
 				_reminder_label.hide_all_reminders()
 				_last_reminder_text = ""  # Reset sound trigger
-			if _trinket_panel != null:
-				_trinket_panel.visible = false
 
 
 func _evaluate_trainer_advice(snapshot) -> void:
@@ -404,20 +424,15 @@ func _evaluate_trainer_advice(snapshot) -> void:
 		# Play notification sound if reminder text changed (new reminder appeared)
 		if _reminder_label.visible:
 			var current_text: String = _reminder_label.get_current_text()
-			if not current_text.is_empty() and current_text != _last_reminder_text:
+			# Only chime once the overlay is actually showing (not during transitions or opponent search)
+			if not current_text.is_empty() and current_text != _last_reminder_text and _overlay_gate_reason.is_empty():
 				_play_pika()
 				_last_reminder_text = current_text
 		else:
 			_last_reminder_text = ""  # Reset when no reminders active
 	
-	# Diagnostic: Log Fighting type identifier once per shop entry
-	if _debug_logging and not _diagnostic_logged:
-		if context.trainer_id == "black_belt" or context.trainer_id == "blackbelt":
-			for monster in context.team_monsters:
-				if "fighting" in monster.types:
-					_log_message("[DIAGNOSTIC] Fighting type detected in team slot %d: %s" % [monster.slot, monster.name_key])
-					_diagnostic_logged = true
-					break
+	# Outline shop cards matching active shop-target advice
+	_update_shop_highlights(all_active)
 
 
 func _get_trainer_prefix(rule_id: String) -> String:
@@ -486,12 +501,12 @@ func _handle_shop_phase(state) -> void:
 	
 	if phase_changed:
 		_battle_logged = false
-		_diagnostic_logged = false  # Reset for new shop entry
 		if _advisor != null:
 			_advisor.reset_suppression()  # Reset for new shop visit
 		_log_phase_entry("SHOP", run, manager)
 		if _deep_inspection:
 			_log_lines(_formatter.format_deep_inspect_shop(manager, run))
+		_clear_shop_highlights()
 	elif _last_snapshot != null:
 		# Compare snapshots and log changes
 		var comparison = _changes_comparer.compare(_last_snapshot, current_snapshot)
@@ -505,8 +520,7 @@ func _handle_shop_phase(state) -> void:
 	# Evaluate trainer advice (after logging, before updating snapshot)
 	_evaluate_trainer_advice(current_snapshot)
 	
-	# Update trinket panel with current trinkets
-	_update_trinket_panel(run)
+	# (overlay visibility is handled every frame by _update_overlay_gate)
 	
 	_last_phase = "shop"
 	_last_snapshot = current_snapshot
@@ -531,32 +545,126 @@ func _handle_battle_phase(state) -> void:
 		
 		_battle_logged = true
 	
-	# Hide reminders and trinket panel during battle
+	# Hide reminders during battle
 	if _reminder_label != null:
 		_reminder_label.hide_all_reminders()
-	if _trinket_panel != null:
-		_trinket_panel.visible = false
 	
+	_clear_shop_highlights()
 	_last_phase = "battle"
 
 
-func _update_trinket_panel(run) -> void:
-	"""Update trinket panel with current owned trinkets."""
-	if _trinket_panel == null:
+func _update_overlay_gate() -> void:
+	"""Every frame: hide the whole reminder/highlight layer unless the shop is on screen and interactive."""
+	if _reminder_layer == null:
 		return
 	
-	# Get trinket_ids from run object
-	if not _has_property(run, "trinket_ids"):
-		_trinket_panel.visible = false
+	var reason := _compute_overlay_gate_reason()
+	if reason == _overlay_gate_reason:
 		return
 	
-	var trinket_ids = run.get("trinket_ids")
-	if trinket_ids == null or not trinket_ids is Array:
-		_trinket_panel.visible = false
+	_overlay_gate_reason = reason
+	_reminder_layer.visible = reason.is_empty()
+
+
+func _compute_overlay_gate_reason() -> String:
+	"""Empty string = overlay allowed. Cheap checks only (runs every frame)."""
+	var main = get_tree().current_scene
+	if main == null:
+		_shop_since_ms = 0
+		return GATE_NOT_SHOP
+	var state = main.get("current_state")
+	if not _script_is(state, SHOP_SCRIPT):
+		_shop_since_ms = 0
+		return GATE_NOT_SHOP
+	
+	# The shop state exists before the transition has finished fading in; wait for it to settle
+	var now := Time.get_ticks_msec()
+	if _shop_since_ms == 0:
+		_shop_since_ms = now
+	if now - _shop_since_ms < SHOP_SETTLE_MS:
+		return GATE_SETTLING
+	
+	# While searching for an opponent the shop's Cancel button replaces the Battle button
+	var view = state.get("view")
+	if view is Node and is_instance_valid(view):
+		var cancel = view.get_node_or_null("CancelButton")
+		if cancel is CanvasItem and cancel.is_visible_in_tree():
+			return GATE_SEARCH
+		# After the search succeeds the shop stays up while the game transitions to battle
+		var battle_button = view.get_node_or_null("BattleButton")
+		if battle_button is CanvasItem and not battle_button.is_visible_in_tree():
+			return GATE_BATTLE_STARTING
+	return ""
+
+
+func _update_shop_highlights(all_active: Array) -> void:
+	"""Convert active shop-target advice into highlight targets (slot index + offer instance id)."""
+	if _shop_highlight == null:
 		return
 	
-	# Update panel with trinket array
-	_trinket_panel.set_trinkets(trinket_ids)
+	var targets: Array = []
+	if _enable_shop_highlights and _enable_trainer_reminders:
+		var seen := {}
+		for advice in all_active:
+			var slots: Array = advice.get("matched_indices", [])
+			var ids: Array = advice.get("matched_ids", [])
+			for i in range(mini(slots.size(), ids.size())):
+				var slot_index := int(slots[i])
+				if seen.has(slot_index):
+					continue
+				seen[slot_index] = true
+				targets.append({"slot": slot_index, "id": int(ids[i])})
+	_shop_highlight.set_targets(targets)
+
+
+func _clear_shop_highlights() -> void:
+	if _shop_highlight != null:
+		_shop_highlight.clear_targets()
+
+
+func _resolve_highlight_rects(targets: Array) -> Array:
+	"""Called every frame by the overlay: current rects for cards still showing the recorded offer.
+	Reads state.view.shop_slots[slot_index].current_content and compares instance ids, retaining nothing."""
+	var rects: Array = []
+	if targets.is_empty():
+		return rects
+	
+	var main = get_tree().current_scene
+	if main == null:
+		return rects
+	var state = main.get("current_state")
+	if not _script_is(state, SHOP_SCRIPT):
+		return rects
+	
+	var view = state.get("view")
+	if view == null or not is_instance_valid(view) or not view is Node:
+		return rects
+	
+	# Do not draw over the Dex overlay
+	var dex = view.get_node_or_null("DexUI")
+	if dex is CanvasItem and dex.is_visible_in_tree():
+		return rects
+	
+	var slots = view.get("shop_slots")
+	if not slots is Array:
+		return rects
+	
+	for target in targets:
+		var slot_index: int = target["slot"]
+		if slot_index < 0 or slot_index >= slots.size():
+			continue
+		var slot = slots[slot_index]
+		if not is_instance_valid(slot) or not slot is Control:
+			continue
+		if not slot.is_visible_in_tree():
+			continue
+		var content = slot.get("current_content")
+		if typeof(content) != TYPE_OBJECT or not is_instance_valid(content):
+			continue
+		if content.get_instance_id() != int(target["id"]):
+			continue
+		rects.append(slot.get_global_rect())
+	return rects
 
 
 func _log_phase_entry(phase: String, run, manager = null) -> void:

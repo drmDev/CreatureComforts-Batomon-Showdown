@@ -7,6 +7,7 @@ extends RefCounted
 ## Represents a shop offer with identity, species, level, types, and price
 class ShopOffer:
 	var slot: int = -1
+	var instance_id: int = 0  # Live offer object's instance id (0 when empty); lets UI overlays validate identity
 	var type: String = "empty"  # "empty", "monster", "item", "unknown"
 	var species_key: String = ""  # monster.name.lamplet
 	var item_id: String = ""  # basic_bait, etc.
@@ -94,6 +95,8 @@ func capture(run, manager, has_property_func: Callable, type_resolver: Callable)
 			var item = items[i]
 			var offer = ShopOffer.new()
 			offer.slot = i
+			if item != null:
+				offer.instance_id = item.get_instance_id()
 			
 			if item == null:
 				offer.type = "empty"

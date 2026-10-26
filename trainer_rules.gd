@@ -41,15 +41,21 @@ class ShopTargetsRule extends BaseRule:
 			return {}
 		
 		var matches: Array = []
+		var matched_indices: Array = []  # Shop slot indices, aligned with matched_ids
+		var matched_ids: Array = []  # Live offer instance ids, so overlays can validate identity
 		
 		# Check for target monsters
 		for shop_item in context.shop_items:
 			if shop_item.is_monster and shop_item.name_key in target_monsters:
 				var monster_name: String = formatter.format_species_name(shop_item.name_key)
 				matches.append("[%d] %s" % [shop_item.slot, monster_name])
+				matched_indices.append(shop_item.slot)
+				matched_ids.append(shop_item.instance_id)
 			elif not shop_item.item_id.is_empty() and shop_item.item_id in target_items:
 				var item_name := _format_item_name(shop_item.item_id)
 				matches.append("[%d] %s" % [shop_item.slot, item_name])
+				matched_indices.append(shop_item.slot)
+				matched_ids.append(shop_item.instance_id)
 		
 		if matches.is_empty():
 			return {}
@@ -58,7 +64,9 @@ class ShopTargetsRule extends BaseRule:
 			"rule_id": rule_id,
 			"severity": severity,
 			"message": message_template % ", ".join(matches),
-			"matched_slots": matches
+			"matched_slots": matches,
+			"matched_indices": matched_indices,
+			"matched_ids": matched_ids
 		}
 	
 	func _format_item_name(item_id: String) -> String:
