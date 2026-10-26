@@ -3,8 +3,6 @@ extends RefCounted
 ## Provides stable data snapshots for rule evaluation without retaining live game objects.
 ## Now consumes ShopSnapshot instead of reading game objects directly.
 
-class_name AdviceContext
-
 
 ## Represents a shop item with stable identification
 class ShopItem:
@@ -45,7 +43,7 @@ var team_monsters: Array = []
 
 
 ## Create context from ShopSnapshot
-func from_snapshot(snapshot) -> AdviceContext:
+func from_snapshot(snapshot):
 	var context = get_script().new()
 	
 	# Extract trainer ID and day from snapshot

@@ -8,7 +8,7 @@ Brainrot Edition (`np_brainrot`) is a GDScript mod for **Batomon Showdown** that
 - ✅ Complete the shared shop-snapshot refactor while preserving working behavior.
 - ✅ Maintain Scavenger target notices and Black Belt Beetbud/Beetdown checks.
 - ✅ Add the Mad Scientist Day 6 transformation reminder with on-screen display.
-- ✅ Discover owned-trinket data and log compact effect descriptions via deep inspection; a collapsible list panel is not yet implemented.
+- ✅ Retire the exploratory owned-trinket reflection probe from deep-inspection logging; trinket-aware advice would require re-verified game data first.
 - Add a compact shop advice panel using the working NP_QoL drawing patterns.
 
 ## Files

@@ -1,5 +1,5 @@
 extends Node
-## Brainrot Edition - Phase 2.3: Refactored Trainer Advice System
+## Brainrot Edition - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
 const VERSION := "0.9001"
