@@ -11,29 +11,14 @@ const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 # Polling and state tracking
 const POLL_INTERVAL_MS := 500
 
-# Trainer display name mapping
-const TRAINER_PREFIXES := {
-	"scavenger": "Scavenger",
-	"blackbelt": "Black Belt",
-	"beetdown": "Black Belt",
-	"mad_scientist": "Mad Scientist",
-	"gamer": "Gamer",
-	"gentleman": "Gentleman",
-	"treasure_hunter": "Treasure Hunter",
-	"burglar": "Burglar"
-}
+# Advice display modes (mirror BaseRule constants in trainer_rules.gd)
+const DISPLAY_NONE := "none"
+const DISPLAY_LABEL := "label"
+const DISPLAY_HIGHLIGHT := "highlight"
+const DISPLAY_BOTH := "both"
 
-# Reminder message templates for day-based and team composition rules
-const REMINDER_TEMPLATES := {
-	"mad_scientist_day6": "Tomorrow: Legendary transformation!",
-	"gamer_day8": "Tomorrow: Mythical monster!",
-	"gentleman_day3": "Tomorrow: No Common/Uncommon shops!",
-	"beetdown_company": "Black Belt: 2+ Fighters active!"
-}
-
-# Shop card highlight overlay (outlines shop cards matching active shop-target advice)
+# Shop card highlight overlay (outlines shop cards matching active highlight-mode advice)
 var _shop_highlight = null
-var _enable_shop_highlights := true
 
 # Overlay gate: hides reminders/highlights while the shop is not on screen or not interactive
 const GATE_NOT_SHOP := "not in shop"
@@ -76,7 +61,12 @@ var _changes_comparer = null
 var _reminder_label = null
 var _reminder_layer: CanvasLayer = null
 var _pika_player: AudioStreamPlayer = null
-var _last_reminder_text := ""  # Track last displayed text to detect new reminders
+
+# Chime queue: rule_ids whose day reminder fired since the last play
+var _pending_chime_rule_ids: Dictionary = {}
+
+# Trainer display names (built from the trainer catalog)
+var _trainer_display_names: Dictionary = {}
 
 
 func _init() -> void:
@@ -118,7 +108,6 @@ func _load_settings() -> void:
 		_debug_logging = mod_loader.get_config("np_brainrot", "debug_logging", true)
 		_deep_inspection = mod_loader.get_config("np_brainrot", "deep_inspection", true)
 		_enable_trainer_reminders = mod_loader.get_config("np_brainrot", "enable_trainer_reminders", true)
-		_enable_shop_highlights = mod_loader.get_config("np_brainrot", "enable_shop_highlights", true)
 		
 		# Connect to config_changed signal for live updates
 		if mod_loader.has_signal("config_changed") and not mod_loader.is_connected("config_changed", _on_config_changed):
@@ -210,18 +199,13 @@ func _on_config_changed(mod_id: String, key: String, value) -> void:
 					_reminder_label.hide_all_reminders()
 				if not _enable_trainer_reminders:
 					_clear_shop_highlights()
-		"enable_shop_highlights":
-			if value is bool:
-				_enable_shop_highlights = value
-				_log_message("Setting changed: Shop Highlights = %s" % _enable_shop_highlights)
-				if not _enable_shop_highlights:
-					_clear_shop_highlights()
 
 
 func _setup_advisor() -> void:
-	"""Initialize advisor and register all rules."""
+	"""Initialize advisor and register all rules from the trainer catalog."""
 	var TrainerAdvisor = load("res://mods/NP_Brainrot/trainer_advisor.gd")
-	var TrainerRules = load("res://mods/NP_Brainrot/trainer_rules.gd")
+	var TrainerCatalog = load("res://mods/NP_Brainrot/trainer_catalog.gd")
+	var RuleFactory = load("res://mods/NP_Brainrot/rule_factory.gd")
 	
 	_advisor = TrainerAdvisor.new()
 	
@@ -229,76 +213,14 @@ func _setup_advisor() -> void:
 	_advice_context_script = load("res://mods/NP_Brainrot/advice_context.gd")
 	_advice_context_builder = _advice_context_script.new()
 	
-	# Register shop target rules for trainers with same targets
-	_register_shop_target_rule("scavenger")
-	_register_shop_target_rule("treasure_hunter")
-	_register_shop_target_rule("burglar")
+	# Build trainer display-name map and register rules from the catalog
+	var definitions: Array = TrainerCatalog.TRAINER_DEFINITIONS
+	for trainer_def in definitions:
+		_trainer_display_names[str(trainer_def.get("id", ""))] = str(trainer_def.get("display_name", ""))
 	
-	# Black Belt Beetbud shop rule
-	var blackbelt_beetbud_rule = TrainerRules.ShopTargetsRule.new(
-		"blackbelt_beetbud",
-		"black_belt",
-		["monster.name.beetbud"],
-		[],
-		"NOTICE",
-		"Beetbud available: shop %s",
-		_formatter
-	)
-	_advisor.register_rule(blackbelt_beetbud_rule)
-	
-	# Black Belt Beetdown company rule
-	var beetdown_company_rule = TrainerRules.BeetdownCompanyRule.new(
-		"beetdown_company",
-		"black_belt",
-		"WARNING",
-		_formatter
-	)
-	_advisor.register_rule(beetdown_company_rule)
-	
-	# Mad Scientist Day 6 reminder
-	var mad_scientist_day6_rule = TrainerRules.DayReminderRule.new(
-		"mad_scientist_day6",
-		"mad_scientist",
-		6,
-		"WARNING",
-		"🧪 MAD SCIENTIST: Your active team transforms into random Legendaries on Day 7!"
-	)
-	_advisor.register_rule(mad_scientist_day6_rule)
-	
-	# Gamer Day 8 reminder
-	var gamer_day8_rule = TrainerRules.DayReminderRule.new(
-		"gamer_day8",
-		"gamer",
-		8,
-		"NOTICE",
-		"🎮 GAMER: A Mythical monster arrives on Day 9!"
-	)
-	_advisor.register_rule(gamer_day8_rule)
-	
-	# Gentleman Day 3 reminder
-	var gentleman_day3_rule = TrainerRules.DayReminderRule.new(
-		"gentleman_day3",
-		"gentleman",
-		3,
-		"NOTICE",
-		"🎩 GENTLEMAN: Common and Uncommon monsters stop appearing in shops starting Day 4!"
-	)
-	_advisor.register_rule(gentleman_day3_rule)
-
-
-func _register_shop_target_rule(trainer_id: String) -> void:
-	"""Register a shop target rule for trainers that share the same targets."""
-	var TrainerRules = load("res://mods/NP_Brainrot/trainer_rules.gd")
-	var rule = TrainerRules.ShopTargetsRule.new(
-		"%s_targets" % trainer_id,
-		trainer_id,
-		["monster.name.lamplet", "monster.name.swoonet"],
-		["basic_bait"],
-		"NOTICE",
-		"Shop targets: %s | Level-up/trinket opportunities",
-		_formatter
-	)
-	_advisor.register_rule(rule)
+	var factory = RuleFactory.new(_formatter)
+	for rule in factory.build_all(definitions):
+		_advisor.register_rule(rule)
 
 
 func _setup_reminder_panel() -> void:
@@ -370,7 +292,7 @@ func _inspect_current_phase() -> void:
 				_advisor.reset_suppression()
 			if _reminder_label != null:
 				_reminder_label.hide_all_reminders()
-				_last_reminder_text = ""  # Reset sound trigger
+			_pending_chime_rule_ids.clear()  # Drop stale chimes when leaving the shop
 
 
 func _evaluate_trainer_advice(snapshot) -> void:
@@ -390,11 +312,10 @@ func _evaluate_trainer_advice(snapshot) -> void:
 	for advice in new_or_changed:
 		var severity: String = advice.get("severity", "NOTICE")
 		var message: String = advice.get("message", "")
-		var rule_id: String = advice.get("rule_id", "")
 		
 		if not message.is_empty():
-			# Format trainer-specific prefix based on rule_id
-			var prefix := _get_trainer_prefix(rule_id)
+			# Trainers are namespaced by their own id, so no prefix inference is needed
+			var prefix: String = _trainer_display_names.get(advice.get("trainer_id", ""), "")
 			
 			var full_message := ""
 			if not prefix.is_empty():
@@ -403,81 +324,41 @@ func _evaluate_trainer_advice(snapshot) -> void:
 				full_message = "*** BRAINROT %s | %s" % [severity, message]
 			
 			_print_notice(full_message)
-	
-	# Update reminder panel with ALL active advice (no suppression for display)
-	if _enable_trainer_reminders and _reminder_label != null:
-		var reminders_to_show: Dictionary = {}
 		
-		for advice in all_active:
-			var rule_id: String = advice.get("rule_id", "")
-			var message: String = advice.get("message", "")
+		# Queue the chime for chime-flagged rules (day reminders); played once the overlay is showing
+		if advice.get("chime", false):
+			_pending_chime_rule_ids[advice.get("rule_id", "")] = true
+	
+	# On-screen surfaces are gated by the single Trainer Reminders setting
+	if _enable_trainer_reminders:
+		if _reminder_label != null:
+			var reminders_to_show: Dictionary = {}
 			
-			# Include day reminders, shop target rules, and team composition rules
-			if rule_id.contains("_day") or rule_id.ends_with("_targets") or rule_id == "blackbelt_beetbud" or rule_id == "beetdown_company":
-				var simplified_message := _simplify_reminder_message(rule_id, message, advice)
-				if not simplified_message.is_empty():
-					reminders_to_show[rule_id] = simplified_message
+			for advice in all_active:
+				var display: String = advice.get("display", DISPLAY_NONE)
+				if display == DISPLAY_LABEL or display == DISPLAY_BOTH:
+					var reminder_text: String = advice.get("reminder", "")
+					if not reminder_text.is_empty():
+						reminders_to_show[advice.get("rule_id", "")] = reminder_text
+			
+			# Replace all reminders at once (single update, single render)
+			_reminder_label.set_reminders(reminders_to_show)
 		
-		# Replace all reminders at once (single update, single render)
-		_reminder_label.set_reminders(reminders_to_show)
-		
-		# Play notification sound if reminder text changed (new reminder appeared)
-		if _reminder_label.visible:
-			var current_text: String = _reminder_label.get_current_text()
-			# Only chime once the overlay is actually showing (not during transitions or opponent search)
-			if not current_text.is_empty() and current_text != _last_reminder_text and _overlay_gate_reason.is_empty():
-				_play_pika()
-				_last_reminder_text = current_text
-		else:
-			_last_reminder_text = ""  # Reset when no reminders active
+		_try_play_chime()
+	elif _reminder_label != null:
+		_reminder_label.hide_all_reminders()
 	
-	# Outline shop cards matching active shop-target advice
+	# Outline shop cards matching active highlight-mode advice
 	_update_shop_highlights(all_active)
 
 
-func _get_trainer_prefix(rule_id: String) -> String:
-	"""Get trainer display name from rule ID using prefix matching."""
-	for key in TRAINER_PREFIXES:
-		if rule_id.begins_with(key):
-			return TRAINER_PREFIXES[key]
-	return ""
-
-
-func _simplify_reminder_message(rule_id: String, original_message: String, advice: Dictionary) -> String:
-	"""Convert full reminder messages to compact single-line format."""
-	
-	# Check templates first (day reminders and team composition rules)
-	if rule_id in REMINDER_TEMPLATES:
-		return REMINDER_TEMPLATES[rule_id]
-	
-	# Shop target rules - extract unique monster names
-	if rule_id.ends_with("_targets") or rule_id == "blackbelt_beetbud":
-		var matched_slots: Array = advice.get("matched_slots", [])
-		if matched_slots.is_empty():
-			return ""
-		
-		var unique_names := _extract_unique_names(matched_slots)
-		return "Reminders: " + ", ".join(unique_names) if not unique_names.is_empty() else ""
-	
-	# Default: use original message (shouldn't happen for displayed reminders)
-	return original_message
-
-
-func _extract_unique_names(matched_slots: Array) -> Array:
-	"""Extract unique monster/item names from matched slot strings."""
-	var unique_names: Array = []
-	var seen_names := {}
-	
-	for slot_text in matched_slots:
-		# slot_text format: "[0] Lamplet" or "[1] Basic Bait"
-		var parts: PackedStringArray = str(slot_text).split("] ", false, 1)
-		if parts.size() >= 2:
-			var name: String = parts[1].strip_edges()
-			if not seen_names.has(name):
-				seen_names[name] = true
-				unique_names.append(name)
-	
-	return unique_names
+func _try_play_chime() -> void:
+	"""Play the notification sound once, only when the overlay is on screen and a chime-flagged (day) reminder is queued."""
+	if _pending_chime_rule_ids.is_empty():
+		return
+	if _overlay_gate_reason.is_empty():
+		_play_pika()
+		_pending_chime_rule_ids.clear()
 
 
 func _handle_shop_phase(state) -> void:
@@ -548,6 +429,7 @@ func _handle_battle_phase(state) -> void:
 	# Hide reminders during battle
 	if _reminder_label != null:
 		_reminder_label.hide_all_reminders()
+	_pending_chime_rule_ids.clear()
 	
 	_clear_shop_highlights()
 	_last_phase = "battle"
@@ -564,6 +446,8 @@ func _update_overlay_gate() -> void:
 	
 	_overlay_gate_reason = reason
 	_reminder_layer.visible = reason.is_empty()
+	if reason.is_empty():
+		_try_play_chime()
 
 
 func _compute_overlay_gate_reason() -> String:
@@ -598,14 +482,17 @@ func _compute_overlay_gate_reason() -> String:
 
 
 func _update_shop_highlights(all_active: Array) -> void:
-	"""Convert active shop-target advice into highlight targets (slot index + offer instance id)."""
+	"""Convert active highlight-mode advice into highlight targets (slot index + offer instance id)."""
 	if _shop_highlight == null:
 		return
 	
 	var targets: Array = []
-	if _enable_shop_highlights and _enable_trainer_reminders:
+	if _enable_trainer_reminders:
 		var seen := {}
 		for advice in all_active:
+			var display: String = advice.get("display", DISPLAY_NONE)
+			if display != DISPLAY_HIGHLIGHT and display != DISPLAY_BOTH:
+				continue
 			var slots: Array = advice.get("matched_indices", [])
 			var ids: Array = advice.get("matched_ids", [])
 			for i in range(mini(slots.size(), ids.size())):

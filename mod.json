@@ -25,13 +25,6 @@
 			"type": "bool",
 			"default": true,
 			"description": "Show on-screen reminders for trainer-specific events (e.g., Mad Scientist Day 6 transformation)"
-		},
-		{
-			"key": "enable_shop_highlights",
-			"label": "Shop Highlights",
-			"type": "bool",
-			"default": true,
-			"description": "Outline shop cards that match the active trainer's reminders (requires Trainer Reminders)"
 		}
 	]
 }

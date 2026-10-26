@@ -50,28 +50,9 @@ func _init() -> void:
 	position = Vector2(LEFT_MARGIN, TOP_BAR_Y)
 
 
-func show_reminder(rule_id: String, simplified_text: String) -> void:
-	"""Display a reminder with simplified text."""
-	_active_reminders[rule_id] = simplified_text
-	_update_display()
-
-
 func set_reminders(reminders: Dictionary) -> void:
 	"""Replace all reminders with the provided dictionary. Single update, single render."""
 	_active_reminders = reminders.duplicate()
-	_update_display()
-
-
-func hide_inactive_reminders(active_rule_ids: Array) -> void:
-	"""Hide all reminders except those in the active list."""
-	var to_remove: Array = []
-	for rule_id in _active_reminders.keys():
-		if rule_id not in active_rule_ids:
-			to_remove.append(rule_id)
-	
-	for rule_id in to_remove:
-		_active_reminders.erase(rule_id)
-	
 	_update_display()
 
 
