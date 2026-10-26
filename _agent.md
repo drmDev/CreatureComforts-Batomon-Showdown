@@ -8,7 +8,7 @@ Brainrot Edition (`np_brainrot`) is a GDScript mod for **Batomon Showdown** that
 - ✅ Complete the shared shop-snapshot refactor while preserving working behavior.
 - ✅ Maintain Scavenger target notices and Black Belt Beetbud/Beetdown checks.
 - ✅ Add the Mad Scientist Day 6 transformation reminder with on-screen display.
-- Discover owned-trinket data and eventually display an organized list.
+- ✅ Discover owned-trinket data and display an organized collapsible list with compact effect descriptions via tooltip.
 - Add a compact shop advice panel using the working NP_QoL drawing patterns.
 
 ## Files
@@ -21,12 +21,13 @@ Brainrot Edition (`np_brainrot`) is a GDScript mod for **Batomon Showdown** that
 | `trainer_advisor.gd` | Evaluates registered rules, tracks active advice, and suppresses unchanged notices by rule ID. |
 | `trainer_rules.gd` | `ShopTargetsRule`, `DayReminderRule`, and compound `BeetdownCompanyRule`; returns structured advice without output side effects. |
 | `reminder_panel.gd` | Reusable UI panel for displaying trainer reminders on-screen during shop phase. Supports multiple simultaneous reminders. |
+| `trinket_panel.gd` | Collapsible panel displaying owned trinkets sorted by quantity, with compact effect descriptions shown inline. |
 | `log_formatter.gd` | Readable names, summaries, detailed inspection, and change output. |
 | `shop_changes.gd` | Structured snapshot comparison for detecting shop state changes. |
 | `gd_checks.ps1` | Runs Godot checks across mod scripts; excludes example directories. |
 | `examples/` | Sample/test material, separate from production script checks. |
 
-The trinket list and expanded advice panel are future features, not yet implemented.
+The expanded advice panel is a future feature, not yet implemented.
 
 ## Working conventions
 - Verify game identifiers/properties from source or runtime evidence; never invent APIs.
