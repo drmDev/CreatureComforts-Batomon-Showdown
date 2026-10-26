@@ -47,6 +47,10 @@ class BaseRule:
 			advice[key] = extra[key]
 		return advice
 
+	## Does this rule apply to the given context's trainer? (empty trainer_id = any trainer)
+	func _matches_trainer(context: AdviceContext) -> bool:
+		return trainer_id.is_empty() or context.trainer_id == trainer_id
+
 
 ## Rule that flags specific shop targets (monsters and/or items)
 class ShopTargetsRule extends BaseRule:
@@ -65,7 +69,7 @@ class ShopTargetsRule extends BaseRule:
 		formatter = p_formatter
 
 	func evaluate(context: AdviceContext) -> Dictionary:
-		if not trainer_id.is_empty() and context.trainer_id != trainer_id:
+		if not _matches_trainer(context):
 			return {}
 
 		var matches: Array = []
@@ -80,7 +84,7 @@ class ShopTargetsRule extends BaseRule:
 				matched_indices.append(shop_item.slot)
 				matched_ids.append(shop_item.instance_id)
 			elif not shop_item.item_id.is_empty() and shop_item.item_id in target_items:
-				var item_name := _format_item_name(shop_item.item_id)
+				var item_name: String = formatter.format_item_name(shop_item.item_id)
 				matches.append("[%d] %s" % [shop_item.slot, item_name])
 				matched_indices.append(shop_item.slot)
 				matched_ids.append(shop_item.instance_id)
@@ -92,11 +96,6 @@ class ShopTargetsRule extends BaseRule:
 			"matched_indices": matched_indices,
 			"matched_ids": matched_ids
 		})
-
-	func _format_item_name(item_id: String) -> String:
-		# Format item ID (e.g., "basic_bait" -> "Basic Bait")
-		return item_id.replace("_", " ").capitalize()
-
 
 ## Rule that flags a team-composition condition
 ## (e.g., "the anchor monster must be the only monster of a given type")
@@ -118,7 +117,7 @@ class TeamCompositionRule extends BaseRule:
 		message = p_message
 
 	func evaluate(context: AdviceContext) -> Dictionary:
-		if not trainer_id.is_empty() and context.trainer_id != trainer_id:
+		if not _matches_trainer(context):
 			return {}
 
 		# Find the anchor monster at or above the minimum level
@@ -159,11 +158,11 @@ class DayReminderRule extends BaseRule:
 		message = p_message
 
 	func evaluate(context: AdviceContext) -> Dictionary:
-		if not trainer_id.is_empty() and context.trainer_id != trainer_id:
+		if not _matches_trainer(context):
 			return {}
 
 		# Check day
 		if context.day != target_day:
 			return {}
 
-		return _make_advice(severity, message, {"matched_day": target_day})
+		return _make_advice(severity, message)

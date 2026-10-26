@@ -4,6 +4,13 @@ extends RefCounted
 ## Adding a trainer = adding one entry here (plus a trainers/<id>.gd only if it needs
 ## custom evaluate() logic, referenced via the "script" key in a rule definition).
 
+# Shared shop-target defaults for trainers that start with the same shopping goal.
+# Items stay empty: basic_bait changed in-game and is no longer reminder worthy.
+const DEFAULT_SHOP_MONSTERS := ["monster.name.lamplet", "monster.name.swoonet"]
+const DEFAULT_SHOP_ITEMS := []
+const DEFAULT_SHOP_SEVERITY := "NOTICE"
+const DEFAULT_SHOP_MESSAGE := "Shop targets: %s | Level-up/trinket opportunities"
+
 const TRAINER_DEFINITIONS := [
 	{
 		"id": "scavenger",
@@ -12,10 +19,10 @@ const TRAINER_DEFINITIONS := [
 			{
 				"type": "shop_targets",
 				"rule_id": "scavenger_targets",
-				"monsters": ["monster.name.lamplet", "monster.name.swoonet"],
-				"items": ["basic_bait"],
-				"severity": "NOTICE",
-				"message_template": "Shop targets: %s | Level-up/trinket opportunities"
+				"monsters": DEFAULT_SHOP_MONSTERS,
+				"items": DEFAULT_SHOP_ITEMS,
+				"severity": DEFAULT_SHOP_SEVERITY,
+				"message_template": DEFAULT_SHOP_MESSAGE
 			}
 		]
 	},
@@ -26,10 +33,10 @@ const TRAINER_DEFINITIONS := [
 			{
 				"type": "shop_targets",
 				"rule_id": "treasure_hunter_targets",
-				"monsters": ["monster.name.lamplet", "monster.name.swoonet"],
-				"items": ["basic_bait"],
-				"severity": "NOTICE",
-				"message_template": "Shop targets: %s | Level-up/trinket opportunities"
+				"monsters": DEFAULT_SHOP_MONSTERS,
+				"items": DEFAULT_SHOP_ITEMS,
+				"severity": DEFAULT_SHOP_SEVERITY,
+				"message_template": DEFAULT_SHOP_MESSAGE
 			}
 		]
 	},
@@ -40,10 +47,10 @@ const TRAINER_DEFINITIONS := [
 			{
 				"type": "shop_targets",
 				"rule_id": "burglar_targets",
-				"monsters": ["monster.name.lamplet", "monster.name.swoonet"],
-				"items": ["basic_bait"],
-				"severity": "NOTICE",
-				"message_template": "Shop targets: %s | Level-up/trinket opportunities"
+				"monsters": DEFAULT_SHOP_MONSTERS,
+				"items": DEFAULT_SHOP_ITEMS,
+				"severity": DEFAULT_SHOP_SEVERITY,
+				"message_template": DEFAULT_SHOP_MESSAGE
 			}
 		]
 	},

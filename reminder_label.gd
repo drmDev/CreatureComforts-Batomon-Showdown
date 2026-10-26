@@ -85,10 +85,3 @@ func _update_display() -> void:
 			if _label != null:
 				_label.text = " | ".join(reminder_texts)
 			visible = true
-
-
-func get_current_text() -> String:
-	"""Get the currently displayed reminder text."""
-	if _label != null:
-		return _label.text
-	return ""

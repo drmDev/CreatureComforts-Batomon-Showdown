@@ -11,11 +11,8 @@ const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 # Polling and state tracking
 const POLL_INTERVAL_MS := 500
 
-# Advice display modes (mirror BaseRule constants in trainer_rules.gd)
-const DISPLAY_NONE := "none"
-const DISPLAY_LABEL := "label"
-const DISPLAY_HIGHLIGHT := "highlight"
-const DISPLAY_BOTH := "both"
+# Advice display modes come from trainer_rules.gd BaseRule (single source)
+const TrainerRules = preload("trainer_rules.gd")
 
 # Shop card highlight overlay (outlines shop cards matching active highlight-mode advice)
 var _shop_highlight = null
@@ -50,7 +47,6 @@ var _formatter = null
 
 # Trainer advice system
 var _advisor = null
-var _advice_context_script = null
 var _advice_context_builder = null
 
 # Snapshot system
@@ -67,10 +63,6 @@ var _pending_chime_rule_ids: Dictionary = {}
 
 # Trainer display names (built from the trainer catalog)
 var _trainer_display_names: Dictionary = {}
-
-
-func _init() -> void:
-	pass
 
 
 func mod_init() -> void:
@@ -209,9 +201,8 @@ func _setup_advisor() -> void:
 	
 	_advisor = TrainerAdvisor.new()
 	
-	# Cache AdviceContext script and builder
-	_advice_context_script = load("res://mods/NP_Brainrot/advice_context.gd")
-	_advice_context_builder = _advice_context_script.new()
+	# Cache AdviceContext builder (rules consume snapshot data as plain records)
+	_advice_context_builder = load("res://mods/NP_Brainrot/advice_context.gd").new()
 	
 	# Build trainer display-name map and register rules from the catalog
 	var definitions: Array = TrainerCatalog.TRAINER_DEFINITIONS
@@ -287,12 +278,7 @@ func _inspect_current_phase() -> void:
 		if _last_phase != "":
 			_last_phase = ""
 			_battle_logged = false
-			_clear_shop_highlights()
-			if _advisor != null:
-				_advisor.reset_suppression()
-			if _reminder_label != null:
-				_reminder_label.hide_all_reminders()
-			_pending_chime_rule_ids.clear()  # Drop stale chimes when leaving the shop
+			_reset_transient_state(true, true, true)  # Drop stale chimes when leaving the shop
 
 
 func _evaluate_trainer_advice(snapshot) -> void:
@@ -335,8 +321,8 @@ func _evaluate_trainer_advice(snapshot) -> void:
 			var reminders_to_show: Dictionary = {}
 			
 			for advice in all_active:
-				var display: String = advice.get("display", DISPLAY_NONE)
-				if display == DISPLAY_LABEL or display == DISPLAY_BOTH:
+				var display: String = advice.get("display", TrainerRules.BaseRule.DISPLAY_NONE)
+				if display == TrainerRules.BaseRule.DISPLAY_LABEL or display == TrainerRules.BaseRule.DISPLAY_BOTH:
 					var reminder_text: String = advice.get("reminder", "")
 					if not reminder_text.is_empty():
 						reminders_to_show[advice.get("rule_id", "")] = reminder_text
@@ -382,12 +368,10 @@ func _handle_shop_phase(state) -> void:
 	
 	if phase_changed:
 		_battle_logged = false
-		if _advisor != null:
-			_advisor.reset_suppression()  # Reset for new shop visit
 		_log_phase_entry("SHOP", run, manager)
 		if _deep_inspection:
 			_log_lines(_formatter.format_deep_inspect_shop(manager, run))
-		_clear_shop_highlights()
+		_reset_transient_state(true, false, false)  # Reset suppression + highlights for new shop visit
 	elif _last_snapshot != null:
 		# Compare snapshots and log changes
 		var comparison = _changes_comparer.compare(_last_snapshot, current_snapshot)
@@ -426,12 +410,8 @@ func _handle_battle_phase(state) -> void:
 		
 		_battle_logged = true
 	
-	# Hide reminders during battle
-	if _reminder_label != null:
-		_reminder_label.hide_all_reminders()
-	_pending_chime_rule_ids.clear()
-	
-	_clear_shop_highlights()
+	# Reset transient overlay/suppression state on battle entry
+	_reset_transient_state(false, true, true)
 	_last_phase = "battle"
 
 
@@ -490,8 +470,8 @@ func _update_shop_highlights(all_active: Array) -> void:
 	if _enable_trainer_reminders:
 		var seen := {}
 		for advice in all_active:
-			var display: String = advice.get("display", DISPLAY_NONE)
-			if display != DISPLAY_HIGHLIGHT and display != DISPLAY_BOTH:
+			var display: String = advice.get("display", TrainerRules.BaseRule.DISPLAY_NONE)
+			if display != TrainerRules.BaseRule.DISPLAY_HIGHLIGHT and display != TrainerRules.BaseRule.DISPLAY_BOTH:
 				continue
 			var slots: Array = advice.get("matched_indices", [])
 			var ids: Array = advice.get("matched_ids", [])
@@ -507,6 +487,17 @@ func _update_shop_highlights(all_active: Array) -> void:
 func _clear_shop_highlights() -> void:
 	if _shop_highlight != null:
 		_shop_highlight.clear_targets()
+
+
+func _reset_transient_state(clear_suppression: bool, clear_reminders: bool, clear_chimes: bool) -> void:
+	"""Reset overlay/suppression state shared across phase transitions."""
+	_clear_shop_highlights()
+	if clear_reminders and _reminder_label != null:
+		_reminder_label.hide_all_reminders()
+	if clear_chimes:
+		_pending_chime_rule_ids.clear()
+	if clear_suppression and _advisor != null:
+		_advisor.reset_suppression()
 
 
 func _resolve_highlight_rects(targets: Array) -> Array:

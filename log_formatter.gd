@@ -3,6 +3,8 @@ extends RefCounted
 ## Formatting helper for Brainrot Edition diagnostic logger
 ## Returns formatted text/arrays of lines instead of writing directly
 
+const ShopSnapshot = preload("shop_snapshot.gd")
+
 const STAT_NAMES := {1: "Dmg", 2: "Heal", 3: "Shield", 4: "Burn", 5: "Poison", 6: "Shock", 7: "Multi"}
 
 var _has_prop: Callable
@@ -22,21 +24,7 @@ func format_monster_name(monster) -> String:
 	if data == null or not _has_prop.call(data, "name_key"):
 		return "Unknown"
 	
-	var name_key: String = str(data.name_key)
-	
-	# Try TranslationServer if available
-	if TranslationServer.has_method("translate"):
-		var translated := TranslationServer.translate(name_key)
-		if translated != name_key:
-			return translated
-	
-	# Fallback: capitalize the name_key
-	# "lamplet" -> "Lamplet"
-	# "monster.name.lamplet" -> "Lamplet"
-	if "." in name_key:
-		name_key = name_key.split(".")[-1]
-	
-	return name_key.capitalize()
+	return format_species_name_static(str(data.name_key))
 
 
 func format_species_name(species_key: String) -> String:
@@ -62,6 +50,11 @@ static func format_species_name_static(species_key: String) -> String:
 		name_key = name_key.split(".")[-1]
 	
 	return name_key.capitalize()
+
+
+func format_item_name(item_id: String) -> String:
+	"""Format an item id into a readable name (e.g., "basic_bait" -> "Basic Bait")."""
+	return item_id.replace("_", " ").capitalize()
 
 
 func format_monster_compact(monster) -> String:
@@ -176,7 +169,7 @@ func inspect_shop_item_deep(item) -> String:
 	var lines := []
 	
 	# Check if it's a creature
-	if item.has_method("get_gold_cost") and _has_prop.call(item, "data"):
+	if ShopSnapshot.classify_shop_entry(item, _has_prop) == "monster":
 		var data = item.data
 		if data != null:
 			lines.append("Creature: %s" % get_object_info(data))
@@ -198,9 +191,13 @@ func inspect_shop_item_deep(item) -> String:
 
 # --- Multi-line formatters (return Array[String]) ---
 
+func _timestamp_prefix(debug_logging: bool) -> String:
+	return "[%s] " % get_time_short() if debug_logging else ""
+
+
 func format_phase_entry(phase: String, run, manager, debug_logging: bool) -> Array[String]:
 	var lines := []
-	var timestamp := "[%s] " % get_time_short() if debug_logging else ""
+	var timestamp := _timestamp_prefix(debug_logging)
 	lines.append("\n%s%s PHASE" % [timestamp, phase])
 	
 	# Log trainer
@@ -247,65 +244,50 @@ func format_shop_offers(manager, run, include_context: bool) -> Array[String]:
 	
 	for i in range(items.size()):
 		var item = items[i]
-		if item == null:
-			lines.append("    [%d] Empty" % i)
-		elif item.has_method("get_gold_cost") and _has_prop.call(item, "data"):
-			# Creature
-			var name := format_monster_name(item)
-			var level := ""
-			if _has_prop.call(item, "level"):
-				level = " Lv%s" % item.level
-			var price := ""
-			if item.has_method("get_gold_cost"):
-				price = " | %sg" % item.get_gold_cost()
-			lines.append("    [%d] %s%s%s" % [i, name, level, price])
-		elif _has_prop.call(item, "id"):
-			# Item
-			var item_name := str(item.id)
-			var price := ""
-			if _has_prop.call(item, "cost"):
-				price = " | %sg" % item.cost
-			lines.append("    [%d] %s (Item)%s" % [i, item_name, price])
-		else:
-			lines.append("    [%d] Unknown" % i)
+		match ShopSnapshot.classify_shop_entry(item, _has_prop):
+			"empty":
+				lines.append("    [%d] Empty" % i)
+			"monster":
+				var name := format_monster_name(item)
+				var level := ""
+				if _has_prop.call(item, "level"):
+					level = " Lv%s" % item.level
+				var price := " | %sg" % item.get_gold_cost()
+				lines.append("    [%d] %s%s%s" % [i, name, level, price])
+			"item":
+				var item_name := format_item_name(str(item.id))
+				var price := ""
+				if _has_prop.call(item, "cost"):
+					price = " | %sg" % item.cost
+				lines.append("    [%d] %s (Item)%s" % [i, item_name, price])
+			_:
+				lines.append("    [%d] Unknown" % i)
 	
 	return lines
 
 
 func format_team_compact(run) -> Array[String]:
-	var lines := []
-	
-	if not _has_prop.call(run, "team"):
-		return lines
-	
-	var team: Array = run.team
-	lines.append("\n  TEAM:")
-	
-	# Reverse order for visual display (game stores bottom-right to top-left)
-	for i in range(team.size()):
-		var visual_slot := team.size() - 1 - i
-		var monster = team[i]
-		if monster != null:
-			lines.append("    [%d] %s" % [visual_slot, format_monster_compact(monster)])
-		else:
-			lines.append("    [%d] Empty" % visual_slot)
-	
-	return lines
+	return _format_slots(run, "team", "TEAM")
 
 
 func format_bench_compact(run) -> Array[String]:
-	var lines := []
+	return _format_slots(run, "bench", "BENCH")
+
+
+## Format an indexed monster list (team/bench), labeling slots in visual (reversed) order
+func _format_slots(run, property_name: String, header: String) -> Array[String]:
+	var lines: Array[String] = []
 	
-	if not _has_prop.call(run, "bench"):
+	if not _has_prop.call(run, property_name):
 		return lines
 	
-	var bench: Array = run.bench
-	lines.append("\n  BENCH:")
+	var slots: Array = run.get(property_name)
+	lines.append("\n  %s:" % header)
 	
-	# Reverse order for visual display
-	for i in range(bench.size()):
-		var visual_slot := bench.size() - 1 - i
-		var monster = bench[i]
+	# Reverse order for visual display (game stores bottom-right to top-left)
+	for i in range(slots.size()):
+		var visual_slot := slots.size() - 1 - i
+		var monster = slots[i]
 		if monster != null:
 			lines.append("    [%d] %s" % [visual_slot, format_monster_compact(monster)])
 		else:
@@ -348,7 +330,7 @@ func format_deep_inspect_battle(state, player, opponent) -> Array[String]:
 func format_snapshot_changes(comparison, run, manager, debug_logging: bool) -> Array[String]:
 	"""Format changes from ShopChanges comparison result."""
 	var lines := []
-	var timestamp := "[%s] " % get_time_short() if debug_logging else ""
+	var timestamp := _timestamp_prefix(debug_logging)
 	
 	if not comparison.has_changes():
 		return lines
@@ -395,14 +377,9 @@ func _describe_snapshot_offer(offer) -> String:
 		return "Empty"
 	
 	if offer.is_monster():
-		var name := format_species_name(offer.species_key)
-		if offer.level > 1:
-			name += " Lv%d" % offer.level
-		if offer.is_shiny:
-			name += " Shiny"
-		return name
+		return _describe_species(offer.species_key, offer.level, offer.is_shiny)
 	elif offer.is_item():
-		return "%s (Item)" % offer.item_id
+		return "%s (Item)" % format_item_name(offer.item_id)
 	
 	return "Unknown"
 
@@ -412,10 +389,16 @@ func _describe_snapshot_monster(monster) -> String:
 	if monster == null:
 		return "Empty"
 	
-	var name := format_species_name(monster.species_key)
-	if monster.level > 1:
-		name += " Lv%d" % monster.level
-	
+	return _describe_species(monster.species_key, monster.level, monster.is_shiny)
+
+
+## Describe a species with optional level/shininess suffixes
+func _describe_species(species_key: String, level: int, is_shiny: bool) -> String:
+	var name := format_species_name(species_key)
+	if level > 1:
+		name += " Lv%d" % level
+	if is_shiny:
+		name += " Shiny"
 	return name
 
 

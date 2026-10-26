@@ -23,9 +23,6 @@ class ComparisonResult:
 	var changes: Array = []  # Array of Change
 	var event_type: String = ""  # "SHOP REROLL", "TEAM CHANGED", etc.
 	
-	func _init() -> void:
-		pass
-	
 	func has_changes() -> bool:
 		return not changes.is_empty()
 	
@@ -106,40 +103,33 @@ func _detect_shop_changes(previous, current, result: ComparisonResult) -> void:
 
 ## Detect team changes (including in-place level/species changes)
 func _detect_team_changes(previous, current, result: ComparisonResult) -> void:
-	var max_size: int = max(previous.team_monsters.size(), current.team_monsters.size())
-	for i in range(max_size):
-		var old_monster: Variant = previous.team_monsters[i] if i < previous.team_monsters.size() else null
-		var new_monster: Variant = current.team_monsters[i] if i < current.team_monsters.size() else null
-		
-		# Calculate visual slot (reversed from storage order)
-		var visual_slot: int = previous.team_monsters.size() - 1 - i if old_monster != null else current.team_monsters.size() - 1 - i
-		
-		if not _monsters_equal(old_monster, new_monster):
-			var change: Change = Change.new("team", "slot_%d" % i, old_monster, new_monster, "Team[%d]" % visual_slot)
-			result.changes.append(change)
+	_detect_list_changes("team", "Team", previous.team_monsters, current.team_monsters, _monsters_equal, result)
 
 
 ## Detect bench changes
 func _detect_bench_changes(previous, current, result: ComparisonResult) -> void:
-	var max_size: int = max(previous.bench_monsters.size(), current.bench_monsters.size())
+	_detect_list_changes("bench", "Bench", previous.bench_monsters, current.bench_monsters, _monsters_equal, result)
+
+
+## Detect changes across an indexed list (team/bench), labeling slots in visual (reversed) order
+func _detect_list_changes(area: String, label_prefix: String, prev_list: Array, cur_list: Array, equal_fn: Callable, result: ComparisonResult) -> void:
+	var max_size: int = max(prev_list.size(), cur_list.size())
 	for i in range(max_size):
-		var old_monster: Variant = previous.bench_monsters[i] if i < previous.bench_monsters.size() else null
-		var new_monster: Variant = current.bench_monsters[i] if i < current.bench_monsters.size() else null
+		var old_entry: Variant = prev_list[i] if i < prev_list.size() else null
+		var new_entry: Variant = cur_list[i] if i < cur_list.size() else null
 		
 		# Calculate visual slot (reversed from storage order)
-		var visual_slot: int = previous.bench_monsters.size() - 1 - i if old_monster != null else current.bench_monsters.size() - 1 - i
+		var visual_slot: int = prev_list.size() - 1 - i if old_entry != null else cur_list.size() - 1 - i
 		
-		if not _monsters_equal(old_monster, new_monster):
-			var change: Change = Change.new("bench", "slot_%d" % i, old_monster, new_monster, "Bench[%d]" % visual_slot)
+		if not equal_fn.call(old_entry, new_entry):
+			var change: Change = Change.new(area, "slot_%d" % i, old_entry, new_entry, "%s[%d]" % [label_prefix, visual_slot])
 			result.changes.append(change)
 
 
 ## Compare two shop offers for equality
 func _offers_equal(a, b) -> bool:
-	if a == null and b == null:
-		return true
 	if a == null or b == null:
-		return false
+		return a == b
 	
 	# Compare type and identity
 	if a.type != b.type:
@@ -157,10 +147,8 @@ func _offers_equal(a, b) -> bool:
 
 ## Compare two monsters for equality (including in-place changes)
 func _monsters_equal(a, b) -> bool:
-	if a == null and b == null:
-		return true
 	if a == null or b == null:
-		return false
+		return a == b
 	
 	# Compare instance ID (identity), species (evolution), and level (level-up)
 	return a.instance_id == b.instance_id and a.species_key == b.species_key and a.level == b.level
@@ -195,13 +183,10 @@ func _classify_event(result: ComparisonResult) -> String:
 			if change.property.begins_with("slot_"):
 				slot_changes += 1
 		
-		# Reroll heuristic: 4+ slot changes indicates a reroll
+		# Reroll heuristic: 4+ slot changes indicates a reroll; otherwise report a shop change
 		if slot_changes >= 4:
 			parts.append("SHOP REROLL")
-		elif slot_changes > 0:
-			parts.append("SHOP CHANGED")
 		else:
-			# Only freeze change
 			parts.append("SHOP CHANGED")
 	
 	# Check for team/bench changes
