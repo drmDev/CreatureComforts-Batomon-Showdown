@@ -70,22 +70,36 @@ func _build_rule(trainer_id: String, rule_def: Dictionary):
 		"custom":
 			var script_path: String = str(rule_def.get("script", ""))
 			if script_path.is_empty():
-				push_warning("RuleFactory: custom rule missing 'script' path")
+				push_error("RuleFactory: custom rule missing 'script' path")
 				return null
 			var script = load(script_path)
 			if script == null:
-				push_warning("RuleFactory: cannot load custom rule script %s" % script_path)
+				push_error("RuleFactory: cannot load custom rule script %s" % script_path)
 				return null
 			return script.new(rule_def, _formatter)
-	push_warning("RuleFactory: unknown rule type '%s'" % rule_type)
+	push_error("RuleFactory: unknown rule type '%s' (trainer '%s'); rule not registered" % [rule_type, trainer_id])
 	return null
 
 
-## Apply optional display/reminder/chime overrides from the catalog entry
+## Apply optional display/reminder/chime overrides from the catalog entry.
+## An unknown display mode fails loudly instead of silently rendering nowhere.
 func _apply_overrides(rule, rule_def: Dictionary) -> void:
 	if rule_def.has("display"):
-		rule.display_mode = str(rule_def.get("display"))
+		var display: String = str(rule_def.get("display"))
+		if _is_valid_display(display):
+			rule.display_mode = display
+		else:
+			push_error("RuleFactory: invalid display mode '%s' for rule '%s' (use none/label/highlight/both)" % [display, rule.rule_id])
 	if rule_def.has("reminder"):
 		rule.reminder_text = str(rule_def.get("reminder"))
 	if rule_def.has("chime"):
 		rule.chime = bool(rule_def.get("chime"))
+
+
+func _is_valid_display(display: String) -> bool:
+	return display in [
+		TrainerRules.BaseRule.DISPLAY_NONE,
+		TrainerRules.BaseRule.DISPLAY_LABEL,
+		TrainerRules.BaseRule.DISPLAY_HIGHLIGHT,
+		TrainerRules.BaseRule.DISPLAY_BOTH
+	]
