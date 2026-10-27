@@ -33,7 +33,9 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	get_viewport().size_changed.connect(_on_viewport_resized)
+	var viewport := get_viewport()
+	if viewport != null and not viewport.size_changed.is_connected(_on_viewport_resized):
+		viewport.size_changed.connect(_on_viewport_resized)
 
 
 func _make_label(font: Font, font_size: int, color: Color) -> Label:
@@ -97,15 +99,3 @@ func _process(_delta: float) -> void:
 		hide_panel()
 
 
-func get_layout_report() -> Dictionary:
-	return {
-		"viewport": get_viewport_rect().size,
-		"position": position,
-		"size": size,
-		"min_size": get_combined_minimum_size(),
-		"header": _header_label.get_global_rect(),
-		"title": _title_label.get_global_rect(),
-		"desc": _description_label.get_global_rect(),
-		"separation": LABEL_SPACING,
-		"padding": INTERNAL_PADDING,
-	}

@@ -2,7 +2,7 @@ extends Node
 ## Brainrot Edition - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9001"
+const VERSION := "0.9002"
 const OUTPUT_DIR := "user://np_brainrot"
 const LOG_FILE := "inspect.log"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
@@ -167,7 +167,7 @@ func _initialize_mod() -> void:
 	_log_message("=".repeat(80))
 	_log_message("Brainrot Edition %s - Refactored Trainer Advice System" % VERSION)
 	_log_message("Initialized at %s" % _formatter.get_timestamp())
-	_log_message("Settings: Debug Logging: %s | Deep Inspection: %s" % [_debug_logging, _deep_inspection])
+	_log_message("Settings: Debug Logging: %s | Deep Inspection: %s | Achievement Notifications: %s" % [_debug_logging, _deep_inspection, _achievement_notifications])
 	_log_message("Log file: %s" % abs_log_path)
 	_log_message("=".repeat(80))
 	
@@ -192,8 +192,8 @@ func _on_config_changed(mod_id: String, key: String, value) -> void:
 			if value is bool:
 				_achievement_notifications = value
 				_log_message("Setting changed: Achievement Notifications = %s" % _achievement_notifications)
-				if not _achievement_notifications:
-					_hide_achievement_panel()
+				if not _achievement_notifications and _achievement_panel != null:
+					_achievement_panel.hide_panel()
 func _setup_advisor() -> void:
 	"""Initialize advisor and register all rules from the trainer catalog."""
 	var TrainerAdvisor = load("res://mods/NP_Brainrot/trainer_advisor.gd")
@@ -260,12 +260,6 @@ func _setup_achievement_panel() -> void:
 	_achievement_panel = AchievementPanel.new()
 	_achievement_panel.name = "AchievementPanel"
 	_achievement_layer.add_child(_achievement_panel)
-
-
-func _hide_achievement_panel() -> void:
-	"""Hide the achievement toast (e.g., when the setting is turned off)."""
-	if _achievement_panel != null:
-		_achievement_panel.hide_panel()
 
 
 func _setup_pika_sound() -> void:
@@ -485,7 +479,6 @@ func _check_battle_completion(state) -> void:
 			_achievement_panel.show_achievement(title, description)
 			if achievement.get("temporary", false):
 				_log_message("TEMPORARY: demo achievement shown after battle (not actually earned)")
-			_log_achievement_panel_layout()  # TEMPORARY: log finalized panel layout for verification
 		else:
 			_log_message("ACHIEVEMENT NOTIFICATION | suppressed (Achievement Notifications off)")
 
@@ -510,29 +503,6 @@ func _log_battle_result(battle_data) -> void:
 	elif player_hp <= 0 and enemy_hp > 0:
 		result = "DEFEAT"
 	_log_message("BATTLE COMPLETE | result=%s | player_hp=%d enemy_hp=%d" % [result, player_hp, enemy_hp])
-
-
-## TEMPORARY: log the finalized achievement panel layout (read-only: show_achievement()
-## already performed the layout work). Remove after visual verification.
-func _log_achievement_panel_layout() -> void:
-	if _achievement_panel == null or not is_instance_valid(_achievement_panel):
-		return
-	var report: Dictionary = _achievement_panel.get_layout_report()
-	var viewport_size: Vector2 = report.get("viewport", Vector2.ZERO)
-	var panel_size: Vector2 = report.get("size", Vector2.ZERO)
-	var min_size: Vector2 = report.get("min_size", Vector2.ZERO)
-	var panel_pos: Vector2 = report.get("position", Vector2.ZERO)
-	var header_rect: Rect2 = report.get("header", Rect2())
-	var title_rect: Rect2 = report.get("title", Rect2())
-	var desc_rect: Rect2 = report.get("desc", Rect2())
-	var panel_rect := Rect2(panel_pos, panel_size)
-	var inside_viewport := panel_pos.x >= 0.0 and panel_pos.y >= 0.0 \
-		and panel_rect.end.x <= viewport_size.x and panel_rect.end.y <= viewport_size.y
-	var labels_inside_panel := panel_rect.encloses(header_rect) \
-		and panel_rect.encloses(title_rect) and panel_rect.encloses(desc_rect)
-	_log_message("ACHIEVEMENT PANEL | viewport=(%.1f,%.1f) pos=(%.1f,%.1f) size=(%.1f,%.1f) min=(%.1f,%.1f) separation=%d padding=%d" % [viewport_size.x, viewport_size.y, panel_pos.x, panel_pos.y, panel_size.x, panel_size.y, min_size.x, min_size.y, int(report.get("separation", 0)), int(report.get("padding", 0))])
-	_log_message("ACHIEVEMENT PANEL | header.bottom=%.1f title.top=%.1f title.bottom=%.1f desc.top=%.1f desc.bottom=%.1f" % [header_rect.end.y, title_rect.position.y, title_rect.end.y, desc_rect.position.y, desc_rect.end.y])
-	_log_message("ACHIEVEMENT PANEL | inside_viewport=%s labels_inside_panel=%s | header<title=%s title<desc=%s" % [inside_viewport, labels_inside_panel, header_rect.end.y < title_rect.position.y, title_rect.end.y < desc_rect.position.y])
 
 
 func _capture_trinket_baseline(run) -> void:
