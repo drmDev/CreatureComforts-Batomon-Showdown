@@ -65,16 +65,8 @@ var _pending_chime_rule_ids: Dictionary = {}
 var _trainer_display_names: Dictionary = {}
 
 
-func mod_init() -> void:
-	pass  # Don't access scene tree nodes during early initialization
-
-
 func mod_ready() -> void:
 	_initialize_mod()
-
-
-func mod_bootstrap() -> void:
-	pass
 
 
 func _ready() -> void:

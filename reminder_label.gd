@@ -59,9 +59,7 @@ func set_reminders(reminders: Dictionary) -> void:
 func hide_all_reminders() -> void:
 	"""Hide all reminders and make label invisible."""
 	_active_reminders.clear()
-	visible = false
-	if _label != null:
-		_label.text = ""
+	_update_display()
 
 
 func _update_display() -> void:

@@ -29,6 +29,8 @@ func build_trainer(trainer_def: Dictionary) -> Array:
 		var rule = _build_rule(trainer_id, rule_def)
 		if rule != null:
 			_apply_overrides(rule, rule_def)
+			if rule.rule_id.is_empty():
+				push_warning("RuleFactory: rule for trainer '%s' built with empty rule_id (type '%s'); it will be skipped by the advisor" % [trainer_id, str(rule_def.get("type", "?"))])
 			rules.append(rule)
 	return rules
 

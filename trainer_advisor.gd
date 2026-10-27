@@ -46,13 +46,9 @@ func evaluate(context: AdviceContext) -> Dictionary:
 					_last_emitted[rule_id] = current_message
 	
 	# Clear suppression for rules that are no longer active
-	var inactive_rules: Array = []
 	for rule_id in _last_emitted.keys():
 		if not new_active.has(rule_id):
-			inactive_rules.append(rule_id)
-	
-	for rule_id in inactive_rules:
-		_last_emitted.erase(rule_id)
+			_last_emitted.erase(rule_id)
 	
 	_active_advice = new_active
 	
