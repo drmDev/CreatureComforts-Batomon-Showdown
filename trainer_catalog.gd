@@ -151,5 +151,50 @@ const TRAINER_DEFINITIONS := [
 				"reminder": "Musician: 2+ Electric monsters!"
 			}
 		]
+	},
+	{
+		"id": "bug_catcher",
+		"display_name": "Bug Catcher",
+		"rules": [
+			{
+				"type": "shop_targets",
+				"rule_id": "bug_catcher_bug",
+				"target_types": ["bug"],
+				"monsters": [],
+				"items": [],
+				"severity": "NOTICE",
+				"message_template": "Bug available: shop %s"
+			}
+		]
+	},
+	{
+		"id": "chemist",
+		"display_name": "Chemist",
+		"rules": [
+			{
+				"type": "shop_targets",
+				"rule_id": "chemist_toxic",
+				"target_types": ["toxic"],
+				"monsters": [],
+				"items": [],
+				"severity": "NOTICE",
+				"message_template": "Toxic available: shop %s"
+			}
+		]
+	},
+	{
+		"id": "redhead",
+		"display_name": "Redhead",
+		"rules": [
+			{
+				"type": "shop_targets",
+				"rule_id": "redhead_fire",
+				"target_types": ["fire"],
+				"monsters": [],
+				"items": [],
+				"severity": "NOTICE",
+				"message_template": "Fire available: shop %s"
+			}
+		]
 	}
 ]
