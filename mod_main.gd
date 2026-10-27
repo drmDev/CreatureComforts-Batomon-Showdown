@@ -31,6 +31,8 @@ var _next_poll := 0
 var _last_phase := ""
 var _last_snapshot = null  # ShopSnapshot from previous poll
 var _battle_logged := false
+var _trinket_baseline = null  # Dictionary: trinket inventory captured at each shop visit
+var _trinkets_gained_last: Array = []  # Panel consumer: ids gained since the previous shop visit
 var _initialization_started := false
 var _initialized := false
 
@@ -340,8 +342,7 @@ func _try_play_chime() -> void:
 
 
 func _handle_shop_phase(state) -> void:
-	var run = get_node_or_null("/root/RunManager")
-	run = run.get("data") if run != null else null
+	var run = _get_run_data()
 	var manager = state.get("manager") if _has_property(state, "manager") else null
 	
 	if run == null or manager == null:
@@ -363,6 +364,12 @@ func _handle_shop_phase(state) -> void:
 		_log_phase_entry("SHOP", run, manager)
 		if _deep_inspection:
 			_log_lines(_formatter.format_deep_inspect_shop(manager, run))
+		# Trinket gains since the previous shop visit (independent of deep inspection)
+		if _trinket_baseline != null:
+			var gains := _collect_trinket_gains(_trinket_baseline, run)
+			_trinkets_gained_last = gains["ids"]
+			_log_lines(_formatter.format_trinket_gains(gains))
+		_capture_trinket_baseline(run)
 		_reset_transient_state(true, false, false)  # Reset suppression + highlights for new shop visit
 	elif _last_snapshot != null:
 		# Compare snapshots and log changes
@@ -399,12 +406,50 @@ func _handle_battle_phase(state) -> void:
 		
 		if _deep_inspection:
 			_log_lines(_formatter.format_deep_inspect_battle(state, player, opponent))
+			# Trinket state at battle entry
+			_log_lines(_formatter.format_battle_trinket_state(_get_run_data()))
 		
 		_battle_logged = true
 	
 	# Reset transient overlay/suppression state on battle entry
 	_reset_transient_state(false, true, true)
 	_last_phase = "battle"
+
+
+func _capture_trinket_baseline(run) -> void:
+	"""Capture the trinket inventory at a shop visit for gain detection."""
+	var snapshot := {}
+	snapshot["trinket_ids"] = run.get("trinket_ids") if _has_property(run, "trinket_ids") else []
+	snapshot["trinkets_gained_total"] = int(run.get("trinkets_gained_total")) if _has_property(run, "trinkets_gained_total") else 0
+
+	_trinket_baseline = snapshot
+
+
+func _collect_trinket_gains(baseline: Dictionary, run) -> Dictionary:
+	"""Trinkets gained since the baseline: inventory diff plus the game counter delta."""
+	var gained_ids: Array = []
+	var counter_delta := 0
+	if not is_instance_valid(run):
+		return {"ids": gained_ids, "counter": counter_delta}
+
+	# Count-based diff (handles duplicates)
+	var baseline_counts := {}
+	for tid in baseline.get("trinket_ids", []):
+		baseline_counts[tid] = baseline_counts.get(tid, 0) + 1
+
+	var current_ids: Array = run.get("trinket_ids") if _has_property(run, "trinket_ids") else []
+	for tid in current_ids:
+		var remaining = baseline_counts.get(tid, 0)
+		if remaining > 0:
+			baseline_counts[tid] = remaining - 1
+		else:
+			gained_ids.append(tid)
+
+	var baseline_total: int = int(baseline.get("trinkets_gained_total", 0))
+	var current_total: int = int(run.get("trinkets_gained_total")) if _has_property(run, "trinkets_gained_total") else 0
+	counter_delta = current_total - baseline_total
+
+	return {"ids": gained_ids, "counter": counter_delta}
 
 
 func _update_overlay_gate() -> void:
@@ -557,7 +602,7 @@ func _log_lines(lines: Array) -> void:
 # Utility functions
 
 func _has_property(obj, property: String) -> bool:
-	if obj == null or not is_instance_valid(obj):
+	if not is_instance_valid(obj):
 		return false
 	for prop in obj.get_property_list():
 		if str(prop.name) == property:
@@ -566,7 +611,7 @@ func _has_property(obj, property: String) -> bool:
 
 
 func _script_is(obj, script_path: String) -> bool:
-	if obj == null or not is_instance_valid(obj):
+	if not is_instance_valid(obj):
 		return false
 	var script: Script = obj.get_script()
 	while script != null:
@@ -574,6 +619,14 @@ func _script_is(obj, script_path: String) -> bool:
 			return true
 		script = script.get_base_script()
 	return false
+
+
+func _get_run_data():
+	"""Return RunManager.data (the run) or null."""
+	var run_manager = get_node_or_null("/root/RunManager")
+	if run_manager == null or not _has_property(run_manager, "data"):
+		return null
+	return run_manager.get("data")
 
 
 func _log_message(message: String) -> void:
