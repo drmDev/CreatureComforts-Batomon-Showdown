@@ -32,7 +32,6 @@ var _last_phase := ""
 var _last_snapshot = null  # ShopSnapshot from previous poll
 var _battle_logged := false
 var _trinket_baseline = null  # Dictionary: trinket inventory captured at each shop visit
-var _trinkets_gained_last: Array = []  # Panel consumer: ids gained since the previous shop visit
 var _initialization_started := false
 var _initialized := false
 
@@ -361,7 +360,6 @@ func _handle_shop_phase(state) -> void:
 		# Trinket gains since the previous shop visit (independent of deep inspection)
 		if _trinket_baseline != null:
 			var gains := _collect_trinket_gains(_trinket_baseline, run)
-			_trinkets_gained_last = gains["ids"]
 			_log_lines(_formatter.format_trinket_gains(gains))
 			_update_trinket_panel(gains)
 		else:
@@ -458,11 +456,7 @@ func _update_trinket_panel(gains: Dictionary) -> void:
 	if ids.is_empty():
 		_hide_trinket_panel()
 		return
-	var entries := _summarize_trinket_gains(ids)
-	if entries.is_empty():
-		_hide_trinket_panel()
-	else:
-		_trinket_panel.show_gains(entries)
+	_trinket_panel.show_gains(_summarize_trinket_gains(ids))
 
 
 func _hide_trinket_panel() -> void:

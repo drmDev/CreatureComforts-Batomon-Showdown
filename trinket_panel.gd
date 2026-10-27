@@ -13,7 +13,7 @@ const ROW_HEIGHT := 16.0
 const ROW_GAP := 2.0
 const FONT_SIZE := 10
 const TITLE_FONT_SIZE := 11
-const DISPLAY_DURATION_MS := 10000  # Auto-hide after 5 seconds
+const DISPLAY_DURATION_MS := 10000  # Auto-hide after 10 seconds
 const MARGIN_RIGHT := 10.0
 
 const BG_COLOR := Color("#1a2332")       # Dark navy (matches reminder_label)
@@ -95,8 +95,7 @@ func _compute_size() -> void:
 
 func _compute_position() -> void:
 	var viewport_size := get_viewport().get_visible_rect().size
-	var margin := MARGIN_RIGHT
-	position = Vector2(viewport_size.x - size.x - margin, (viewport_size.y - size.y) * 0.5)
+	position = Vector2(viewport_size.x - size.x - MARGIN_RIGHT, (viewport_size.y - size.y) * 0.5)
 
 
 func _process(_delta: float) -> void:

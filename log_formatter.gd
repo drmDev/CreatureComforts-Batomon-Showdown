@@ -54,8 +54,7 @@ func format_item_name(item_id: String) -> String:
 
 func format_trinket_name(trinket_id: String) -> String:
 	"""Format a trinket id into a readable name.
-	Uses format_item_name as fallback. If trinket ids use a prefix (e.g. "trinket_"),
-	it is stripped first. Translation key pattern is unverified — adjust after runtime check."""
+	Strips a "trinket_" prefix if present, then reuses format_item_name."""
 	var name := trinket_id
 	if name.begins_with("trinket_"):
 		name = name.substr(8, name.length())

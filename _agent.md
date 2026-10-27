@@ -10,7 +10,7 @@ Brainrot Edition (`np_brainrot`) is a GDScript mod for **Batomon Showdown** that
 - ✅ Add the Mad Scientist Day 6 transformation reminder with on-screen display.
 - ✅ Retire the exploratory owned-trinket reflection probe from deep-inspection logging; trinket-aware advice would require re-verified game data first.
 - ✅ Battle entry logs trinket state only (`trinket_ids` + `_active_passives` attribution), and shop visits report `--- TRINKETS GAINED ---` as a shop-to-shop inventory diff.
-- ✅ Add a trinket-gain panel that appears right-center on shop return, auto-hides after 5 seconds, using the NP_QoL drawing patterns.
+- ✅ Add a trinket-gain panel that appears right-center on shop return, auto-hides after 10 seconds, using the NP_QoL drawing patterns.
 
 ## Files
 | File | Responsibility |
@@ -25,7 +25,7 @@ Brainrot Edition (`np_brainrot`) is a GDScript mod for **Batomon Showdown** that
 | `rule_factory.gd` | Builds rule instances from `trainer_catalog.gd`; supports per-trainer custom scripts via a `script` key. |
 | `reminder_label.gd` | Compact top-bar label showing label-mode reminders for the current trainer. |
 | `shop_highlight.gd` | Click-through overlay that outlines shop cards for highlight-mode advice (slot + offer instance id, resolved against live cards each frame). |
-| `trinket_panel.gd` | Right-center panel showing trinkets gained since the last shop visit; auto-hides after 5 seconds. Uses the NP_QoL drawing pattern. |
+| `trinket_panel.gd` | Right-center panel showing trinkets gained since the last shop visit; auto-hides after 10 seconds. Uses the NP_QoL drawing pattern. |
 | `log_formatter.gd` | Readable names, summaries, detailed inspection, and change output. |
 | `shop_changes.gd` | Structured snapshot comparison for detecting shop state changes. |
 | `gd_checks.ps1` | Runs Godot checks across mod scripts; excludes example directories. |
