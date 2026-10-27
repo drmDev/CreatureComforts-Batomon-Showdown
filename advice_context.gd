@@ -11,13 +11,15 @@ class ShopItem:
 	var item_id: String
 	var is_monster: bool
 	var instance_id: int  # Live offer instance id, for overlays that must validate identity
+	var types: Array = []  # Lowercase type names for monster offers: ["fire", "flying"]
 	
-	func _init(p_slot: int, p_name_key: String, p_item_id: String, p_is_monster: bool, p_instance_id: int = 0) -> void:
+	func _init(p_slot: int, p_name_key: String, p_item_id: String, p_is_monster: bool, p_instance_id: int = 0, p_types: Array = []) -> void:
 		slot = p_slot
 		name_key = p_name_key
 		item_id = p_item_id
 		is_monster = p_is_monster
 		instance_id = p_instance_id
+		types = p_types
 
 
 ## Represents a team/bench monster with stable identification
@@ -66,7 +68,7 @@ func from_snapshot(snapshot):
 			item_id = offer.item_id
 		
 		if not name_key.is_empty() or not item_id.is_empty():
-			context.shop_items.append(ShopItem.new(offer.slot, name_key, item_id, is_monster, offer.instance_id))
+			context.shop_items.append(ShopItem.new(offer.slot, name_key, item_id, is_monster, offer.instance_id, offer.types))
 	
 	# Convert team monsters to Monster format
 	for i in range(snapshot.team_monsters.size()):

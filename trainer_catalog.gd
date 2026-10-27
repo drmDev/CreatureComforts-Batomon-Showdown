@@ -67,6 +67,15 @@ const TRAINER_DEFINITIONS := [
 				"message_template": "Beetbud available: shop %s"
 			},
 			{
+				"type": "shop_targets",
+				"rule_id": "blackbelt_fighting",
+				"target_types": ["fighting"],
+				"monsters": [],
+				"items": [],
+				"severity": "NOTICE",
+				"message_template": "Fighter available: shop %s"
+			},
+			{
 				"type": "team_composition",
 				"rule_id": "beetdown_company",
 				"monster_key": "monster.name.beetdown",
@@ -117,6 +126,29 @@ const TRAINER_DEFINITIONS := [
 				"severity": "NOTICE",
 				"message": "🎩 GENTLEMAN: Common and Uncommon monsters stop appearing in shops starting Day 4!",
 				"reminder": "Tomorrow: No Common/Uncommon shops!"
+			}
+		]
+	},
+	{
+		"id": "musician",
+		"display_name": "Musician",
+		"rules": [
+			{
+				"type": "shop_targets",
+				"rule_id": "musician_electric_shop",
+				"target_types": ["electric"],
+				"monsters": [],
+				"items": [],
+				"severity": "NOTICE",
+				"message_template": "Electric available: shop %s"
+			},
+			{
+				"type": "team_composition",
+				"rule_id": "musician_electric_limit",
+				"required_type": "electric",
+				"severity": "WARNING",
+				"message": "Musician: %s Electric monsters active (only 1 allowed)",
+				"reminder": "Musician: 2+ Electric monsters!"
 			}
 		]
 	}

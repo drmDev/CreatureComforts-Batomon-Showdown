@@ -46,7 +46,8 @@ func _build_rule(trainer_id: String, rule_def: Dictionary):
 				rule_def.get("items", []),
 				str(rule_def.get("severity", "NOTICE")),
 				str(rule_def.get("message_template", "")),
-				_formatter
+				_formatter,
+				rule_def.get("target_types", [])
 			)
 		"day_reminder":
 			return TrainerRules.DayReminderRule.new(
@@ -58,6 +59,8 @@ func _build_rule(trainer_id: String, rule_def: Dictionary):
 				str(rule_def.get("reminder", rule_def.get("message", "")))
 			)
 		"team_composition":
+			# monster_key empty => count mode (warn when required_type monsters exceed max_count);
+			# monster_key set => anchor mode (the named monster must be the only one of required_type).
 			return TrainerRules.TeamCompositionRule.new(
 				str(rule_def.get("rule_id", "")),
 				trainer_id,
@@ -67,7 +70,8 @@ func _build_rule(trainer_id: String, rule_def: Dictionary):
 				int(rule_def.get("min_level", 1)),
 				str(rule_def.get("required_type", "")),
 				str(rule_def.get("message", "")),
-				str(rule_def.get("reminder", ""))
+				str(rule_def.get("reminder", "")),
+				int(rule_def.get("max_count", 1))
 			)
 		"custom":
 			var script_path: String = str(rule_def.get("script", ""))
