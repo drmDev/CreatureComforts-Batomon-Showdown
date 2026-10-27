@@ -1,8 +1,8 @@
 ```markdown
-# AGENTS.md — Brainrot Edition
+# AGENTS.md — Creature Comforts
 
 ## Summary
-Brainrot Edition (`np_brainrot`) is a GDScript mod for **Batomon Showdown** that observes shop/battle state and provides contextual gameplay advice. It logs readable state changes, emits distinct trainer-specific notices, and displays on-screen reminders for critical trainer events without automating gameplay. Reusable rules support shop targets, day reminders, and compound team conditions. Development prioritizes verified game data, maintainability, quiet logging, and incremental runtime validation.
+Creature Comforts (`creature_comforts`) is a GDScript mod for **Batomon Showdown** that observes shop/battle state and provides contextual gameplay advice. It logs readable state changes, emits distinct trainer-specific notices, and displays on-screen reminders for critical trainer events without automating gameplay. Reusable rules support shop targets, day reminders, and compound team conditions. Development prioritizes verified game data, maintainability, quiet logging, and incremental runtime validation.
 
 ## Current goals
 - ✅ Complete the shared shop-snapshot refactor while preserving working behavior.

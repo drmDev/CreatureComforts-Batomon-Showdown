@@ -1,9 +1,11 @@
 extends Node
-## Brainrot Edition - Trainer Advice System
+## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
 const VERSION := "0.9002"
-const OUTPUT_DIR := "user://np_brainrot"
+const MOD_ID := "creature_comforts"
+const MOD_ID_OLD := "np_brainrot"  # Legacy ID for settings migration (one-time)
+const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
 const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
@@ -99,9 +101,33 @@ func _load_settings() -> void:
 	_settings_load_attempted = true
 	
 	if mod_loader.has_method("get_config"):
-		_debug_logging = mod_loader.get_config("np_brainrot", "debug_logging", true)
-		_deep_inspection = mod_loader.get_config("np_brainrot", "deep_inspection", true)
-		_achievement_notifications = mod_loader.get_config("np_brainrot", "achievement_notifications", false)
+		# Try loading from the new mod ID first
+		_debug_logging = mod_loader.get_config(MOD_ID, "debug_logging", true)
+		_deep_inspection = mod_loader.get_config(MOD_ID, "deep_inspection", true)
+		_achievement_notifications = mod_loader.get_config(MOD_ID, "achievement_notifications", false)
+		
+		# One-time migration: if settings under the old mod ID exist, prefer them
+		# and save them under the new ID.
+		var old_debug = mod_loader.get_config(MOD_ID_OLD, "debug_logging", true)
+		var old_deep = mod_loader.get_config(MOD_ID_OLD, "deep_inspection", true)
+		var old_achievement = mod_loader.get_config(MOD_ID_OLD, "achievement_notifications", false)
+		
+		var needs_migration := false
+		if _debug_logging != old_debug:
+			_debug_logging = old_debug
+			needs_migration = true
+		if _deep_inspection != old_deep:
+			_deep_inspection = old_deep
+			needs_migration = true
+		if _achievement_notifications != old_achievement:
+			_achievement_notifications = old_achievement
+			needs_migration = true
+		
+		if needs_migration and mod_loader.has_method("set_config"):
+			mod_loader.set_config(MOD_ID, "debug_logging", _debug_logging)
+			mod_loader.set_config(MOD_ID, "deep_inspection", _deep_inspection)
+			mod_loader.set_config(MOD_ID, "achievement_notifications", _achievement_notifications)
+			print("Creature Comforts: migrated settings from '%s' to '%s'" % [MOD_ID_OLD, MOD_ID])
 		
 		# Connect to config_changed signal for live updates
 		if mod_loader.has_signal("config_changed") and not mod_loader.is_connected("config_changed", _on_config_changed):
@@ -109,7 +135,7 @@ func _load_settings() -> void:
 	elif not _settings_warning_shown:
 		# Fallback if ModLoader doesn't support config API - keep defaults
 		_settings_warning_shown = true
-		push_warning("Brainrot Edition: ModLoader.get_config() not available, using defaults")
+		push_warning("Creature Comforts: ModLoader.get_config() not available, using defaults")
 
 
 func _initialize_mod() -> void:
@@ -121,15 +147,15 @@ func _initialize_mod() -> void:
 	_load_settings()
 	
 	# Create formatter
-	var LogFormatter = load("res://mods/NP_Brainrot/log_formatter.gd")
+	var LogFormatter = load("res://mods/CreatureComforts/log_formatter.gd")
 	_formatter = LogFormatter.new(_has_property)
 	
 	# Create snapshot builder
-	var ShopSnapshot = load("res://mods/NP_Brainrot/shop_snapshot.gd")
+	var ShopSnapshot = load("res://mods/CreatureComforts/shop_snapshot.gd")
 	_snapshot_builder = ShopSnapshot.new()
 	
 	# Create changes comparer
-	var ShopChanges = load("res://mods/NP_Brainrot/shop_changes.gd")
+	var ShopChanges = load("res://mods/CreatureComforts/shop_changes.gd")
 	_changes_comparer = ShopChanges.new()
 	
 	# Create advisor and register rules
@@ -148,7 +174,7 @@ func _initialize_mod() -> void:
 	var dir_path := ProjectSettings.globalize_path(OUTPUT_DIR)
 	var dir_result := DirAccess.make_dir_recursive_absolute(dir_path)
 	if dir_result != OK and dir_result != ERR_ALREADY_EXISTS:
-		push_error("Brainrot Edition: Failed to create directory %s: %s" % [dir_path, error_string(dir_result)])
+		push_error("Creature Comforts: Failed to create directory %s: %s" % [dir_path, error_string(dir_result)])
 		return
 	
 	_log_path = OUTPUT_DIR.path_join(LOG_FILE)
@@ -158,25 +184,26 @@ func _initialize_mod() -> void:
 	if not FileAccess.file_exists(_log_path):
 		var file := FileAccess.open(_log_path, FileAccess.WRITE)
 		if file == null:
-			push_error("Brainrot Edition: Cannot create log file %s: %s" % [abs_log_path, error_string(FileAccess.get_open_error())])
+			push_error("Creature Comforts: Cannot create log file %s: %s" % [abs_log_path, error_string(FileAccess.get_open_error())])
 			return
 		file.close()
 	
 	_initialized = true
 	
 	_log_message("=".repeat(80))
-	_log_message("Brainrot Edition %s - Refactored Trainer Advice System" % VERSION)
+	_log_message("Creature Comforts %s - Trainer Advice System" % VERSION)
 	_log_message("Initialized at %s" % _formatter.get_timestamp())
 	_log_message("Settings: Debug Logging: %s | Deep Inspection: %s | Achievement Notifications: %s" % [_debug_logging, _deep_inspection, _achievement_notifications])
 	_log_message("Log file: %s" % abs_log_path)
 	_log_message("=".repeat(80))
 	
-	print("Brainrot Edition %s loaded - logging to %s" % [VERSION, abs_log_path])
+	print("Creature Comforts %s loaded - logging to %s" % [VERSION, abs_log_path])
 
 
 func _on_config_changed(mod_id: String, key: String, value) -> void:
 	"""Handle live config changes from ModLoader."""
-	if mod_id != "np_brainrot":
+	# Accept both old and new mod IDs during the migration window
+	if mod_id != MOD_ID and mod_id != MOD_ID_OLD:
 		return
 	
 	match key:
@@ -196,14 +223,14 @@ func _on_config_changed(mod_id: String, key: String, value) -> void:
 					_achievement_panel.hide_panel()
 func _setup_advisor() -> void:
 	"""Initialize advisor and register all rules from the trainer catalog."""
-	var TrainerAdvisor = load("res://mods/NP_Brainrot/trainer_advisor.gd")
-	var TrainerCatalog = load("res://mods/NP_Brainrot/trainer_catalog.gd")
-	var RuleFactory = load("res://mods/NP_Brainrot/rule_factory.gd")
+	var TrainerAdvisor = load("res://mods/CreatureComforts/trainer_advisor.gd")
+	var TrainerCatalog = load("res://mods/CreatureComforts/trainer_catalog.gd")
+	var RuleFactory = load("res://mods/CreatureComforts/rule_factory.gd")
 	
 	_advisor = TrainerAdvisor.new()
 	
 	# Cache AdviceContext builder (rules consume snapshot data as plain records)
-	_advice_context_builder = load("res://mods/NP_Brainrot/advice_context.gd").new()
+	_advice_context_builder = load("res://mods/CreatureComforts/advice_context.gd").new()
 	
 	# Build trainer display-name map and register rules from the catalog
 	var definitions: Array = TrainerCatalog.TRAINER_DEFINITIONS
@@ -217,25 +244,25 @@ func _setup_advisor() -> void:
 
 func _setup_reminder_panel() -> void:
 	"""Initialize reminder label UI layer."""
-	var ReminderLabel = load("res://mods/NP_Brainrot/reminder_label.gd")
+	var ReminderLabel = load("res://mods/CreatureComforts/reminder_label.gd")
 	
 	_reminder_layer = CanvasLayer.new()
 	_reminder_layer.layer = 100  # Above game UI but below debug overlays
-	_reminder_layer.name = "NP_Brainrot_Reminders"
+	_reminder_layer.name = "CreatureComforts_Reminders"
 	add_child(_reminder_layer)
 	
 	_reminder_label = ReminderLabel.new()
 	_reminder_label.name = "ReminderLabel"
 	_reminder_layer.add_child(_reminder_label)
 	
-	var ShopHighlight = load("res://mods/NP_Brainrot/shop_highlight.gd")
+	var ShopHighlight = load("res://mods/CreatureComforts/shop_highlight.gd")
 	_shop_highlight = ShopHighlight.new()
 	_shop_highlight.name = "ShopHighlight"
 	_shop_highlight.setup(_resolve_highlight_rects)
 	_reminder_layer.add_child(_shop_highlight)
 	
 	# Create trinket gain panel (right-center, auto-hides after 5s)
-	var TrinketPanel = load("res://mods/NP_Brainrot/trinket_panel.gd")
+	var TrinketPanel = load("res://mods/CreatureComforts/trinket_panel.gd")
 	_trinket_panel = TrinketPanel.new()
 	_trinket_panel.name = "TrinketPanel"
 	_reminder_layer.add_child(_trinket_panel)
@@ -243,20 +270,20 @@ func _setup_reminder_panel() -> void:
 
 func _setup_achievement_panel() -> void:
 	"""Initialize the battle-completion achievement panel system (Phase 1)."""
-	var BattleCompletionDetector = load("res://mods/NP_Brainrot/battle_completion_detector.gd")
+	var BattleCompletionDetector = load("res://mods/CreatureComforts/battle_completion_detector.gd")
 	_battle_completion = BattleCompletionDetector.new()
 	
-	var AchievementEvaluator = load("res://mods/NP_Brainrot/achievement_evaluator.gd")
+	var AchievementEvaluator = load("res://mods/CreatureComforts/achievement_evaluator.gd")
 	_achievement_evaluator = AchievementEvaluator.new()
 	
 	# Separate layer from _reminder_layer: the overlay gate hides reminders outside the
 	# shop, but the achievement panel must be visible after battles (over the results screen).
 	_achievement_layer = CanvasLayer.new()
 	_achievement_layer.layer = 100
-	_achievement_layer.name = "NP_Brainrot_Achievements"
+	_achievement_layer.name = "CreatureComforts_Achievements"
 	add_child(_achievement_layer)
 	
-	var AchievementPanel = load("res://mods/NP_Brainrot/achievement_panel.gd")
+	var AchievementPanel = load("res://mods/CreatureComforts/achievement_panel.gd")
 	_achievement_panel = AchievementPanel.new()
 	_achievement_panel.name = "AchievementPanel"
 	_achievement_layer.add_child(_achievement_panel)
@@ -273,7 +300,7 @@ func _setup_pika_sound() -> void:
 	add_child(_pika_player)
 	
 	if _pika_player.stream == null:
-		push_warning("Brainrot Edition: Failed to load notification sound: " + path)
+		push_warning("Creature Comforts: Failed to load notification sound: " + path)
 
 
 func _play_pika() -> void:
@@ -337,9 +364,9 @@ func _evaluate_trainer_advice(snapshot) -> void:
 			
 			var full_message := ""
 			if not prefix.is_empty():
-				full_message = "*** BRAINROT %s | %s | %s" % [severity, prefix, message]
+				full_message = "*** COMFORTS %s | %s | %s" % [severity, prefix, message]
 			else:
-				full_message = "*** BRAINROT %s | %s" % [severity, message]
+				full_message = "*** COMFORTS %s | %s" % [severity, message]
 			
 			_print_notice(full_message)
 		
@@ -757,7 +784,7 @@ func _log_message(message: String) -> void:
 	
 	var file := FileAccess.open(_log_path, FileAccess.READ_WRITE)
 	if file == null:
-		push_warning("Brainrot Edition: Cannot open log file: " + error_string(FileAccess.get_open_error()))
+		push_warning("Creature Comforts: Cannot open log file: " + error_string(FileAccess.get_open_error()))
 		return
 	
 	file.seek_end()

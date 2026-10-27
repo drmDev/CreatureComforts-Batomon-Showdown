@@ -1,6 +1,6 @@
 # log_formatter.gd
 extends RefCounted
-## Formatting helper for Brainrot Edition diagnostic logger
+## Formatting helper for Creature Comforts diagnostic logger
 ## Returns formatted text/arrays of lines instead of writing directly
 
 const ShopSnapshot = preload("shop_snapshot.gd")
