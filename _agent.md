@@ -10,13 +10,13 @@ Brainrot Edition (`np_brainrot`) is a GDScript mod for **Batomon Showdown** that
 - ✅ Add the Mad Scientist Day 6 transformation reminder with on-screen display.
 - ✅ Retire the exploratory owned-trinket reflection probe from deep-inspection logging; trinket-aware advice would require re-verified game data first.
 - ✅ Battle entry logs trinket state only (`trinket_ids` + `_active_passives` attribution), and shop visits report `--- TRINKETS GAINED ---` as a shop-to-shop inventory diff.
-- Add a compact shop advice panel using the working NP_QoL drawing patterns.
+- ✅ Add a trinket-gain panel that appears right-center on shop return, auto-hides after 5 seconds, using the NP_QoL drawing patterns.
 
 ## Files
 | File | Responsibility |
 |---|---|
-| `mod.json` | Mod identity, version, descriptions, and settings declarations. Includes `enable_trainer_reminders` setting. |
-| `mod_main.gd` | Loader lifecycle, initialization, polling, phase transitions, catalog-driven rule registration, reminder label/highlight management, and console/file output coordination. |
+| `mod.json` | Mod identity, version, descriptions, and settings declarations. |
+| `mod_main.gd` | Loader lifecycle, initialization, polling, phase transitions, catalog-driven rule registration, reminder label/highlight/trinket-panel management, and console/file output coordination. |
 | `shop_snapshot.gd` | Shared capture of run, shop, team, and bench values, including identity, species, levels, types, prices, and slots. |
 | `advice_context.gd` | Supplies the rule-facing context from snapshot data. |
 | `trainer_advisor.gd` | Evaluates registered rules, tracks active advice, and suppresses unchanged notices by rule ID. |
@@ -25,17 +25,16 @@ Brainrot Edition (`np_brainrot`) is a GDScript mod for **Batomon Showdown** that
 | `rule_factory.gd` | Builds rule instances from `trainer_catalog.gd`; supports per-trainer custom scripts via a `script` key. |
 | `reminder_label.gd` | Compact top-bar label showing label-mode reminders for the current trainer. |
 | `shop_highlight.gd` | Click-through overlay that outlines shop cards for highlight-mode advice (slot + offer instance id, resolved against live cards each frame). |
+| `trinket_panel.gd` | Right-center panel showing trinkets gained since the last shop visit; auto-hides after 5 seconds. Uses the NP_QoL drawing pattern. |
 | `log_formatter.gd` | Readable names, summaries, detailed inspection, and change output. |
 | `shop_changes.gd` | Structured snapshot comparison for detecting shop state changes. |
 | `gd_checks.ps1` | Runs Godot checks across mod scripts; excludes example directories. |
 | `examples/` | Sample/test material, separate from production script checks. |
 
-The expanded advice panel is a future feature, not yet implemented.
-
 ## Working conventions
 - Verify game identifiers/properties from source or runtime evidence; never invent APIs.
 - Keep rules independent of live game objects, file writing, and UI drawing.
-- Rules declare a display mode; the single `enable_trainer_reminders` setting gates both label reminders and shop highlights, and the Pika chime plays only for chime-flagged day reminders.
+- Rules declare a display mode; label reminders, shop highlights, and the trinket-gain panel are always on (no setting gate), and the Pika chime plays only for chime-flagged day reminders.
 - Preserve snapshot schemas consistently across producers and consumers.
 - Retain the 500 ms polling interval unless measurements justify changing it.
 - Suppress unchanged notices; reset on new shop visits and actual trainer/run changes.

@@ -52,6 +52,16 @@ func format_item_name(item_id: String) -> String:
 	return item_id.replace("_", " ").capitalize()
 
 
+func format_trinket_name(trinket_id: String) -> String:
+	"""Format a trinket id into a readable name.
+	Uses format_item_name as fallback. If trinket ids use a prefix (e.g. "trinket_"),
+	it is stripped first. Translation key pattern is unverified — adjust after runtime check."""
+	var name := trinket_id
+	if name.begins_with("trinket_"):
+		name = name.substr(8, name.length())
+	return format_item_name(name)
+
+
 func _monster_display_name(monster, include_shiny := true) -> String:
 	"""Species name with optional level/shininess suffixes."""
 	var name := format_monster_name(monster)

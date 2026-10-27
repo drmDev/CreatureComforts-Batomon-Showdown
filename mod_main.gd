@@ -39,7 +39,6 @@ var _initialized := false
 # Settings (defaults match mod.json)
 var _debug_logging := true
 var _deep_inspection := true
-var _enable_trainer_reminders := true
 var _settings_load_attempted := false
 var _settings_warning_shown := false
 
@@ -65,6 +64,9 @@ var _pending_chime_rule_ids: Dictionary = {}
 
 # Trainer display names (built from the trainer catalog)
 var _trainer_display_names: Dictionary = {}
+
+# Trinket gain panel (right-center, auto-hides after 5s)
+var _trinket_panel = null
 
 
 func mod_ready() -> void:
@@ -93,7 +95,6 @@ func _load_settings() -> void:
 	if mod_loader.has_method("get_config"):
 		_debug_logging = mod_loader.get_config("np_brainrot", "debug_logging", true)
 		_deep_inspection = mod_loader.get_config("np_brainrot", "deep_inspection", true)
-		_enable_trainer_reminders = mod_loader.get_config("np_brainrot", "enable_trainer_reminders", true)
 		
 		# Connect to config_changed signal for live updates
 		if mod_loader.has_signal("config_changed") and not mod_loader.is_connected("config_changed", _on_config_changed):
@@ -156,7 +157,7 @@ func _initialize_mod() -> void:
 	_log_message("=".repeat(80))
 	_log_message("Brainrot Edition %s - Refactored Trainer Advice System" % VERSION)
 	_log_message("Initialized at %s" % _formatter.get_timestamp())
-	_log_message("Settings: Debug Logging: %s | Deep Inspection: %s | Trainer Reminders: %s" % [_debug_logging, _deep_inspection, _enable_trainer_reminders])
+	_log_message("Settings: Debug Logging: %s | Deep Inspection: %s" % [_debug_logging, _deep_inspection])
 	_log_message("Log file: %s" % abs_log_path)
 	_log_message("=".repeat(80))
 	
@@ -177,16 +178,6 @@ func _on_config_changed(mod_id: String, key: String, value) -> void:
 			if value is bool:
 				_deep_inspection = value
 				_log_message("Setting changed: Deep Inspection = %s" % _deep_inspection)
-		"enable_trainer_reminders":
-			if value is bool:
-				_enable_trainer_reminders = value
-				_log_message("Setting changed: Trainer Reminders = %s" % _enable_trainer_reminders)
-				if not _enable_trainer_reminders and _reminder_label != null:
-					_reminder_label.hide_all_reminders()
-				if not _enable_trainer_reminders:
-					_clear_shop_highlights()
-
-
 func _setup_advisor() -> void:
 	"""Initialize advisor and register all rules from the trainer catalog."""
 	var TrainerAdvisor = load("res://mods/NP_Brainrot/trainer_advisor.gd")
@@ -226,6 +217,12 @@ func _setup_reminder_panel() -> void:
 	_shop_highlight.name = "ShopHighlight"
 	_shop_highlight.setup(_resolve_highlight_rects)
 	_reminder_layer.add_child(_shop_highlight)
+	
+	# Create trinket gain panel (right-center, auto-hides after 5s)
+	var TrinketPanel = load("res://mods/NP_Brainrot/trinket_panel.gd")
+	_trinket_panel = TrinketPanel.new()
+	_trinket_panel.name = "TrinketPanel"
+	_reminder_layer.add_child(_trinket_panel)
 
 
 func _setup_pika_sound() -> void:
@@ -309,24 +306,21 @@ func _evaluate_trainer_advice(snapshot) -> void:
 		if advice.get("chime", false):
 			_pending_chime_rule_ids[advice.get("rule_id", "")] = true
 	
-	# On-screen surfaces are gated by the single Trainer Reminders setting
-	if _enable_trainer_reminders:
-		if _reminder_label != null:
-			var reminders_to_show: Dictionary = {}
-			
-			for advice in all_active:
-				var display: String = advice.get("display", TrainerRules.BaseRule.DISPLAY_NONE)
-				if display == TrainerRules.BaseRule.DISPLAY_LABEL or display == TrainerRules.BaseRule.DISPLAY_BOTH:
-					var reminder_text: String = advice.get("reminder", "")
-					if not reminder_text.is_empty():
-						reminders_to_show[advice.get("rule_id", "")] = reminder_text
-			
-			# Replace all reminders at once (single update, single render)
-			_reminder_label.set_reminders(reminders_to_show)
+	# Update on-screen reminder label
+	if _reminder_label != null:
+		var reminders_to_show: Dictionary = {}
 		
-		_try_play_chime()
-	elif _reminder_label != null:
-		_reminder_label.hide_all_reminders()
+		for advice in all_active:
+			var display: String = advice.get("display", TrainerRules.BaseRule.DISPLAY_NONE)
+			if display == TrainerRules.BaseRule.DISPLAY_LABEL or display == TrainerRules.BaseRule.DISPLAY_BOTH:
+				var reminder_text: String = advice.get("reminder", "")
+				if not reminder_text.is_empty():
+					reminders_to_show[advice.get("rule_id", "")] = reminder_text
+		
+		# Replace all reminders at once (single update, single render)
+		_reminder_label.set_reminders(reminders_to_show)
+	
+	_try_play_chime()
 	
 	# Outline shop cards matching active highlight-mode advice
 	_update_shop_highlights(all_active)
@@ -369,6 +363,9 @@ func _handle_shop_phase(state) -> void:
 			var gains := _collect_trinket_gains(_trinket_baseline, run)
 			_trinkets_gained_last = gains["ids"]
 			_log_lines(_formatter.format_trinket_gains(gains))
+			_update_trinket_panel(gains)
+		else:
+			_hide_trinket_panel()
 		_capture_trinket_baseline(run)
 		_reset_transient_state(true, false, false)  # Reset suppression + highlights for new shop visit
 	elif _last_snapshot != null:
@@ -377,9 +374,10 @@ func _handle_shop_phase(state) -> void:
 		if comparison.has_changes():
 			_log_lines(_formatter.format_snapshot_changes(comparison, run, manager, _debug_logging))
 	
-	# Reset suppression only on trainer identity changes (not gold/shop/freeze changes)
+	# Reset suppression and trinket baseline on trainer identity changes (new run)
 	if trainer_changed and _advisor != null:
 		_advisor.reset_suppression()
+		_trinket_baseline = null  # Prevent false gains from a previous run's inventory
 	
 	# Evaluate trainer advice (after logging, before updating snapshot)
 	_evaluate_trainer_advice(current_snapshot)
@@ -452,6 +450,42 @@ func _collect_trinket_gains(baseline: Dictionary, run) -> Dictionary:
 	return {"ids": gained_ids, "counter": counter_delta}
 
 
+func _update_trinket_panel(gains: Dictionary) -> void:
+	"""Show the trinket gain panel with aggregated entries, or hide if no gains."""
+	if _trinket_panel == null:
+		return
+	var ids: Array = gains.get("ids", [])
+	if ids.is_empty():
+		_hide_trinket_panel()
+		return
+	var entries := _summarize_trinket_gains(ids)
+	if entries.is_empty():
+		_hide_trinket_panel()
+	else:
+		_trinket_panel.show_gains(entries)
+
+
+func _hide_trinket_panel() -> void:
+	"""Hide the trinket gain panel."""
+	if _trinket_panel != null:
+		_trinket_panel.hide_panel()
+
+
+func _summarize_trinket_gains(ids: Array) -> Array:
+	"""Group trinket ids by count and format names. Returns Array of {name, count}."""
+	var counts := {}
+	for tid in ids:
+		var key := str(tid)
+		counts[key] = counts.get(key, 0) + 1
+	
+	var entries: Array = []
+	for tid in counts.keys():
+		var name: String = _formatter.format_trinket_name(tid)
+		entries.append({"name": name, "count": int(counts[tid])})
+	
+	return entries
+
+
 func _update_overlay_gate() -> void:
 	"""Every frame: hide the whole reminder/highlight layer unless the shop is on screen and interactive."""
 	if _reminder_layer == null:
@@ -504,20 +538,19 @@ func _update_shop_highlights(all_active: Array) -> void:
 		return
 	
 	var targets: Array = []
-	if _enable_trainer_reminders:
-		var seen := {}
-		for advice in all_active:
-			var display: String = advice.get("display", TrainerRules.BaseRule.DISPLAY_NONE)
-			if display != TrainerRules.BaseRule.DISPLAY_HIGHLIGHT and display != TrainerRules.BaseRule.DISPLAY_BOTH:
+	var seen := {}
+	for advice in all_active:
+		var display: String = advice.get("display", TrainerRules.BaseRule.DISPLAY_NONE)
+		if display != TrainerRules.BaseRule.DISPLAY_HIGHLIGHT and display != TrainerRules.BaseRule.DISPLAY_BOTH:
+			continue
+		var slots: Array = advice.get("matched_indices", [])
+		var ids: Array = advice.get("matched_ids", [])
+		for i in range(mini(slots.size(), ids.size())):
+			var slot_index := int(slots[i])
+			if seen.has(slot_index):
 				continue
-			var slots: Array = advice.get("matched_indices", [])
-			var ids: Array = advice.get("matched_ids", [])
-			for i in range(mini(slots.size(), ids.size())):
-				var slot_index := int(slots[i])
-				if seen.has(slot_index):
-					continue
-				seen[slot_index] = true
-				targets.append({"slot": slot_index, "id": int(ids[i])})
+			seen[slot_index] = true
+			targets.append({"slot": slot_index, "id": int(ids[i])})
 	_shop_highlight.set_targets(targets)
 
 
@@ -529,8 +562,10 @@ func _clear_shop_highlights() -> void:
 func _reset_transient_state(clear_suppression: bool, clear_reminders: bool, clear_chimes: bool) -> void:
 	"""Reset overlay/suppression state shared across phase transitions."""
 	_clear_shop_highlights()
-	if clear_reminders and _reminder_label != null:
-		_reminder_label.hide_all_reminders()
+	if clear_reminders:
+		if _reminder_label != null:
+			_reminder_label.hide_all_reminders()
+		_hide_trinket_panel()
 	if clear_chimes:
 		_pending_chime_rule_ids.clear()
 	if clear_suppression and _advisor != null:
