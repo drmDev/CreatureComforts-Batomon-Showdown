@@ -11,12 +11,13 @@ Brainrot Edition (`np_brainrot`) is a GDScript mod for **Batomon Showdown** that
 - ✅ Retire the exploratory owned-trinket reflection probe from deep-inspection logging; trinket-aware advice would require re-verified game data first.
 - ✅ Battle entry logs trinket state only (`trinket_ids` + `_active_passives` attribution), and shop visits report `--- TRINKETS GAINED ---` as a shop-to-shop inventory diff.
 - ✅ Add a trinket-gain panel that appears right-center on shop return, auto-hides after 10 seconds, using the NP_QoL drawing patterns.
+- ✅ Add the post-battle achievement panel (Phase 1): battle-completion detection, placeholder achievement evaluation, and a bottom-right panel driven by a clearly marked temporary demo trigger, gated by the opt-in Achievement Notifications setting.
 
 ## Files
 | File | Responsibility |
 |---|---|
 | `mod.json` | Mod identity, version, descriptions, and settings declarations. |
-| `mod_main.gd` | Loader lifecycle, initialization, polling, phase transitions, catalog-driven rule registration, reminder label/highlight/trinket-panel management, and console/file output coordination. |
+| `mod_main.gd` | Loader lifecycle, initialization, polling, phase transitions, catalog-driven rule registration, reminder label/highlight/trinket-panel/achievement-panel management, and console/file output coordination. |
 | `shop_snapshot.gd` | Shared capture of run, shop, team, and bench values, including identity, species, levels, types, prices, and slots. |
 | `advice_context.gd` | Supplies the rule-facing context from snapshot data. |
 | `trainer_advisor.gd` | Evaluates registered rules, tracks active advice, and suppresses unchanged notices by rule ID. |
@@ -26,6 +27,9 @@ Brainrot Edition (`np_brainrot`) is a GDScript mod for **Batomon Showdown** that
 | `reminder_label.gd` | Compact top-bar label showing label-mode reminders for the current trainer. |
 | `shop_highlight.gd` | Click-through overlay that outlines shop cards for highlight-mode advice (slot + offer instance id, resolved against live cards each frame). |
 | `trinket_panel.gd` | Right-center panel showing trinkets gained since the last shop visit; auto-hides after 10 seconds. Uses the NP_QoL drawing pattern. |
+| `battle_completion_detector.gd` | Reports each battle's completion exactly once via `simulation.data.battle_over` (wins, losses, and draws); resets when leaving the battle phase. |
+| `achievement_evaluator.gd` | Placeholder achievement evaluation; Phase 1 emits a clearly marked temporary demo achievement after every completed battle. |
+| `achievement_panel.gd` | Bottom-right post-battle achievement toast; auto-hides after ~4 seconds. Uses the NP_QoL / Trinket Panel drawing pattern. Displays only when the Achievement Notifications setting is enabled. |
 | `log_formatter.gd` | Readable names, summaries, detailed inspection, and change output. |
 | `shop_changes.gd` | Structured snapshot comparison for detecting shop state changes. |
 | `gd_checks.ps1` | Runs Godot checks across mod scripts; excludes example directories. |
@@ -34,7 +38,7 @@ Brainrot Edition (`np_brainrot`) is a GDScript mod for **Batomon Showdown** that
 ## Working conventions
 - Verify game identifiers/properties from source or runtime evidence; never invent APIs.
 - Keep rules independent of live game objects, file writing, and UI drawing.
-- Rules declare a display mode; label reminders, shop highlights, and the trinket-gain panel are always on (no setting gate), and the Pika chime plays only for chime-flagged day reminders.
+- Rules declare a display mode; label reminders, shop highlights, and the trinket-gain panel are always on (no setting gate), the achievement toast is gated by the Achievement Notifications setting, and the Pika chime plays only for chime-flagged day reminders.
 - Preserve snapshot schemas consistently across producers and consumers.
 - Retain the 500 ms polling interval unless measurements justify changing it.
 - Suppress unchanged notices; reset on new shop visits and actual trainer/run changes.

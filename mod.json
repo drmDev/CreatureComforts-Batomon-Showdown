@@ -18,6 +18,13 @@
 			"type": "bool",
 			"default": true,
 			"description": "Discover and log additional properties of game objects (types, keywords, abilities)"
+		},
+		{
+			"key": "achievement_notifications",
+			"label": "Achievement Notifications",
+			"type": "bool",
+			"default": false,
+			"description": "Show the achievement toast after a battle completes"
 		}
 	]
 }
