@@ -1,4 +1,4 @@
-extends Control
+extends "../hud/comfort_panel.gd"
 ## Fixed-width toast. Explicit label layout avoids hidden Container sizing.
 
 const TOAST_WIDTH := 220.0
@@ -20,8 +20,8 @@ func _init() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = false
 	_panel_style = StyleBoxFlat.new()
-	_panel_style.bg_color = Color("#1a2332")
-	_panel_style.border_color = Color("#f39c12")
+	_panel_style.bg_color = BG_COLOR
+	_panel_style.border_color = BORDER_COLOR
 	_panel_style.set_border_width_all(1)
 	_panel_style.set_corner_radius_all(3)
 	var font := SystemFont.new()
@@ -33,9 +33,7 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	var viewport := get_viewport()
-	if viewport != null and not viewport.size_changed.is_connected(_on_viewport_resized):
-		viewport.size_changed.connect(_on_viewport_resized)
+	_connect_viewport_resize(_on_viewport_resized)
 
 
 func _make_label(font: Font, font_size: int, color: Color) -> Label:

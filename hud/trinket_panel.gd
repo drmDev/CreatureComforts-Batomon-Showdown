@@ -1,4 +1,4 @@
-extends Control
+extends "comfort_panel.gd"
 ## TrinketPanel - Collapsible panel showing non-junk trinkets earned during a battle.
 ##
 ## Behaviour adapted from examples/MyBattleStats/disabled_collapsible_panel.gd:
@@ -34,20 +34,8 @@ const DISPLAY_DURATION_MS := 8000  # Auto-hide after 8 seconds on the results sc
 const MARGIN_RIGHT := 10.0
 const MARGIN_BOTTOM := 130.0       # Sits above the bottom-right achievement toast
 
-const BG_COLOR := Color("#1a2332")       # Dark navy (matches reminder_label)
-const BORDER_COLOR := Color("#f39c12")   # Gold (matches reminder_label)
 const HEADER_BG := Color("#2b3a52")      # Slightly lighter navy for the header bar
-const TITLE_COLOR := Color("#ecf0f1")    # Light text
-const TEXT_COLOR := Color("#d4d8e0")     # Slightly dimmer for rows
-const SHADOW_COLOR := Color("#2c3e50")   # Dark shadow
 const INK_COLOR := Color("#ecf0f1")      # "-" / "+" glyph colour
-
-const FALLBACK_FONTS := [
-	"res://assets/ui/fonts/NotoSansJP-ExtraBold.ttf",
-	"res://assets/ui/fonts/NotoSansKR-ExtraBold.ttf",
-	"res://assets/ui/fonts/NotoSansSC-ExtraBold.ttf",
-]
-const SYSTEM_FALLBACKS := ["Leelawadee UI", "Tahoma", "Segoe UI", "Noto Sans Thai", "Noto Sans", "Arial Unicode MS", "Droid Sans Fallback"]
 
 
 var _entries: Array = []  # Array of Dictionary {"name": String, "count": int}
@@ -55,7 +43,6 @@ var _content_key := ""    # Cheap change detection so repeated show_gains() call
 var _panel_style: StyleBoxFlat
 var _header_style: StyleBoxFlat
 var _button_style: StyleBoxFlat
-var _text_font: Font
 var _hide_at_ms := 0
 
 # Collapsible state
@@ -76,7 +63,7 @@ func _init() -> void:
 	clip_contents = true
 	visible = false
 	_setup_styles()
-	_setup_font()
+	_text_font = _build_panel_font()
 
 
 func _setup_styles() -> void:
@@ -98,22 +85,6 @@ func _setup_styles() -> void:
 	_button_style.bg_color = BORDER_COLOR
 	_button_style.set_corner_radius_all(2)
 	_button_style.set_content_margin_all(2)
-
-
-func _setup_font() -> void:
-	var fallbacks: Array[Font] = []
-	for font_path in FALLBACK_FONTS:
-		if ResourceLoader.exists(font_path):
-			var font_resource = load(font_path)
-			if font_resource is Font:
-				fallbacks.append(font_resource)
-	var system_font := SystemFont.new()
-	system_font.font_names = PackedStringArray(SYSTEM_FALLBACKS)
-	fallbacks.append(system_font)
-
-	_text_font = SystemFont.new()
-	_text_font.font_names = PackedStringArray(["Consolas"])
-	_text_font.fallbacks = fallbacks
 
 
 ## Optional file logger hook (mod_main passes its _log_message Callable).
@@ -253,7 +224,7 @@ func _draw() -> void:
 		for entry in _entries:
 			var baseline := cursor_y + ROW_HEIGHT - 2.0
 			var line := "%dx %s" % [entry.count, entry.name]
-			_draw_text(Vector2(CONTENT_PADDING + 1.0, baseline), line, TEXT_COLOR, FONT_SIZE)
+			_draw_text_shadow(Vector2(CONTENT_PADDING + 1.0, baseline), line, LABEL_COLOR, FONT_SIZE)
 			cursor_y += ROW_HEIGHT + ROW_GAP
 
 	# Header bar
@@ -273,7 +244,7 @@ func _draw() -> void:
 func _draw_title(r: Rect2) -> void:
 	var t := _fit_text(_text_font, header_text(), TITLE_FONT_SIZE, r.size.x)
 	var baseline := r.position.y + HEAD_H * 0.5 + 3.0
-	_draw_text(Vector2(r.position.x, baseline), t, TITLE_COLOR, TITLE_FONT_SIZE)
+	_draw_text_shadow(Vector2(r.position.x, baseline), t, VALUE_COLOR, TITLE_FONT_SIZE)
 
 
 ## Trim `text` with an ellipsis so it fits `max_w` at `font_size` (Overrun-style, per character).
@@ -293,12 +264,6 @@ func _fit_text(font: Font, text: String, font_size: int, max_w: float) -> String
 		else:
 			hi = mid - 1
 	return text.left(lo).strip_edges(false, true) + dots if lo > 0 else dots
-
-
-## Draw text with a light shadow for readability (mirrors NP_QoL ui_skin.draw_text_with_shadow).
-func _draw_text(pos: Vector2, text: String, color: Color, font_size: int) -> void:
-	draw_string(_text_font, pos + Vector2(0.0, 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size, SHADOW_COLOR)
-	draw_string(_text_font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size, color)
 
 
 func _gui_input(event) -> void:

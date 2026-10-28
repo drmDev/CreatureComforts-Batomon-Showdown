@@ -58,7 +58,7 @@ func format_trinket_name(trinket_id: String) -> String:
 	Strips a "trinket_" prefix if present, then reuses format_item_name."""
 	var name := trinket_id
 	if name.begins_with("trinket_"):
-		name = name.substr(8, name.length())
+		name = name.substr(8)
 	return format_item_name(name)
 
 

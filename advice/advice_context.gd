@@ -1,7 +1,7 @@
 extends RefCounted
 ## AdviceContext - Safe game data extraction into plain-value records
 ## Provides stable data snapshots for rule evaluation without retaining live game objects.
-## Now consumes ShopSnapshot instead of reading game objects directly.
+## Consumes ShopSnapshot instead of reading game objects directly.
 
 
 ## Represents a shop item with stable identification

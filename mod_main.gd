@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9025"
+const VERSION := "0.9026"
 const MOD_ID := "creature_comforts"
 const MOD_ID_OLD := "np_brainrot"  # Legacy ID for settings migration (one-time)
 const OUTPUT_DIR := "user://creature_comforts"
@@ -15,9 +15,15 @@ const POLL_INTERVAL_MS := 500
 
 # Battle result labels (from simulation.data.player_health)
 const BATTLE_RESULT_VICTORY := "VICTORY"
+const BATTLE_RESULT_DEFEAT := "DEFEAT"
+const BATTLE_RESULT_DRAW := "DRAW"
+const BATTLE_RESULT_UNKNOWN := "UNKNOWN"
 
 # Advice display modes come from trainer_rules.gd BaseRule (single source)
 const TrainerRules = preload("advice/trainer_rules.gd")
+# Junk trinket id lives in the formatter (single source for the panel filter + log)
+const LogFormatterScript = preload("core/log_formatter.gd")
+const JUNK_TRINKET_ID := LogFormatterScript.JUNK_TRINKET_ID
 
 # Shop card highlight overlay (outlines shop cards matching active highlight-mode advice)
 var _shop_highlight = null
@@ -189,8 +195,7 @@ func _initialize_mod() -> void:
 	_load_settings()
 	
 	# Create formatter
-	var LogFormatter = load("res://mods/CreatureComforts/core/log_formatter.gd")
-	_formatter = LogFormatter.new(_has_property)
+	_formatter = LogFormatterScript.new(_has_property)
 	
 	# Create snapshot builder
 	var ShopSnapshot = load("res://mods/CreatureComforts/core/shop_snapshot.gd")
@@ -266,6 +271,8 @@ func _on_config_changed(mod_id: String, key: String, value) -> void:
 				_log_message("Setting changed: Achievement Notifications = %s" % _achievement_notifications)
 				if not _achievement_notifications and _achievement_panel != null:
 					_achievement_panel.hide_panel()
+
+
 func _setup_advisor() -> void:
 	"""Initialize advisor and register all rules from the trainer catalog."""
 	var TrainerAdvisor = load("res://mods/CreatureComforts/advice/trainer_advisor.gd")
@@ -332,7 +339,7 @@ func _setup_achievement_panel() -> void:
 	_battle_completion = BattleCompletionDetector.new()
 	
 	var AchievementEvaluator = load("res://mods/CreatureComforts/achievements/achievement_evaluator.gd")
-	_achievement_evaluator = AchievementEvaluator.new()
+	_achievement_evaluator = AchievementEvaluator.new(_has_property)
 	
 	# Pass the mod root so achievements.json stays at the mod root even though the
 	# store script now lives in achievements/.
@@ -401,10 +408,12 @@ func _inspect_current_phase() -> void:
 	_update_player_hud(state, is_battle)
 	_poll_achievements()
 	if not is_battle:
-		if _battle_completion != null:
-			_battle_completion.reset()
-		if _achievement_evaluator != null:
-			_achievement_evaluator.reset_battle()
+		# Reset battle-scoped tracking only when actually leaving the battle phase.
+		if _last_phase == "battle":
+			if _battle_completion != null:
+				_battle_completion.reset()
+			if _achievement_evaluator != null:
+				_achievement_evaluator.reset_battle()
 		# Leaving the battle state (event, shop, or other): stop battle trinket tracking.
 		_finalize_battle_trinket_tracking()
 		# Keep a rolling "last state outside battle" snapshot. The battle is simulated before the
@@ -648,8 +657,9 @@ func _handle_battle_phase(state) -> void:
 			_battle_over_seen = true
 			_log_message("BATTLE TRINKET GAINS | end snapshot frozen at battle_over: %s" % str(_battle_trinket_end.get("trinket_ids", [])))
 	
-	# Reset transient overlay/suppression state on battle entry
-	_reset_transient_state(false, true, true)
+	# Reset transient overlay/suppression state on battle entry (not every poll)
+	if _last_phase != "battle":
+		_reset_transient_state(false, true, true)
 	_last_phase = "battle"
 
 
@@ -714,27 +724,24 @@ func _award_achievements(earned: Array) -> void:
 ## Log how the battle ended and return the result label.
 func _log_battle_result(battle_data) -> String:
 	if battle_data == null:
-		_log_message("BATTLE COMPLETE | result=UNKNOWN")
-		return "UNKNOWN"
+		_log_message("BATTLE COMPLETE | result=%s" % BATTLE_RESULT_UNKNOWN)
+		return BATTLE_RESULT_UNKNOWN
 	
 	var player_health = battle_data.get("player_health")
 	if player_health == null or player_health.size() < 2:
-		_log_message("BATTLE COMPLETE | result=UNKNOWN | player_health unavailable")
-		return "UNKNOWN"
+		_log_message("BATTLE COMPLETE | result=%s | player_health unavailable" % BATTLE_RESULT_UNKNOWN)
+		return BATTLE_RESULT_UNKNOWN
 	
 	var player_hp := int(player_health[0])
 	var enemy_hp := int(player_health[1])
 	
-	var result := "DRAW"
+	var result := BATTLE_RESULT_DRAW
 	if player_hp > 0 and enemy_hp <= 0:
 		result = BATTLE_RESULT_VICTORY
 	elif player_hp <= 0 and enemy_hp > 0:
-		result = "DEFEAT"
+		result = BATTLE_RESULT_DEFEAT
 	_log_message("BATTLE COMPLETE | result=%s | player_hp=%d enemy_hp=%d" % [result, player_hp, enemy_hp])
 	return result
-
-
-const JUNK_TRINKET_ID := "junk"  # Verified in runtime log: trinket_ids contain "junk"
 
 
 ## Capture the trinket inventory (ids + gained counter) as a plain snapshot dict.
@@ -767,11 +774,6 @@ func _diff_trinket_states(before: Dictionary, after: Dictionary) -> Dictionary:
 	return {"ids": gained_ids, "counter": counter_delta}
 
 
-## Is this trinket id a Junk trinket (hidden from the player)?
-func _is_junk_trinket(tid) -> bool:
-	return str(tid) == JUNK_TRINKET_ID
-
-
 ## Update the trinket panel from a gains dict, showing only non-junk trinkets.
 ## Hides the panel when nothing non-junk was earned (1 or 10 junk alone => no panel).
 ## Returns true when the panel was shown.
@@ -781,7 +783,7 @@ func _update_trinket_panel(gains: Dictionary) -> bool:
 	var ids: Array = gains.get("ids", [])
 	var shown_ids: Array = []
 	for tid in ids:
-		if not _is_junk_trinket(tid):
+		if str(tid) != JUNK_TRINKET_ID:
 			shown_ids.append(tid)
 	if shown_ids.is_empty():
 		_hide_trinket_panel()
@@ -849,7 +851,7 @@ func _finalize_battle_trinket_tracking(show_panel := true) -> void:
 			if not post["ids"].is_empty():
 				_log_message("BATTLE TRINKET GAINS | excluded post-battle additions: %s" % str(post["ids"]))
 			if show_panel and _battle_result != BATTLE_RESULT_VICTORY:
-				_log_message("BATTLE TRINKET GAINS | panel suppressed (result=%s)" % (_battle_result if not _battle_result.is_empty() else "UNKNOWN"))
+				_log_message("BATTLE TRINKET GAINS | panel suppressed (result=%s)" % (_battle_result if not _battle_result.is_empty() else BATTLE_RESULT_UNKNOWN))
 			elif show_panel:
 				# Shows only non-junk gains; hides itself when nothing eligible remains.
 				panel_updated = _update_trinket_panel(gains)

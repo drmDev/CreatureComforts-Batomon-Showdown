@@ -64,22 +64,15 @@ func hide_all_reminders() -> void:
 
 func _update_display() -> void:
 	"""Update label visibility and text based on active reminders."""
-	if _active_reminders.is_empty():
+	# Combine all active reminders into a single line.
+	var reminder_texts: Array = []
+	for reminder_text in _active_reminders.values():
+		if not reminder_text.is_empty():
+			reminder_texts.append(reminder_text)
+	
+	if reminder_texts.is_empty():
 		visible = false
-		if _label != null:
-			_label.text = ""
+		_label.text = ""
 	else:
-		# Combine all active reminders into single line
-		var reminder_texts: Array = []
-		for reminder_text in _active_reminders.values():
-			if not reminder_text.is_empty():
-				reminder_texts.append(reminder_text)
-		
-		if reminder_texts.is_empty():
-			visible = false
-			if _label != null:
-				_label.text = ""
-		else:
-			if _label != null:
-				_label.text = " | ".join(reminder_texts)
-			visible = true
+		_label.text = " | ".join(reminder_texts)
+		visible = true

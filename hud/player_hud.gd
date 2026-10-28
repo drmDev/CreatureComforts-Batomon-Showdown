@@ -1,4 +1,4 @@
-extends Control
+extends "comfort_panel.gd"
 ## PlayerHud - Compact battle HUD showing the player's HP, Wins, and Day.
 ##
 ## Ported from NP_QoL's player_hud.gd, but restyled to match Creature Comforts'
@@ -18,38 +18,21 @@ const LABEL_GAP := 3.0
 const GROUP_GAP := 8.0
 const SEPARATOR := " | "
 
-# Panel palette (matches reminder_label / trinket_panel / achievement_panel)
-const BG_COLOR := Color("#1a2332")       # Dark navy
-const BORDER_COLOR := Color("#f39c12")   # Gold
-const LABEL_COLOR := Color("#d4d8e0")    # Dimmer label text
-const VALUE_COLOR := Color("#ecf0f1")    # Bright value text
-const SHADOW_COLOR := Color("#2c3e50")   # Dark shadow
-
-const FALLBACK_FONTS := [
-	"res://assets/ui/fonts/NotoSansJP-ExtraBold.ttf",
-	"res://assets/ui/fonts/NotoSansKR-ExtraBold.ttf",
-	"res://assets/ui/fonts/NotoSansSC-ExtraBold.ttf",
-]
-const SYSTEM_FALLBACKS := ["Leelawadee UI", "Tahoma", "Segoe UI", "Noto Sans Thai", "Noto Sans", "Arial Unicode MS", "Droid Sans Fallback"]
-
 var _player_stats: Dictionary = {}
 var _panel_style: StyleBoxFlat
-var _text_font: Font
 
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
 	_setup_styles()
-	_setup_font()
+	_text_font = _build_panel_font()
 	# Width is fitted to the measured label/value text; start with the placeholder widths.
 	size = Vector2(_measure_content_width({}), CONTENT_PADDING + ROW_HEIGHT + CONTENT_PADDING)
 
 
 func _ready() -> void:
-	var viewport := get_viewport()
-	if viewport != null and not viewport.size_changed.is_connected(_on_viewport_resized):
-		viewport.size_changed.connect(_on_viewport_resized)
+	_connect_viewport_resize(_on_viewport_resized)
 	_anchor_centered()
 
 
@@ -60,22 +43,6 @@ func _setup_styles() -> void:
 	_panel_style.set_border_width_all(1)
 	_panel_style.set_corner_radius_all(3)
 	_panel_style.set_content_margin_all(CONTENT_PADDING)
-
-
-func _setup_font() -> void:
-	var fallbacks: Array[Font] = []
-	for font_path in FALLBACK_FONTS:
-		if ResourceLoader.exists(font_path):
-			var font_resource = load(font_path)
-			if font_resource is Font:
-				fallbacks.append(font_resource)
-	var system_font := SystemFont.new()
-	system_font.font_names = PackedStringArray(SYSTEM_FALLBACKS)
-	fallbacks.append(system_font)
-
-	_text_font = SystemFont.new()
-	_text_font.font_names = PackedStringArray(["Consolas"])
-	_text_font.fallbacks = fallbacks
 
 
 ## Update the displayed stats. Expected keys: hp, wins, day (values are pre-formatted strings).
@@ -157,21 +124,15 @@ func _draw_stats_row() -> void:
 func _draw_stat(start_x: float, baseline: float, label: String, value: String) -> float:
 	var cursor_x := start_x
 
-	_draw_text(Vector2(cursor_x, baseline), label, LABEL_COLOR)
+	_draw_text_shadow(Vector2(cursor_x, baseline), label, LABEL_COLOR, FONT_SIZE)
 	cursor_x += _text_width(label) + LABEL_GAP
 
-	_draw_text(Vector2(cursor_x, baseline), value, VALUE_COLOR)
+	_draw_text_shadow(Vector2(cursor_x, baseline), value, VALUE_COLOR, FONT_SIZE)
 	cursor_x += _text_width(value) + GROUP_GAP
 
 	return cursor_x
 
 
 func _draw_separator(start_x: float, baseline: float) -> float:
-	_draw_text(Vector2(start_x, baseline), SEPARATOR, LABEL_COLOR)
+	_draw_text_shadow(Vector2(start_x, baseline), SEPARATOR, LABEL_COLOR, FONT_SIZE)
 	return start_x + _text_width(SEPARATOR)
-
-
-## Draw text with a light shadow for readability (mirrors the other panels).
-func _draw_text(pos: Vector2, text: String, color: Color) -> void:
-	draw_string(_text_font, pos + Vector2(0.0, 1.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, FONT_SIZE, SHADOW_COLOR)
-	draw_string(_text_font, pos, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, FONT_SIZE, color)
