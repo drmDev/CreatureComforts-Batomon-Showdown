@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9017"
+const VERSION := "0.9024"
 const MOD_ID := "creature_comforts"
 const MOD_ID_OLD := "np_brainrot"  # Legacy ID for settings migration (one-time)
 const OUTPUT_DIR := "user://creature_comforts"
@@ -91,6 +91,14 @@ var _trainer_display_names: Dictionary = {}
 
 # Trinket gain panel (right-center, auto-hides after 5s)
 var _trinket_panel = null
+
+# Shop income panel (near bottom-center, shop-only, shows daily income)
+var _shop_income_panel = null
+
+# Daily income schedule (user-verified: Day 1 base income is 35, +5 per day).
+# Trinket/passive gold_gain bonuses are added on top.
+const BASE_INCOME := 35
+const INCOME_PER_DAY := 5
 
 # Player HUD (battle-only HP / Wins / Day line, ported from NP_QoL)
 var _player_hud = null
@@ -290,6 +298,12 @@ func _setup_reminder_panel() -> void:
 	_shop_highlight.name = "ShopHighlight"
 	_shop_highlight.setup(_resolve_highlight_rects)
 	_reminder_layer.add_child(_shop_highlight)
+	
+	# Bottom-center income readout; the reminder layer's shop gate controls visibility.
+	var ShopIncomePanel = load("res://mods/CreatureComforts/hud/shop_income_panel.gd")
+	_shop_income_panel = ShopIncomePanel.new()
+	_shop_income_panel.name = "ShopIncomePanel"
+	_reminder_layer.add_child(_shop_income_panel)
 	
 func _setup_player_hud() -> void:
 	"""Initialize the battle-only player HUD (HP / Wins / Day)."""
@@ -544,10 +558,34 @@ func _handle_shop_phase(state) -> void:
 	# Evaluate trainer advice (after logging, before updating snapshot)
 	_evaluate_trainer_advice(current_snapshot)
 	
+	_update_shop_income(run)
+	
 	# (overlay visibility is handled every frame by _update_overlay_gate)
 	
 	_last_phase = "shop"
 	_last_snapshot = current_snapshot
+
+
+## Current day's income: base schedule plus passive gold_gain bonuses (e.g. Gold Nugget +3).
+func _compute_daily_income(run) -> int:
+	var day := int(run.get("current_round")) if _has_property(run, "current_round") else 1
+	var income := BASE_INCOME + INCOME_PER_DAY * maxi(day - 1, 0)
+	
+	if _has_property(run, "_active_passives"):
+		var passives = run.get("_active_passives")
+		if passives is Array:
+			for passive in passives:
+				if passive != null and is_instance_valid(passive) and _has_property(passive, "gold_gain"):
+					income += int(passive.get("gold_gain"))
+	
+	return income
+
+
+func _update_shop_income(run) -> void:
+	"""Refresh the bottom-center income panel while the shop is active."""
+	if _shop_income_panel == null:
+		return
+	_shop_income_panel.set_income(_compute_daily_income(run))
 
 
 func _handle_battle_phase(state) -> void:

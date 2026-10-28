@@ -59,12 +59,13 @@ requested scope, mention it briefly instead of implementing it.
 - ✅ Add "Herd U Liek Mudkipz" using the same Twins double-evolution rule as "Oh Yeah!", for Frillet (level 2) evolving into two level-3 Dewlotls.
 - ✅ Add "So I started blasting": Gentleman trainer owns a level-2 Rhizuka on Day 5 or earlier (`run.current_round`), checked from team + bench state.
 - ✅ Port NP_QoL's battle player HUD (HP / Wins / Day) into the mod, restyled to the shared dark-navy/gold panel look and text-only (no heart/badge/sun icons).
+- ✅ Add the shop income panel: a tiny bottom-center square showing the day's income (base schedule + `gold_gain` trinket/passive bonuses).
 
 ## Files
 | File | Responsibility |
 |---|---|
 | `mod.json` | Mod identity, version, descriptions, and settings declarations. |
-| `mod_main.gd` | Loader lifecycle, initialization, polling, phase transitions, catalog-driven rule registration, reminder label/highlight/trinket-panel/player-HUD/achievement management, per-poll and per-battle achievement detection + shared award persistence, battle-scoped trinket gain capture (rolling pre-battle baseline → in-battle diff), Junk filtering, and console/file output coordination. |
+| `mod_main.gd` | Loader lifecycle, initialization, polling, phase transitions, catalog-driven rule registration, reminder label/highlight/trinket-panel/player-HUD/shop-income/achievement management, per-poll and per-battle achievement detection + shared award persistence, battle-scoped trinket gain capture (rolling pre-battle baseline → in-battle diff), Junk filtering, and console/file output coordination. |
 | `core/shop_snapshot.gd` | Shared capture of run, shop, team, and bench values, including identity, species, levels, types, prices, and slots. |
 | `core/shop_changes.gd` | Structured snapshot comparison for detecting shop state changes. |
 | `core/log_formatter.gd` | Readable names, summaries, detailed inspection, and change output. |
@@ -75,6 +76,7 @@ requested scope, mention it briefly instead of implementing it.
 | `advice/rule_factory.gd` | Builds rule instances from `trainer_catalog.gd`; supports per-trainer custom scripts via a `script` key. |
 | `hud/reminder_label.gd` | Compact top-bar label showing label-mode reminders for the current trainer. |
 | `hud/player_hud.gd` | Battle-only single-line HUD showing HP / Wins / Day, ported from NP_QoL and restyled to the shared dark-navy/gold panel look (text-only, no icons). Panel width is fitted to the measured text (no fixed/trailing space) and re-centered when stats change. Centered near the top of the battle screen; visibility driven by mod_main. |
+| `hud/shop_income_panel.gd` | Tiny square shop-only panel near bottom-center showing the current daily income (base 35 on Day 1, +5 per day, plus `gold_gain` passive bonuses such as Gold Nugget). Styled like the other panels; visibility follows the reminder layer's shop gate. |
 | `hud/shop_highlight.gd` | Click-through overlay that outlines shop cards for highlight-mode advice (slot + offer instance id, resolved against live cards each frame). |
 | `hud/trinket_panel.gd` | Collapsible panel showing non-junk trinkets earned in a battle; appears when the battle state ends after a VICTORY (defeat-triggered gifts like Locked Box / Mysterious Chest are pre-applied at combat start and would otherwise be spoiled) and auto-hides after 8 seconds. Uses the collapsible-panel pattern (header drag, -/+ toggle, height animation) adapted from examples/MyBattleStats/disabled_collapsible_panel.gd. |
 | `achievements/battle_completion_detector.gd` | Reports each battle's completion exactly once via `simulation.data.battle_over` (wins, losses, and draws); resets when leaving the battle phase. |
