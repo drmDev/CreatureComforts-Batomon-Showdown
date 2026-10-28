@@ -13,6 +13,7 @@ Creature Comforts (`creature_comforts`) is a GDScript mod for **Batomon Showdown
 - ✅ Add a trinket-gain panel that appears right-center on shop return, auto-hides after 10 seconds, using the NP_QoL drawing patterns.
 - ✅ Refactored trinket-gain panel to be battle-scoped: keeps a rolling pre-battle inventory snapshot (needed because the autobattler simulates the fight before the 500ms poll sees the battle state), diffs it against the last in-battle snapshot, filters out Junk trinkets, and shows a collapsible panel on the battle results screen (above the achievement toast) only when non-junk trinkets were earned. Uses the collapsible-panel pattern from examples/MyBattleStats/disabled_collapsible_panel.gd (header drag, -/+ toggle, height animation).
 - ✅ Add the post-battle achievement panel (Phase 1): battle-completion detection, placeholder achievement evaluation, and a bottom-right panel driven by a clearly marked temporary demo trigger, gated by the opt-in Achievement Notifications setting.
+- ✅ Port NP_QoL's battle player HUD (HP / Wins / Day) into the mod, restyled to the shared dark-navy/gold panel look and text-only (no heart/badge/sun icons).
 
 ## Files
 | File | Responsibility |
@@ -26,6 +27,7 @@ Creature Comforts (`creature_comforts`) is a GDScript mod for **Batomon Showdown
 | `trainer_catalog.gd` | Declarative trainer definitions (id, display name, rule data) consumed by the rule factory. |
 | `rule_factory.gd` | Builds rule instances from `trainer_catalog.gd`; supports per-trainer custom scripts via a `script` key. |
 | `reminder_label.gd` | Compact top-bar label showing label-mode reminders for the current trainer. |
+| `player_hud.gd` | Battle-only single-line HUD showing HP / Wins / Day, ported from NP_QoL and restyled to the shared dark-navy/gold panel look (text-only, no icons). Centered near the top of the battle screen; visibility driven by mod_main. |
 | `shop_highlight.gd` | Click-through overlay that outlines shop cards for highlight-mode advice (slot + offer instance id, resolved against live cards each frame). |
 | `trinket_panel.gd` | Collapsible panel showing non-junk trinkets earned during a battle; appears on the battle results screen (above the achievement toast), auto-hides after 8 seconds. Uses the collapsible-panel pattern (header drag, -/+ toggle, height animation) adapted from examples/MyBattleStats/disabled_collapsible_panel.gd. |
 | `battle_completion_detector.gd` | Reports each battle's completion exactly once via `simulation.data.battle_over` (wins, losses, and draws); resets when leaving the battle phase. |

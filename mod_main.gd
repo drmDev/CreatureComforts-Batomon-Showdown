@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9003"
+const VERSION := "0.9004"
 const MOD_ID := "creature_comforts"
 const MOD_ID_OLD := "np_brainrot"  # Legacy ID for settings migration (one-time)
 const OUTPUT_DIR := "user://creature_comforts"
@@ -80,6 +80,10 @@ var _trainer_display_names: Dictionary = {}
 
 # Trinket gain panel (right-center, auto-hides after 5s)
 var _trinket_panel = null
+
+# Player HUD (battle-only HP / Wins / Day line, ported from NP_QoL)
+var _player_hud = null
+var _player_hud_layer: CanvasLayer = null
 
 # Achievement system (Phase 1): detection + placeholder evaluation + bottom-right panel
 var _battle_completion = null
@@ -174,6 +178,9 @@ func _initialize_mod() -> void:
 	
 	# Create reminder label system
 	_setup_reminder_panel()
+	
+	# Create battle player HUD
+	_setup_player_hud()
 	
 	# Create achievement panel system (Phase 1)
 	_setup_achievement_panel()
@@ -272,6 +279,20 @@ func _setup_reminder_panel() -> void:
 	_shop_highlight.setup(_resolve_highlight_rects)
 	_reminder_layer.add_child(_shop_highlight)
 	
+func _setup_player_hud() -> void:
+	"""Initialize the battle-only player HUD (HP / Wins / Day)."""
+	var PlayerHud = load("res://mods/CreatureComforts/player_hud.gd")
+	
+	_player_hud_layer = CanvasLayer.new()
+	_player_hud_layer.layer = 110  # Above game UI, matching NP_QoL's HUD layer
+	_player_hud_layer.name = "CreatureComforts_PlayerHud"
+	add_child(_player_hud_layer)
+	
+	_player_hud = PlayerHud.new()
+	_player_hud.name = "PlayerHud"
+	_player_hud_layer.add_child(_player_hud)
+
+
 func _setup_achievement_panel() -> void:
 	"""Initialize the battle-completion achievement panel system (Phase 1)."""
 	var BattleCompletionDetector = load("res://mods/CreatureComforts/battle_completion_detector.gd")
@@ -339,6 +360,7 @@ func _inspect_current_phase() -> void:
 	var state = main.get("current_state") if _has_property(main, "current_state") else null
 	
 	var is_battle := _script_is(state, BATTLE_SCRIPT)
+	_update_player_hud(state, is_battle)
 	if not is_battle:
 		if _battle_completion != null:
 			_battle_completion.reset()
@@ -359,6 +381,44 @@ func _inspect_current_phase() -> void:
 			_last_phase = ""
 			_battle_logged = false
 			_reset_transient_state(true, true, true)  # Drop stale chimes when leaving the shop
+
+
+func _update_player_hud(state, is_battle: bool) -> void:
+	"""Show the player HUD only during an active battle; hide it everywhere else."""
+	if _player_hud == null:
+		return
+	if not is_battle:
+		_player_hud.visible = false
+		return
+	
+	var player_run = state.get("_replay_p1_data") if _has_property(state, "_replay_p1_data") else null
+	if player_run == null:
+		_player_hud.visible = false
+		return
+	
+	_player_hud.update_stats(_build_player_stats(player_run))
+	var is_active: bool = state.get("is_battle_active") if _has_property(state, "is_battle_active") else false
+	_player_hud.visible = is_active
+
+
+func _build_player_stats(player_run) -> Dictionary:
+	"""Read HP / Wins / Day from the battle's player run data (same fields as NP_QoL)."""
+	var stats := {
+		"hp": "?",
+		"wins": "?",
+		"day": "?",
+	}
+	
+	for pair in [
+		["hp", "lives"],
+		["wins", "current_wins"],
+		["day", "current_round"],
+	]:
+		var value = player_run.get(pair[1])
+		if value != null:
+			stats[pair[0]] = str(value)
+	
+	return stats
 
 
 func _evaluate_trainer_advice(snapshot) -> void:
