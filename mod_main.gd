@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9002"
+const VERSION := "0.9003"
 const MOD_ID := "creature_comforts"
 const MOD_ID_OLD := "np_brainrot"  # Legacy ID for settings migration (one-time)
 const OUTPUT_DIR := "user://creature_comforts"
@@ -33,7 +33,18 @@ var _next_poll := 0
 var _last_phase := ""
 var _last_snapshot = null  # ShopSnapshot from previous poll
 var _battle_logged := false
-var _trinket_baseline = null  # Dictionary: trinket inventory captured at each shop visit
+
+# Battle-scoped trinket gains.
+# IMPORTANT: this is an autobattler - the whole fight is simulated before the mod's 500ms poll
+# first sees the battle state, so the first battle poll already contains the battle-granted
+# trinkets. We therefore keep a rolling snapshot of the last NON-battle state (shop/event) and use
+# it as the "before battle" baseline. The end snapshot is refreshed while inside the battle state.
+var _pre_battle_trinket_state = null  # Dictionary: last trinket inventory seen outside battle
+var _battle_trinket_start = null      # Dictionary: baseline used for the current battle
+var _battle_trinket_end = null        # Dictionary: latest trinket inventory inside the battle
+var _battle_trinket_tracking := false
+var _battle_over_seen := false     # battle_over observed; end snapshot is frozen at this point
+var _battle_gains_logged := false  # Battle gains already logged this battle (log once after battle_over)
 var _initialization_started := false
 var _initialized := false
 
@@ -261,13 +272,6 @@ func _setup_reminder_panel() -> void:
 	_shop_highlight.setup(_resolve_highlight_rects)
 	_reminder_layer.add_child(_shop_highlight)
 	
-	# Create trinket gain panel (right-center, auto-hides after 5s)
-	var TrinketPanel = load("res://mods/CreatureComforts/trinket_panel.gd")
-	_trinket_panel = TrinketPanel.new()
-	_trinket_panel.name = "TrinketPanel"
-	_reminder_layer.add_child(_trinket_panel)
-
-
 func _setup_achievement_panel() -> void:
 	"""Initialize the battle-completion achievement panel system (Phase 1)."""
 	var BattleCompletionDetector = load("res://mods/CreatureComforts/battle_completion_detector.gd")
@@ -287,6 +291,15 @@ func _setup_achievement_panel() -> void:
 	_achievement_panel = AchievementPanel.new()
 	_achievement_panel.name = "AchievementPanel"
 	_achievement_layer.add_child(_achievement_panel)
+
+	# Collapsible trinket-gain panel lives on the achievement layer so it shows on the
+	# battle results screen (same timing as the achievement toast), above it.
+	var TrinketPanel = load("res://mods/CreatureComforts/trinket_panel.gd")
+	_trinket_panel = TrinketPanel.new()
+	_trinket_panel.name = "TrinketPanel"
+	# Route panel position/drag/toggle diagnostics into the mod log as well as the console.
+	_trinket_panel.set_logger(Callable(self, "_log_message"))
+	_achievement_layer.add_child(_trinket_panel)
 
 
 func _setup_pika_sound() -> void:
@@ -326,8 +339,16 @@ func _inspect_current_phase() -> void:
 	var state = main.get("current_state") if _has_property(main, "current_state") else null
 	
 	var is_battle := _script_is(state, BATTLE_SCRIPT)
-	if not is_battle and _battle_completion != null:
-		_battle_completion.reset()
+	if not is_battle:
+		if _battle_completion != null:
+			_battle_completion.reset()
+		# Leaving the battle state (event, shop, or other): stop battle trinket tracking.
+		_finalize_battle_trinket_tracking()
+		# Keep a rolling "last state outside battle" snapshot. The battle is simulated before the
+		# first poll sees the battle state, so this is the only reliable pre-battle baseline.
+		var pre_run = _get_run_data()
+		if pre_run != null and is_instance_valid(pre_run):
+			_pre_battle_trinket_state = _capture_trinket_state(pre_run)
 	
 	if _script_is(state, SHOP_SCRIPT):
 		_handle_shop_phase(state)
@@ -426,14 +447,8 @@ func _handle_shop_phase(state) -> void:
 		_log_phase_entry("SHOP", run, manager)
 		if _deep_inspection:
 			_log_lines(_formatter.format_deep_inspect_shop(manager, run))
-		# Trinket gains since the previous shop visit (independent of deep inspection)
-		if _trinket_baseline != null:
-			var gains := _collect_trinket_gains(_trinket_baseline, run)
-			_log_lines(_formatter.format_trinket_gains(gains))
-			_update_trinket_panel(gains)
-		else:
-			_hide_trinket_panel()
-		_capture_trinket_baseline(run)
+		# Trinket gains are battle-scoped now (tracked during the battle state only), so no
+		# shop-to-shop inventory diff happens here; the trinket panel shows on the results screen.
 		_reset_transient_state(true, false, false)  # Reset suppression + highlights for new shop visit
 	elif _last_snapshot != null:
 		# Compare snapshots and log changes
@@ -441,10 +456,10 @@ func _handle_shop_phase(state) -> void:
 		if comparison.has_changes():
 			_log_lines(_formatter.format_snapshot_changes(comparison, run, manager, _debug_logging))
 	
-	# Reset suppression and trinket baseline on trainer identity changes (new run)
+	# Reset suppression and battle trinket tracking on trainer identity changes (new run)
 	if trainer_changed and _advisor != null:
 		_advisor.reset_suppression()
-		_trinket_baseline = null  # Prevent false gains from a previous run's inventory
+		_finalize_battle_trinket_tracking()  # Prevent false gains from a previous run's inventory
 	
 	# Evaluate trainer advice (after logging, before updating snapshot)
 	_evaluate_trainer_advice(current_snapshot)
@@ -477,7 +492,35 @@ func _handle_battle_phase(state) -> void:
 			# Trinket state at battle entry
 			_log_lines(_formatter.format_battle_trinket_state(_get_run_data()))
 		
+		# Battle-scoped trinket baseline. The fight is simulated before our first poll sees the
+		# battle state, so prefer the last snapshot taken OUTSIDE battle (shop/event); only fall
+		# back to the current inventory when no pre-battle snapshot exists (e.g. mod reload mid-run).
+		if _pre_battle_trinket_state != null:
+			_battle_trinket_start = _pre_battle_trinket_state
+		else:
+			_battle_trinket_start = _capture_trinket_state(_get_run_data())
+		# Provisional end = current; it is frozen the first time battle_over is observed.
+		_battle_trinket_end = _capture_trinket_state(_get_run_data())
+		_battle_trinket_tracking = true
+		_battle_over_seen = false
+		_battle_gains_logged = false
+		
 		_battle_logged = true
+	
+	# Freeze the battle-end snapshot the FIRST time battle_over is observed. The game pre-computes
+	# the following event's rewards during the results screen, applying them to run.trinket_ids
+	# before the event UI appears; continuing to refresh the end snapshot would leak those future
+	# event trinkets into the battle diff. Once frozen, keep refreshing the panel display only
+	# (idempotent show_gains) so it stays visible while the results screen remains.
+	if _battle_trinket_tracking:
+		if not _battle_over_seen and _battle_is_over(state):
+			var run = _get_run_data()
+			if run != null and is_instance_valid(run):
+				_battle_trinket_end = _capture_trinket_state(run)
+			_battle_over_seen = true
+			_log_message("BATTLE TRINKET GAINS | end snapshot frozen at battle_over: %s" % str(_battle_trinket_end.get("trinket_ids", [])))
+		if _battle_over_seen:
+			_update_battle_trinket_panel()
 	
 	# Reset transient overlay/suppression state on battle entry
 	_reset_transient_state(false, true, true)
@@ -532,51 +575,61 @@ func _log_battle_result(battle_data) -> void:
 	_log_message("BATTLE COMPLETE | result=%s | player_hp=%d enemy_hp=%d" % [result, player_hp, enemy_hp])
 
 
-func _capture_trinket_baseline(run) -> void:
-	"""Capture the trinket inventory at a shop visit for gain detection."""
+const JUNK_TRINKET_ID := "junk"  # Verified in runtime log: trinket_ids contain "junk"
+
+
+## Capture the trinket inventory (ids + gained counter) as a plain snapshot dict.
+func _capture_trinket_state(run) -> Dictionary:
 	var snapshot := {}
 	snapshot["trinket_ids"] = run.get("trinket_ids") if _has_property(run, "trinket_ids") else []
 	snapshot["trinkets_gained_total"] = int(run.get("trinkets_gained_total")) if _has_property(run, "trinkets_gained_total") else 0
+	return snapshot
 
-	_trinket_baseline = snapshot
 
-
-func _collect_trinket_gains(baseline: Dictionary, run) -> Dictionary:
-	"""Trinkets gained since the baseline: inventory diff plus the game counter delta."""
+## Diff trinkets gained between two captured states (inventory diff + counter delta).
+## Handles duplicates via count-based matching. Returns {"ids": [], "counter": int}.
+func _diff_trinket_states(before: Dictionary, after: Dictionary) -> Dictionary:
 	var gained_ids: Array = []
 	var counter_delta := 0
-	if not is_instance_valid(run):
-		return {"ids": gained_ids, "counter": counter_delta}
 
-	# Count-based diff (handles duplicates)
-	var baseline_counts := {}
-	for tid in baseline.get("trinket_ids", []):
-		baseline_counts[tid] = baseline_counts.get(tid, 0) + 1
+	var before_counts := {}
+	for tid in before.get("trinket_ids", []):
+		before_counts[tid] = before_counts.get(tid, 0) + 1
 
-	var current_ids: Array = run.get("trinket_ids") if _has_property(run, "trinket_ids") else []
-	for tid in current_ids:
-		var remaining = baseline_counts.get(tid, 0)
+	var after_ids: Array = after.get("trinket_ids", [])
+	for tid in after_ids:
+		var remaining = before_counts.get(tid, 0)
 		if remaining > 0:
-			baseline_counts[tid] = remaining - 1
+			before_counts[tid] = remaining - 1
 		else:
 			gained_ids.append(tid)
 
-	var baseline_total: int = int(baseline.get("trinkets_gained_total", 0))
-	var current_total: int = int(run.get("trinkets_gained_total")) if _has_property(run, "trinkets_gained_total") else 0
-	counter_delta = current_total - baseline_total
+	var before_total: int = int(before.get("trinkets_gained_total", 0))
+	var after_total: int = int(after.get("trinkets_gained_total", 0))
+	counter_delta = after_total - before_total
 
 	return {"ids": gained_ids, "counter": counter_delta}
 
 
+## Is this trinket id a Junk trinket (hidden from the player)?
+func _is_junk_trinket(tid) -> bool:
+	return str(tid) == JUNK_TRINKET_ID
+
+
+## Update the trinket panel from a gains dict, showing only non-junk trinkets.
+## Hides the panel when nothing non-junk was earned (1 or 10 junk alone => no panel).
 func _update_trinket_panel(gains: Dictionary) -> void:
-	"""Show the trinket gain panel with aggregated entries, or hide if no gains."""
 	if _trinket_panel == null:
 		return
 	var ids: Array = gains.get("ids", [])
-	if ids.is_empty():
+	var shown_ids: Array = []
+	for tid in ids:
+		if not _is_junk_trinket(tid):
+			shown_ids.append(tid)
+	if shown_ids.is_empty():
 		_hide_trinket_panel()
 		return
-	_trinket_panel.show_gains(_summarize_trinket_gains(ids))
+	_trinket_panel.show_gains(_summarize_trinket_gains(shown_ids))
 
 
 func _hide_trinket_panel() -> void:
@@ -598,6 +651,65 @@ func _summarize_trinket_gains(ids: Array) -> Array:
 		entries.append({"name": name, "count": int(counts[tid])})
 	
 	return entries
+
+
+## Is the battle currently marked over (battle_over flag on simulation.data)?
+func _battle_is_over(state) -> bool:
+	if state == null or not is_instance_valid(state):
+		return false
+	var sim = state.get("simulation") if _has_property(state, "simulation") else null
+	if sim == null or not is_instance_valid(sim):
+		return false
+	var data = sim.get("data") if _has_property(sim, "data") else null
+	if data == null:
+		return false
+	return bool(data.get("battle_over"))
+
+
+## Refresh the trinket panel from battle gains. Only shows non-junk gains; hides otherwise.
+## Logs the battle's trinket gains once (after the first non-empty/over calculation).
+func _update_battle_trinket_panel() -> void:
+	if _battle_trinket_start == null:
+		return
+	var run = _get_run_data()
+	if run == null or not is_instance_valid(run):
+		return
+	var gains := _diff_trinket_states(_battle_trinket_start, _battle_trinket_end)
+	
+	# Log once per battle (this runs on the results screen, same timing as the achievement log)
+	if not _battle_gains_logged and (not gains["ids"].is_empty() or int(gains["counter"]) != 0):
+		_battle_gains_logged = true
+		_log_lines(_formatter.format_battle_trinket_gains(gains))
+	
+	_update_trinket_panel(gains)
+
+
+## Stop battle trinket tracking and hide the panel. Called when leaving the battle state
+## (and on trainer/run changes) so the next battle re-baselines cleanly.
+func _finalize_battle_trinket_tracking() -> void:
+	if not _battle_trinket_tracking and _battle_trinket_start == null:
+		return
+	# Use the frozen battle_over snapshot only; do NOT re-read the live inventory here because the
+	# game may already have applied the following event's rewards. Log if the live inventory grew
+	# after the freeze, so event-granted trinkets are visibly excluded (diagnostic only).
+	if _battle_trinket_start != null and _battle_trinket_end != null and _battle_over_seen:
+		var run = _get_run_data()
+		if run != null and is_instance_valid(run):
+			var gains := _diff_trinket_states(_battle_trinket_start, _battle_trinket_end)
+			if not _battle_gains_logged and (not gains["ids"].is_empty() or int(gains["counter"]) != 0):
+				_battle_gains_logged = true
+				_log_lines(_formatter.format_battle_trinket_gains(gains))
+			# Diagnostic: changes applied after the freeze (e.g. event rewards) are excluded.
+			var live := _capture_trinket_state(run)
+			var post := _diff_trinket_states(_battle_trinket_end, live)
+			if not post["ids"].is_empty():
+				_log_message("BATTLE TRINKET GAINS | excluded post-battle additions: %s" % str(post["ids"]))
+	_battle_trinket_start = null
+	_battle_trinket_end = null
+	_battle_trinket_tracking = false
+	_battle_over_seen = false
+	_battle_gains_logged = false
+	_hide_trinket_panel()
 
 
 func _update_overlay_gate() -> void:
@@ -679,7 +791,8 @@ func _reset_transient_state(clear_suppression: bool, clear_reminders: bool, clea
 	if clear_reminders:
 		if _reminder_label != null:
 			_reminder_label.hide_all_reminders()
-		_hide_trinket_panel()
+		# Trinket panel now lives on the achievement layer (battle results screen) and is
+		# managed by _finalize_battle_trinket_tracking / auto-hide, not by this reset.
 	if clear_chimes:
 		_pending_chime_rule_ids.clear()
 	if clear_suppression and _advisor != null:
