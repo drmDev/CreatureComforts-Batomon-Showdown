@@ -6,6 +6,7 @@ extends RefCounted
 const ShopSnapshot = preload("shop_snapshot.gd")
 
 const STAT_NAMES := {1: "Dmg", 2: "Heal", 3: "Shield", 4: "Burn", 5: "Poison", 6: "Shock", 7: "Multi"}
+const JUNK_TRINKET_ID := "junk"  # Junk trinkets are hidden from the trinket-gain panel
 
 var _has_prop: Callable
 
@@ -346,27 +347,6 @@ func format_battle_trinket_state(run) -> Array[String]:
 	return lines
 
 
-func format_trinket_gains(gains: Dictionary) -> Array[String]:
-	"""Report trinkets gained since the previous shop visit (computed by mod_main)."""
-	var lines: Array[String] = []
-	lines.append("\n  --- TRINKETS GAINED ---")
-
-	var gained_ids: Array = gains.get("ids", [])
-	var counter_gained: int = int(gains.get("counter", 0))
-	var count: int = gained_ids.size()
-
-	if count > 0 or counter_gained > 0:
-		lines.append("    +%d trinket(s): %s" % [count, _format_flat_value(gained_ids)])
-		if count == 0:
-			lines.append("      (gained trinkets are no longer in inventory)")
-		elif count != counter_gained:
-			lines.append("      (total counter +%d, %d gained trinket(s) no longer in inventory)" % [counter_gained, counter_gained - count])
-	else:
-		lines.append("    (none)")
-
-	return lines
-
-
 func format_battle_trinket_gains(gains: Dictionary) -> Array[String]:
 	"""Report trinkets gained during the battle (battle-scoped, computed by mod_main)."""
 	var lines: Array[String] = []
@@ -385,7 +365,7 @@ func format_battle_trinket_gains(gains: Dictionary) -> Array[String]:
 		# Count how many are junk (hidden from the panel)
 		var junk_count := 0
 		for tid in gained_ids:
-			if str(tid) == "junk":
+			if str(tid) == JUNK_TRINKET_ID:
 				junk_count += 1
 		if junk_count > 0:
 			lines.append("      (junk excluded from panel: %d)" % junk_count)

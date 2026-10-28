@@ -41,7 +41,6 @@ var trainer_id: String = ""
 var day: int = 0
 var shop_items: Array = []
 var team_monsters: Array = []
-# bench_monsters removed - no rules currently use bench data
 
 
 ## Create context from ShopSnapshot

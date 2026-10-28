@@ -4,7 +4,7 @@ extends RefCounted
 ## Uses plain values only; retains no live game objects.
 
 
-## Represents a shop offer with identity, species, level, types, and price
+## Represents a shop offer with identity, species, level, and types
 class ShopOffer:
 	var slot: int = -1
 	var instance_id: int = 0  # Live offer object's instance id (0 when empty); lets UI overlays validate identity
@@ -13,7 +13,6 @@ class ShopOffer:
 	var item_id: String = ""  # basic_bait, etc.
 	var level: int = 1
 	var is_shiny: bool = false
-	var price: int = 0
 	var types: Array = []  # Array of lowercase type names: ["fire", "flying"]
 
 	func is_empty() -> bool:
@@ -102,12 +101,9 @@ func capture(run, manager, has_property_func: Callable, type_resolver: Callable)
 						offer.level = int(item.get("level"))
 					if has_property_func.call(item, "is_shiny"):
 						offer.is_shiny = bool(item.get("is_shiny"))
-					offer.price = int(item.get_gold_cost())
 				"item":
 					offer.type = "item"
 					offer.item_id = str(item.id)
-					if has_property_func.call(item, "cost"):
-						offer.price = int(item.get("cost"))
 				_:
 					offer.type = "unknown"
 

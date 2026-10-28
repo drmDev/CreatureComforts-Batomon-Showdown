@@ -12,9 +12,9 @@ extends Control
 ## own StyleBoxFlat + font (same NP_QoL drawing pattern as before), so it has no external skin
 ## dependency. It also keeps the earlier right/bottom auto-hide behaviour.
 ##
-## Appears on the battle results screen, bottom-right just above the achievement toast, and
-## auto-hides after a few seconds. It only shows when at least one non-junk trinket was earned;
-## that filtering is done by mod_main before calling show_gains().
+## Appears bottom-right just above the achievement toast when the battle state ends and the
+## panel is shown, and auto-hides after a few seconds. It only shows when at least one non-junk
+## trinket was earned; that filtering is done by mod_main before calling show_gains().
 
 const PANEL_WIDTH := 185.0
 const CONTENT_PADDING := 6.0
@@ -49,8 +49,6 @@ const FALLBACK_FONTS := [
 ]
 const SYSTEM_FALLBACKS := ["Leelawadee UI", "Tahoma", "Segoe UI", "Noto Sans Thai", "Noto Sans", "Arial Unicode MS", "Droid Sans Fallback"]
 
-
-signal moved_by_drag
 
 var _entries: Array = []  # Array of Dictionary {"name": String, "count": int}
 var _content_key := ""    # Cheap change detection so repeated show_gains() calls don't re-anchor
@@ -144,9 +142,8 @@ func header_text() -> String:
 ## Show the panel with the given (already non-junk filtered) entries.
 ## entries: Array of Dictionary {"name": String, "count": int}
 ##
-## mod_main calls this every poll while the results screen is up, so it must be idempotent:
-## only the FIRST call (hidden -> visible) anchors the panel. Later calls with the same content
-## do nothing, which preserves any drag position and the minimize animation.
+## Idempotent: only the FIRST call (hidden -> visible) anchors the panel. Later calls with the
+## same content do nothing, which preserves any drag position and the minimize animation.
 func show_gains(entries: Array) -> void:
 	var key := _make_content_key(entries)
 	var first_show := not visible
@@ -316,7 +313,6 @@ func _gui_input(event) -> void:
 			_pressing = false
 			if _dragged:
 				_debug("drag end pos=%s" % position)
-				moved_by_drag.emit()
 			else:
 				toggle()
 		accept_event()

@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9024"
+const VERSION := "0.9025"
 const MOD_ID := "creature_comforts"
 const MOD_ID_OLD := "np_brainrot"  # Legacy ID for settings migration (one-time)
 const OUTPUT_DIR := "user://creature_comforts"
@@ -60,9 +60,13 @@ var _initialization_started := false
 var _initialized := false
 
 # Settings (defaults match mod.json)
-var _debug_logging := true
-var _deep_inspection := true
-var _achievement_notifications := false
+const DEFAULT_DEBUG_LOGGING := true
+const DEFAULT_DEEP_INSPECTION := true
+const DEFAULT_ACHIEVEMENT_NOTIFICATIONS := false
+
+var _debug_logging := DEFAULT_DEBUG_LOGGING
+var _deep_inspection := DEFAULT_DEEP_INSPECTION
+var _achievement_notifications := DEFAULT_ACHIEVEMENT_NOTIFICATIONS
 var _settings_load_attempted := false
 var _settings_warning_shown := false
 
@@ -89,7 +93,7 @@ var _pending_chime_rule_ids: Dictionary = {}
 # Trainer display names (built from the trainer catalog)
 var _trainer_display_names: Dictionary = {}
 
-# Trinket gain panel (right-center, auto-hides after 5s)
+# Trinket gain panel (bottom-right of the results screen, auto-hides after 8s)
 var _trinket_panel = null
 
 # Shop income panel (near bottom-center, shop-only, shows daily income)
@@ -102,7 +106,6 @@ const INCOME_PER_DAY := 5
 
 # Player HUD (battle-only HP / Wins / Day line, ported from NP_QoL)
 var _player_hud = null
-var _player_hud_layer: CanvasLayer = null
 
 # Achievement system: poll-based detection + JSON persistence + bottom-right panel
 var _battle_completion = null
@@ -136,29 +139,33 @@ func _load_settings() -> void:
 	_settings_load_attempted = true
 	
 	if mod_loader.has_method("get_config"):
-		# Try loading from the new mod ID first
-		_debug_logging = mod_loader.get_config(MOD_ID, "debug_logging", true)
-		_deep_inspection = mod_loader.get_config(MOD_ID, "deep_inspection", true)
-		_achievement_notifications = mod_loader.get_config(MOD_ID, "achievement_notifications", false)
+		# Load from the current mod ID.
+		_debug_logging = mod_loader.get_config(MOD_ID, "debug_logging", DEFAULT_DEBUG_LOGGING)
+		_deep_inspection = mod_loader.get_config(MOD_ID, "deep_inspection", DEFAULT_DEEP_INSPECTION)
+		_achievement_notifications = mod_loader.get_config(MOD_ID, "achievement_notifications", DEFAULT_ACHIEVEMENT_NOTIFICATIONS)
 		
-		# One-time migration: if settings under the old mod ID exist, prefer them
-		# and save them under the new ID.
-		var old_debug = mod_loader.get_config(MOD_ID_OLD, "debug_logging", true)
-		var old_deep = mod_loader.get_config(MOD_ID_OLD, "deep_inspection", true)
-		var old_achievement = mod_loader.get_config(MOD_ID_OLD, "achievement_notifications", false)
+		# Legacy migration: adopt a value stored under the old mod ID only when the
+		# current setting is still at its default. get_config() returns the default
+		# when a key is absent, so this is the best available "unset" signal; it
+		# prevents an installed legacy pack from clobbering a user's current choice.
+		var migrated := false
+		if _debug_logging == DEFAULT_DEBUG_LOGGING:
+			var old_debug = mod_loader.get_config(MOD_ID_OLD, "debug_logging", DEFAULT_DEBUG_LOGGING)
+			if old_debug != _debug_logging:
+				_debug_logging = old_debug
+				migrated = true
+		if _deep_inspection == DEFAULT_DEEP_INSPECTION:
+			var old_deep = mod_loader.get_config(MOD_ID_OLD, "deep_inspection", DEFAULT_DEEP_INSPECTION)
+			if old_deep != _deep_inspection:
+				_deep_inspection = old_deep
+				migrated = true
+		if _achievement_notifications == DEFAULT_ACHIEVEMENT_NOTIFICATIONS:
+			var old_achievement = mod_loader.get_config(MOD_ID_OLD, "achievement_notifications", DEFAULT_ACHIEVEMENT_NOTIFICATIONS)
+			if old_achievement != _achievement_notifications:
+				_achievement_notifications = old_achievement
+				migrated = true
 		
-		var needs_migration := false
-		if _debug_logging != old_debug:
-			_debug_logging = old_debug
-			needs_migration = true
-		if _deep_inspection != old_deep:
-			_deep_inspection = old_deep
-			needs_migration = true
-		if _achievement_notifications != old_achievement:
-			_achievement_notifications = old_achievement
-			needs_migration = true
-		
-		if needs_migration and mod_loader.has_method("set_config"):
+		if migrated and mod_loader.has_method("set_config"):
 			mod_loader.set_config(MOD_ID, "debug_logging", _debug_logging)
 			mod_loader.set_config(MOD_ID, "deep_inspection", _deep_inspection)
 			mod_loader.set_config(MOD_ID, "achievement_notifications", _achievement_notifications)
@@ -309,14 +316,14 @@ func _setup_player_hud() -> void:
 	"""Initialize the battle-only player HUD (HP / Wins / Day)."""
 	var PlayerHud = load("res://mods/CreatureComforts/hud/player_hud.gd")
 	
-	_player_hud_layer = CanvasLayer.new()
-	_player_hud_layer.layer = 110  # Above game UI, matching NP_QoL's HUD layer
-	_player_hud_layer.name = "CreatureComforts_PlayerHud"
-	add_child(_player_hud_layer)
+	var layer := CanvasLayer.new()
+	layer.layer = 110  # Above game UI, matching NP_QoL's HUD layer
+	layer.name = "CreatureComforts_PlayerHud"
+	add_child(layer)
 	
 	_player_hud = PlayerHud.new()
 	_player_hud.name = "PlayerHud"
-	_player_hud_layer.add_child(_player_hud)
+	layer.add_child(_player_hud)
 
 
 func _setup_achievement_panel() -> void:
@@ -742,7 +749,6 @@ func _capture_trinket_state(run) -> Dictionary:
 ## Handles duplicates via count-based matching. Returns {"ids": [], "counter": int}.
 func _diff_trinket_states(before: Dictionary, after: Dictionary) -> Dictionary:
 	var gained_ids: Array = []
-	var counter_delta := 0
 
 	var before_counts := {}
 	for tid in before.get("trinket_ids", []):
@@ -756,9 +762,7 @@ func _diff_trinket_states(before: Dictionary, after: Dictionary) -> Dictionary:
 		else:
 			gained_ids.append(tid)
 
-	var before_total: int = int(before.get("trinkets_gained_total", 0))
-	var after_total: int = int(after.get("trinkets_gained_total", 0))
-	counter_delta = after_total - before_total
+	var counter_delta: int = int(after.get("trinkets_gained_total", 0)) - int(before.get("trinkets_gained_total", 0))
 
 	return {"ids": gained_ids, "counter": counter_delta}
 
@@ -770,9 +774,10 @@ func _is_junk_trinket(tid) -> bool:
 
 ## Update the trinket panel from a gains dict, showing only non-junk trinkets.
 ## Hides the panel when nothing non-junk was earned (1 or 10 junk alone => no panel).
-func _update_trinket_panel(gains: Dictionary) -> void:
+## Returns true when the panel was shown.
+func _update_trinket_panel(gains: Dictionary) -> bool:
 	if _trinket_panel == null:
-		return
+		return false
 	var ids: Array = gains.get("ids", [])
 	var shown_ids: Array = []
 	for tid in ids:
@@ -780,8 +785,9 @@ func _update_trinket_panel(gains: Dictionary) -> void:
 			shown_ids.append(tid)
 	if shown_ids.is_empty():
 		_hide_trinket_panel()
-		return
+		return false
 	_trinket_panel.show_gains(_summarize_trinket_gains(shown_ids))
+	return true
 
 
 func _hide_trinket_panel() -> void:
@@ -846,8 +852,7 @@ func _finalize_battle_trinket_tracking(show_panel := true) -> void:
 				_log_message("BATTLE TRINKET GAINS | panel suppressed (result=%s)" % (_battle_result if not _battle_result.is_empty() else "UNKNOWN"))
 			elif show_panel:
 				# Shows only non-junk gains; hides itself when nothing eligible remains.
-				_update_trinket_panel(gains)
-				panel_updated = true
+				panel_updated = _update_trinket_panel(gains)
 
 	if not panel_updated:
 		_hide_trinket_panel()

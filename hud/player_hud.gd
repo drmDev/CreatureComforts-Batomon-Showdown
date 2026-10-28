@@ -12,6 +12,7 @@ const CONTENT_PADDING := 4.0
 const CONTENT_INSET := 2.0  # Extra left/right breathing room inside the padding
 const ROW_HEIGHT := 12.0
 const FONT_SIZE := 9
+const TOP_OFFSET := 244.0   # Fixed distance from the top of the battle screen
 
 const LABEL_GAP := 3.0
 const GROUP_GAP := 8.0
@@ -118,7 +119,7 @@ func _anchor_centered() -> void:
 	if viewport == null:
 		return
 	var viewport_size := viewport.get_visible_rect().size
-	position = Vector2(roundf((viewport_size.x - size.x) * 0.5), 244.0)
+	position = Vector2(roundf((viewport_size.x - size.x) * 0.5), TOP_OFFSET)
 
 
 func _on_viewport_resized() -> void:

@@ -29,11 +29,6 @@ func _init(base_dir: String = "") -> void:
 	_load()
 
 
-## Absolute path of the achievements file (useful for logging).
-func get_path() -> String:
-	return _path
-
-
 ## Has this achievement already been completed?
 func is_completed(id: String) -> bool:
 	var achievements: Dictionary = _data.get("achievements", {})
