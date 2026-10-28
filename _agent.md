@@ -19,22 +19,23 @@ Creature Comforts (`creature_comforts`) is a GDScript mod for **Batomon Showdown
 | File | Responsibility |
 |---|---|
 | `mod.json` | Mod identity, version, descriptions, and settings declarations. |
-| `mod_main.gd` | Loader lifecycle, initialization, polling, phase transitions, catalog-driven rule registration, reminder label/highlight/trinket-panel/achievement-panel management, battle-scoped trinket gain capture (rolling pre-battle baseline → in-battle diff), Junk filtering, and console/file output coordination. |
-| `shop_snapshot.gd` | Shared capture of run, shop, team, and bench values, including identity, species, levels, types, prices, and slots. |
-| `advice_context.gd` | Supplies the rule-facing context from snapshot data. |
-| `trainer_advisor.gd` | Evaluates registered rules, tracks active advice, and suppresses unchanged notices by rule ID. |
-| `trainer_rules.gd` | Reusable rule classes (`ShopTargetsRule`, `DayReminderRule`, `TeamCompositionRule`) emitting a shared advice contract (rule_id, trainer_id, severity, message, display mode, reminder text, chime flag); returns structured advice without output side effects. |
-| `trainer_catalog.gd` | Declarative trainer definitions (id, display name, rule data) consumed by the rule factory. |
-| `rule_factory.gd` | Builds rule instances from `trainer_catalog.gd`; supports per-trainer custom scripts via a `script` key. |
-| `reminder_label.gd` | Compact top-bar label showing label-mode reminders for the current trainer. |
-| `player_hud.gd` | Battle-only single-line HUD showing HP / Wins / Day, ported from NP_QoL and restyled to the shared dark-navy/gold panel look (text-only, no icons). Centered near the top of the battle screen; visibility driven by mod_main. |
-| `shop_highlight.gd` | Click-through overlay that outlines shop cards for highlight-mode advice (slot + offer instance id, resolved against live cards each frame). |
-| `trinket_panel.gd` | Collapsible panel showing non-junk trinkets earned during a battle; appears on the battle results screen (above the achievement toast), auto-hides after 8 seconds. Uses the collapsible-panel pattern (header drag, -/+ toggle, height animation) adapted from examples/MyBattleStats/disabled_collapsible_panel.gd. |
-| `battle_completion_detector.gd` | Reports each battle's completion exactly once via `simulation.data.battle_over` (wins, losses, and draws); resets when leaving the battle phase. |
-| `achievement_evaluator.gd` | Placeholder achievement evaluation; Phase 1 emits a clearly marked temporary demo achievement after every completed battle. |
-| `achievement_panel.gd` | Bottom-right post-battle achievement toast; auto-hides after ~4 seconds. Uses the NP_QoL / Trinket Panel drawing pattern. Displays only when the Achievement Notifications setting is enabled. |
-| `log_formatter.gd` | Readable names, summaries, detailed inspection, and change output. |
-| `shop_changes.gd` | Structured snapshot comparison for detecting shop state changes. |
+| `mod_main.gd` | Loader lifecycle, initialization, polling, phase transitions, catalog-driven rule registration, reminder label/highlight/trinket-panel/player-HUD/achievement management, per-poll achievement detection + persistence, battle-scoped trinket gain capture (rolling pre-battle baseline → in-battle diff), Junk filtering, and console/file output coordination. |
+| `core/shop_snapshot.gd` | Shared capture of run, shop, team, and bench values, including identity, species, levels, types, prices, and slots. |
+| `core/shop_changes.gd` | Structured snapshot comparison for detecting shop state changes. |
+| `core/log_formatter.gd` | Readable names, summaries, detailed inspection, and change output. |
+| `advice/advice_context.gd` | Supplies the rule-facing context from snapshot data. |
+| `advice/trainer_advisor.gd` | Evaluates registered rules, tracks active advice, and suppresses unchanged notices by rule ID. |
+| `advice/trainer_rules.gd` | Reusable rule classes (`ShopTargetsRule`, `DayReminderRule`, `TeamCompositionRule`) emitting a shared advice contract (rule_id, trainer_id, severity, message, display mode, reminder text, chime flag); returns structured advice without output side effects. |
+| `advice/trainer_catalog.gd` | Declarative trainer definitions (id, display name, rule data) consumed by the rule factory. |
+| `advice/rule_factory.gd` | Builds rule instances from `trainer_catalog.gd`; supports per-trainer custom scripts via a `script` key. |
+| `hud/reminder_label.gd` | Compact top-bar label showing label-mode reminders for the current trainer. |
+| `hud/player_hud.gd` | Battle-only single-line HUD showing HP / Wins / Day, ported from NP_QoL and restyled to the shared dark-navy/gold panel look (text-only, no icons). Centered near the top of the battle screen; visibility driven by mod_main. |
+| `hud/shop_highlight.gd` | Click-through overlay that outlines shop cards for highlight-mode advice (slot + offer instance id, resolved against live cards each frame). |
+| `hud/trinket_panel.gd` | Collapsible panel showing non-junk trinkets earned during a battle; appears on the battle results screen (above the achievement toast), auto-hides after 8 seconds. Uses the collapsible-panel pattern (header drag, -/+ toggle, height animation) adapted from examples/MyBattleStats/disabled_collapsible_panel.gd. |
+| `achievements/battle_completion_detector.gd` | Reports each battle's completion exactly once via `simulation.data.battle_over` (wins, losses, and draws); resets when leaving the battle phase. |
+| `achievements/achievement_evaluator.gd` | Poll-based achievement detection. Keeps a rolling team+bench species/level baseline and awards "Oh Yeah!" when the Twins trainer evolves a level-2 Beetbud into two level-3 Beetdowns (Beetdown count rises by ≥2). Returns structured achievements without persistence or UI side effects. |
+| `achievements/achievement_store.gd` | Simple JSON persistence for achievement completion at the mod root (`achievements.json`). Tracks completed/not-completed per achievement id with a completion timestamp; tolerates missing or corrupt files. |
+| `achievements/achievement_panel.gd` | Bottom-right achievement toast; auto-hides after ~4 seconds. Uses the NP_QoL / Trinket Panel drawing pattern. Displays only when the Achievement Notifications setting is enabled. |
 | `gd_checks.ps1` | Runs Godot checks across mod scripts; excludes example directories. |
 | `examples/` | Sample/test material, separate from production script checks. |
 

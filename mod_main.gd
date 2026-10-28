@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9004"
+const VERSION := "0.9007"
 const MOD_ID := "creature_comforts"
 const MOD_ID_OLD := "np_brainrot"  # Legacy ID for settings migration (one-time)
 const OUTPUT_DIR := "user://creature_comforts"
@@ -14,7 +14,7 @@ const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 const POLL_INTERVAL_MS := 500
 
 # Advice display modes come from trainer_rules.gd BaseRule (single source)
-const TrainerRules = preload("trainer_rules.gd")
+const TrainerRules = preload("advice/trainer_rules.gd")
 
 # Shop card highlight overlay (outlines shop cards matching active highlight-mode advice)
 var _shop_highlight = null
@@ -85,9 +85,10 @@ var _trinket_panel = null
 var _player_hud = null
 var _player_hud_layer: CanvasLayer = null
 
-# Achievement system (Phase 1): detection + placeholder evaluation + bottom-right panel
+# Achievement system: poll-based detection + JSON persistence + bottom-right panel
 var _battle_completion = null
 var _achievement_evaluator = null
+var _achievement_store = null
 var _achievement_panel = null
 var _achievement_layer: CanvasLayer = null
 
@@ -162,15 +163,15 @@ func _initialize_mod() -> void:
 	_load_settings()
 	
 	# Create formatter
-	var LogFormatter = load("res://mods/CreatureComforts/log_formatter.gd")
+	var LogFormatter = load("res://mods/CreatureComforts/core/log_formatter.gd")
 	_formatter = LogFormatter.new(_has_property)
 	
 	# Create snapshot builder
-	var ShopSnapshot = load("res://mods/CreatureComforts/shop_snapshot.gd")
+	var ShopSnapshot = load("res://mods/CreatureComforts/core/shop_snapshot.gd")
 	_snapshot_builder = ShopSnapshot.new()
 	
 	# Create changes comparer
-	var ShopChanges = load("res://mods/CreatureComforts/shop_changes.gd")
+	var ShopChanges = load("res://mods/CreatureComforts/core/shop_changes.gd")
 	_changes_comparer = ShopChanges.new()
 	
 	# Create advisor and register rules
@@ -241,14 +242,14 @@ func _on_config_changed(mod_id: String, key: String, value) -> void:
 					_achievement_panel.hide_panel()
 func _setup_advisor() -> void:
 	"""Initialize advisor and register all rules from the trainer catalog."""
-	var TrainerAdvisor = load("res://mods/CreatureComforts/trainer_advisor.gd")
-	var TrainerCatalog = load("res://mods/CreatureComforts/trainer_catalog.gd")
-	var RuleFactory = load("res://mods/CreatureComforts/rule_factory.gd")
+	var TrainerAdvisor = load("res://mods/CreatureComforts/advice/trainer_advisor.gd")
+	var TrainerCatalog = load("res://mods/CreatureComforts/advice/trainer_catalog.gd")
+	var RuleFactory = load("res://mods/CreatureComforts/advice/rule_factory.gd")
 	
 	_advisor = TrainerAdvisor.new()
 	
 	# Cache AdviceContext builder (rules consume snapshot data as plain records)
-	_advice_context_builder = load("res://mods/CreatureComforts/advice_context.gd").new()
+	_advice_context_builder = load("res://mods/CreatureComforts/advice/advice_context.gd").new()
 	
 	# Build trainer display-name map and register rules from the catalog
 	var definitions: Array = TrainerCatalog.TRAINER_DEFINITIONS
@@ -262,7 +263,7 @@ func _setup_advisor() -> void:
 
 func _setup_reminder_panel() -> void:
 	"""Initialize reminder label UI layer."""
-	var ReminderLabel = load("res://mods/CreatureComforts/reminder_label.gd")
+	var ReminderLabel = load("res://mods/CreatureComforts/hud/reminder_label.gd")
 	
 	_reminder_layer = CanvasLayer.new()
 	_reminder_layer.layer = 100  # Above game UI but below debug overlays
@@ -273,7 +274,7 @@ func _setup_reminder_panel() -> void:
 	_reminder_label.name = "ReminderLabel"
 	_reminder_layer.add_child(_reminder_label)
 	
-	var ShopHighlight = load("res://mods/CreatureComforts/shop_highlight.gd")
+	var ShopHighlight = load("res://mods/CreatureComforts/hud/shop_highlight.gd")
 	_shop_highlight = ShopHighlight.new()
 	_shop_highlight.name = "ShopHighlight"
 	_shop_highlight.setup(_resolve_highlight_rects)
@@ -281,7 +282,7 @@ func _setup_reminder_panel() -> void:
 	
 func _setup_player_hud() -> void:
 	"""Initialize the battle-only player HUD (HP / Wins / Day)."""
-	var PlayerHud = load("res://mods/CreatureComforts/player_hud.gd")
+	var PlayerHud = load("res://mods/CreatureComforts/hud/player_hud.gd")
 	
 	_player_hud_layer = CanvasLayer.new()
 	_player_hud_layer.layer = 110  # Above game UI, matching NP_QoL's HUD layer
@@ -294,12 +295,17 @@ func _setup_player_hud() -> void:
 
 
 func _setup_achievement_panel() -> void:
-	"""Initialize the battle-completion achievement panel system (Phase 1)."""
-	var BattleCompletionDetector = load("res://mods/CreatureComforts/battle_completion_detector.gd")
+	"""Initialize the achievement detection, persistence, and panel system."""
+	var BattleCompletionDetector = load("res://mods/CreatureComforts/achievements/battle_completion_detector.gd")
 	_battle_completion = BattleCompletionDetector.new()
 	
-	var AchievementEvaluator = load("res://mods/CreatureComforts/achievement_evaluator.gd")
+	var AchievementEvaluator = load("res://mods/CreatureComforts/achievements/achievement_evaluator.gd")
 	_achievement_evaluator = AchievementEvaluator.new()
+	
+	# Pass the mod root so achievements.json stays at the mod root even though the
+	# store script now lives in achievements/.
+	var AchievementStore = load("res://mods/CreatureComforts/achievements/achievement_store.gd")
+	_achievement_store = AchievementStore.new(str(get_script().resource_path).get_base_dir())
 	
 	# Separate layer from _reminder_layer: the overlay gate hides reminders outside the
 	# shop, but the achievement panel must be visible after battles (over the results screen).
@@ -308,14 +314,14 @@ func _setup_achievement_panel() -> void:
 	_achievement_layer.name = "CreatureComforts_Achievements"
 	add_child(_achievement_layer)
 	
-	var AchievementPanel = load("res://mods/CreatureComforts/achievement_panel.gd")
+	var AchievementPanel = load("res://mods/CreatureComforts/achievements/achievement_panel.gd")
 	_achievement_panel = AchievementPanel.new()
 	_achievement_panel.name = "AchievementPanel"
 	_achievement_layer.add_child(_achievement_panel)
 
 	# Collapsible trinket-gain panel lives on the achievement layer so it shows on the
 	# battle results screen (same timing as the achievement toast), above it.
-	var TrinketPanel = load("res://mods/CreatureComforts/trinket_panel.gd")
+	var TrinketPanel = load("res://mods/CreatureComforts/hud/trinket_panel.gd")
 	_trinket_panel = TrinketPanel.new()
 	_trinket_panel.name = "TrinketPanel"
 	# Route panel position/drag/toggle diagnostics into the mod log as well as the console.
@@ -361,6 +367,7 @@ func _inspect_current_phase() -> void:
 	
 	var is_battle := _script_is(state, BATTLE_SCRIPT)
 	_update_player_hud(state, is_battle)
+	_poll_achievements()
 	if not is_battle:
 		if _battle_completion != null:
 			_battle_completion.reset()
@@ -588,8 +595,8 @@ func _handle_battle_phase(state) -> void:
 
 
 func _check_battle_completion(state) -> void:
-	"""Detect battle completion once and trigger achievement evaluation/presentation."""
-	if _battle_completion == null or _achievement_evaluator == null or _achievement_panel == null:
+	"""Detect battle completion once and log the result."""
+	if _battle_completion == null:
 		return
 	if not _battle_completion.poll(state):
 		return
@@ -598,17 +605,32 @@ func _check_battle_completion(state) -> void:
 	var battle_data = sim.get("data") if sim != null and _has_property(sim, "data") else null
 	
 	_log_battle_result(battle_data)
+
+
+## Poll the run for newly earned achievements, persist them, and show the panel.
+## Runs every poll (the Twins transformation happens in the shop, but polling all
+## phases keeps the team-state baseline current).
+func _poll_achievements() -> void:
+	if _achievement_evaluator == null or _achievement_store == null or _achievement_panel == null:
+		return
+	var run = _get_run_data()
+	if run == null or not is_instance_valid(run):
+		return
 	
-	var achievements: Array = _achievement_evaluator.evaluate(battle_data)
-	for achievement in achievements:
-		var title: String = str(achievement.get("title", ""))
-		var description: String = str(achievement.get("description", ""))
+	var earned: Array = _achievement_evaluator.poll(run)
+	for achievement in earned:
+		var id := str(achievement.get("id", ""))
+		if id.is_empty() or _achievement_store.is_completed(id):
+			continue
+		var title := str(achievement.get("title", ""))
+		var description := str(achievement.get("description", ""))
 		if title.is_empty() or description.is_empty():
 			continue
+		
+		_achievement_store.mark_completed(id)
+		_log_message("ACHIEVEMENT EARNED | %s | %s" % [id, title])
 		if _achievement_notifications:
 			_achievement_panel.show_achievement(title, description)
-			if achievement.get("temporary", false):
-				_log_message("TEMPORARY: demo achievement shown after battle (not actually earned)")
 		else:
 			_log_message("ACHIEVEMENT NOTIFICATION | suppressed (Achievement Notifications off)")
 
