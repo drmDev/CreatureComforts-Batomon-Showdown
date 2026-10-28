@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9004"
+const VERSION := "0.9006"
 const MOD_ID := "creature_comforts"
 const MOD_ID_OLD := "np_brainrot"  # Legacy ID for settings migration (one-time)
 const OUTPUT_DIR := "user://creature_comforts"
@@ -85,9 +85,10 @@ var _trinket_panel = null
 var _player_hud = null
 var _player_hud_layer: CanvasLayer = null
 
-# Achievement system (Phase 1): detection + placeholder evaluation + bottom-right panel
+# Achievement system: poll-based detection + JSON persistence + bottom-right panel
 var _battle_completion = null
 var _achievement_evaluator = null
+var _achievement_store = null
 var _achievement_panel = null
 var _achievement_layer: CanvasLayer = null
 
@@ -294,12 +295,15 @@ func _setup_player_hud() -> void:
 
 
 func _setup_achievement_panel() -> void:
-	"""Initialize the battle-completion achievement panel system (Phase 1)."""
+	"""Initialize the achievement detection, persistence, and panel system."""
 	var BattleCompletionDetector = load("res://mods/CreatureComforts/battle_completion_detector.gd")
 	_battle_completion = BattleCompletionDetector.new()
 	
 	var AchievementEvaluator = load("res://mods/CreatureComforts/achievement_evaluator.gd")
 	_achievement_evaluator = AchievementEvaluator.new()
+	
+	var AchievementStore = load("res://mods/CreatureComforts/achievement_store.gd")
+	_achievement_store = AchievementStore.new()
 	
 	# Separate layer from _reminder_layer: the overlay gate hides reminders outside the
 	# shop, but the achievement panel must be visible after battles (over the results screen).
@@ -361,6 +365,7 @@ func _inspect_current_phase() -> void:
 	
 	var is_battle := _script_is(state, BATTLE_SCRIPT)
 	_update_player_hud(state, is_battle)
+	_poll_achievements()
 	if not is_battle:
 		if _battle_completion != null:
 			_battle_completion.reset()
@@ -588,8 +593,8 @@ func _handle_battle_phase(state) -> void:
 
 
 func _check_battle_completion(state) -> void:
-	"""Detect battle completion once and trigger achievement evaluation/presentation."""
-	if _battle_completion == null or _achievement_evaluator == null or _achievement_panel == null:
+	"""Detect battle completion once and log the result."""
+	if _battle_completion == null:
 		return
 	if not _battle_completion.poll(state):
 		return
@@ -598,17 +603,32 @@ func _check_battle_completion(state) -> void:
 	var battle_data = sim.get("data") if sim != null and _has_property(sim, "data") else null
 	
 	_log_battle_result(battle_data)
+
+
+## Poll the run for newly earned achievements, persist them, and show the panel.
+## Runs every poll (the Twins transformation happens in the shop, but polling all
+## phases keeps the team-state baseline current).
+func _poll_achievements() -> void:
+	if _achievement_evaluator == null or _achievement_store == null or _achievement_panel == null:
+		return
+	var run = _get_run_data()
+	if run == null or not is_instance_valid(run):
+		return
 	
-	var achievements: Array = _achievement_evaluator.evaluate(battle_data)
-	for achievement in achievements:
-		var title: String = str(achievement.get("title", ""))
-		var description: String = str(achievement.get("description", ""))
+	var earned: Array = _achievement_evaluator.poll(run)
+	for achievement in earned:
+		var id := str(achievement.get("id", ""))
+		if id.is_empty() or _achievement_store.is_completed(id):
+			continue
+		var title := str(achievement.get("title", ""))
+		var description := str(achievement.get("description", ""))
 		if title.is_empty() or description.is_empty():
 			continue
+		
+		_achievement_store.mark_completed(id)
+		_log_message("ACHIEVEMENT EARNED | %s | %s" % [id, title])
 		if _achievement_notifications:
 			_achievement_panel.show_achievement(title, description)
-			if achievement.get("temporary", false):
-				_log_message("TEMPORARY: demo achievement shown after battle (not actually earned)")
 		else:
 			_log_message("ACHIEVEMENT NOTIFICATION | suppressed (Achievement Notifications off)")
 

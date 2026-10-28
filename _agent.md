@@ -14,12 +14,13 @@ Creature Comforts (`creature_comforts`) is a GDScript mod for **Batomon Showdown
 - ✅ Refactored trinket-gain panel to be battle-scoped: keeps a rolling pre-battle inventory snapshot (needed because the autobattler simulates the fight before the 500ms poll sees the battle state), diffs it against the last in-battle snapshot, filters out Junk trinkets, and shows a collapsible panel on the battle results screen (above the achievement toast) only when non-junk trinkets were earned. Uses the collapsible-panel pattern from examples/MyBattleStats/disabled_collapsible_panel.gd (header drag, -/+ toggle, height animation).
 - ✅ Add the post-battle achievement panel (Phase 1): battle-completion detection, placeholder achievement evaluation, and a bottom-right panel driven by a clearly marked temporary demo trigger, gated by the opt-in Achievement Notifications setting.
 - ✅ Port NP_QoL's battle player HUD (HP / Wins / Day) into the mod, restyled to the shared dark-navy/gold panel look and text-only (no heart/badge/sun icons).
+- ✅ Replace the temporary demo achievement with the first real achievement, "Oh Yeah!" (Twins trainer evolves a level-2 Beetbud into two level-3 Beetdowns). Detection is poll-based and transition-based; completion is persisted one-time to `achievements.json` at the mod root.
 
 ## Files
 | File | Responsibility |
 |---|---|
 | `mod.json` | Mod identity, version, descriptions, and settings declarations. |
-| `mod_main.gd` | Loader lifecycle, initialization, polling, phase transitions, catalog-driven rule registration, reminder label/highlight/trinket-panel/achievement-panel management, battle-scoped trinket gain capture (rolling pre-battle baseline → in-battle diff), Junk filtering, and console/file output coordination. |
+| `mod_main.gd` | Loader lifecycle, initialization, polling, phase transitions, catalog-driven rule registration, reminder label/highlight/trinket-panel/player-HUD/achievement management, per-poll achievement detection + persistence, battle-scoped trinket gain capture (rolling pre-battle baseline → in-battle diff), Junk filtering, and console/file output coordination. |
 | `shop_snapshot.gd` | Shared capture of run, shop, team, and bench values, including identity, species, levels, types, prices, and slots. |
 | `advice_context.gd` | Supplies the rule-facing context from snapshot data. |
 | `trainer_advisor.gd` | Evaluates registered rules, tracks active advice, and suppresses unchanged notices by rule ID. |
@@ -31,8 +32,9 @@ Creature Comforts (`creature_comforts`) is a GDScript mod for **Batomon Showdown
 | `shop_highlight.gd` | Click-through overlay that outlines shop cards for highlight-mode advice (slot + offer instance id, resolved against live cards each frame). |
 | `trinket_panel.gd` | Collapsible panel showing non-junk trinkets earned during a battle; appears on the battle results screen (above the achievement toast), auto-hides after 8 seconds. Uses the collapsible-panel pattern (header drag, -/+ toggle, height animation) adapted from examples/MyBattleStats/disabled_collapsible_panel.gd. |
 | `battle_completion_detector.gd` | Reports each battle's completion exactly once via `simulation.data.battle_over` (wins, losses, and draws); resets when leaving the battle phase. |
-| `achievement_evaluator.gd` | Placeholder achievement evaluation; Phase 1 emits a clearly marked temporary demo achievement after every completed battle. |
-| `achievement_panel.gd` | Bottom-right post-battle achievement toast; auto-hides after ~4 seconds. Uses the NP_QoL / Trinket Panel drawing pattern. Displays only when the Achievement Notifications setting is enabled. |
+| `achievement_evaluator.gd` | Poll-based achievement detection. Keeps a rolling team+bench species/level baseline and awards "Oh Yeah!" when the Twins trainer evolves a level-2 Beetbud into two level-3 Beetdowns (Beetdown count rises by ≥2). Returns structured achievements without persistence or UI side effects. |
+| `achievement_store.gd` | Simple JSON persistence for achievement completion at the mod root (`achievements.json`). Tracks completed/not-completed per achievement id with a completion timestamp; tolerates missing or corrupt files. |
+| `achievement_panel.gd` | Bottom-right achievement toast; auto-hides after ~4 seconds. Uses the NP_QoL / Trinket Panel drawing pattern. Displays only when the Achievement Notifications setting is enabled. |
 | `log_formatter.gd` | Readable names, summaries, detailed inspection, and change output. |
 | `shop_changes.gd` | Structured snapshot comparison for detecting shop state changes. |
 | `gd_checks.ps1` | Runs Godot checks across mod scripts; excludes example directories. |
