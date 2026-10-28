@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9007"
+const VERSION := "0.9014"
 const MOD_ID := "creature_comforts"
 const MOD_ID_OLD := "np_brainrot"  # Legacy ID for settings migration (one-time)
 const OUTPUT_DIR := "user://creature_comforts"
@@ -371,6 +371,8 @@ func _inspect_current_phase() -> void:
 	if not is_battle:
 		if _battle_completion != null:
 			_battle_completion.reset()
+		if _achievement_evaluator != null:
+			_achievement_evaluator.reset_battle()
 		# Leaving the battle state (event, shop, or other): stop battle trinket tracking.
 		_finalize_battle_trinket_tracking()
 		# Keep a rolling "last state outside battle" snapshot. The battle is simulated before the
@@ -540,6 +542,8 @@ func _handle_shop_phase(state) -> void:
 func _handle_battle_phase(state) -> void:
 	# Battle completion detection (win/loss/draw) - independent of replay logging
 	_check_battle_completion(state)
+	# Battle-scoped achievements (Big Dog, Best Dog) - read from the battle simulation
+	_poll_battle_achievements(state)
 	
 	# Check if replay data is ready
 	var player = state.get("_replay_p1_data") if _has_property(state, "_replay_p1_data") else null
@@ -611,13 +615,30 @@ func _check_battle_completion(state) -> void:
 ## Runs every poll (the Twins transformation happens in the shop, but polling all
 ## phases keeps the team-state baseline current).
 func _poll_achievements() -> void:
-	if _achievement_evaluator == null or _achievement_store == null or _achievement_panel == null:
+	if _achievement_evaluator == null:
 		return
 	var run = _get_run_data()
 	if run == null or not is_instance_valid(run):
 		return
 	
-	var earned: Array = _achievement_evaluator.poll(run)
+	_award_achievements(_achievement_evaluator.poll(run))
+
+
+## Poll the active battle for battle-scoped achievements (Big Dog, Best Dog).
+func _poll_battle_achievements(state) -> void:
+	if _achievement_evaluator == null:
+		return
+	var run = _get_run_data()
+	if run == null or not is_instance_valid(run):
+		return
+	
+	_award_achievements(_achievement_evaluator.poll_battle(state, run))
+
+
+## Persist and display newly earned achievements (deduplicated by the store).
+func _award_achievements(earned: Array) -> void:
+	if _achievement_store == null or _achievement_panel == null:
+		return
 	for achievement in earned:
 		var id := str(achievement.get("id", ""))
 		if id.is_empty() or _achievement_store.is_completed(id):

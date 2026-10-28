@@ -8,8 +8,8 @@ extends Control
 ## Displays as a single line: "HP 3 | Wins 2 | Day 4"
 ## Shown only while a battle is active (mod_main controls visibility).
 
-const PANEL_WIDTH := 150.0
 const CONTENT_PADDING := 4.0
+const CONTENT_INSET := 2.0  # Extra left/right breathing room inside the padding
 const ROW_HEIGHT := 12.0
 const FONT_SIZE := 9
 
@@ -39,9 +39,10 @@ var _text_font: Font
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
-	size = Vector2(PANEL_WIDTH, CONTENT_PADDING + ROW_HEIGHT + CONTENT_PADDING)
 	_setup_styles()
 	_setup_font()
+	# Width is fitted to the measured label/value text; start with the placeholder widths.
+	size = Vector2(_measure_content_width({}), CONTENT_PADDING + ROW_HEIGHT + CONTENT_PADDING)
 
 
 func _ready() -> void:
@@ -79,11 +80,44 @@ func _setup_font() -> void:
 ## Update the displayed stats. Expected keys: hp, wins, day (values are pre-formatted strings).
 func update_stats(new_stats: Dictionary) -> void:
 	_player_stats = new_stats
+	var fitted_width := _measure_content_width(new_stats)
+	if not is_equal_approx(size.x, fitted_width):
+		size.x = fitted_width
+		_anchor_centered()
 	queue_redraw()
 
 
+## Panel width that exactly fits the current stats line (no trailing empty space).
+func _measure_content_width(stats: Dictionary) -> float:
+	var hp := str(stats.get("hp", "?"))
+	var wins := str(stats.get("wins", "?"))
+	var day := str(stats.get("day", "?"))
+
+	var content_width := 0.0
+	content_width += _stat_group_width("HP", hp) + GROUP_GAP
+	content_width += _text_width(SEPARATOR)
+	content_width += _stat_group_width("Wins", wins) + GROUP_GAP
+	content_width += _text_width(SEPARATOR)
+	content_width += _stat_group_width("Day", day)
+
+	return ceilf(CONTENT_PADDING + CONTENT_INSET + content_width + CONTENT_INSET + CONTENT_PADDING)
+
+
+func _stat_group_width(label: String, value: String) -> float:
+	return _text_width(label) + LABEL_GAP + _text_width(value)
+
+
+func _text_width(text: String) -> float:
+	if _text_font == null:
+		return 0.0
+	return _text_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
+
+
 func _anchor_centered() -> void:
-	var viewport_size := get_viewport().get_visible_rect().size
+	var viewport := get_viewport()
+	if viewport == null:
+		return
+	var viewport_size := viewport.get_visible_rect().size
 	position = Vector2(roundf((viewport_size.x - size.x) * 0.5), 244.0)
 
 
@@ -102,7 +136,7 @@ func _draw_stats_row() -> void:
 	if _player_stats.is_empty():
 		return
 
-	var content_left := CONTENT_PADDING + 2.0
+	var content_left := CONTENT_PADDING + CONTENT_INSET
 	var row_top := CONTENT_PADDING
 	var baseline := row_top + ROW_HEIGHT - 2.0
 	var cursor_x := content_left
@@ -123,17 +157,17 @@ func _draw_stat(start_x: float, baseline: float, label: String, value: String) -
 	var cursor_x := start_x
 
 	_draw_text(Vector2(cursor_x, baseline), label, LABEL_COLOR)
-	cursor_x += _text_font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x + LABEL_GAP
+	cursor_x += _text_width(label) + LABEL_GAP
 
 	_draw_text(Vector2(cursor_x, baseline), value, VALUE_COLOR)
-	cursor_x += _text_font.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x + GROUP_GAP
+	cursor_x += _text_width(value) + GROUP_GAP
 
 	return cursor_x
 
 
 func _draw_separator(start_x: float, baseline: float) -> float:
 	_draw_text(Vector2(start_x, baseline), SEPARATOR, LABEL_COLOR)
-	return start_x + _text_font.get_string_size(SEPARATOR, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
+	return start_x + _text_width(SEPARATOR)
 
 
 ## Draw text with a light shadow for readability (mirrors the other panels).

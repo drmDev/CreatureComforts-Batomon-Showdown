@@ -4,6 +4,48 @@
 ## Summary
 Creature Comforts (`creature_comforts`) is a GDScript mod for **Batomon Showdown** that observes shop/battle state and provides contextual gameplay advice. It logs readable state changes, emits distinct trainer-specific notices, and displays on-screen reminders for critical trainer events without automating gameplay. Reusable rules support shop targets, day reminders, and compound team conditions. Development prioritizes verified game data, maintainability, quiet logging, and incremental runtime validation.
 
+## Preserve Existing Functionality
+
+- Prefer surgical changes over large refactors.
+- Do not modify unrelated systems unless necessary.
+- Preserve existing UI behavior, layout, and visual styling.
+- Avoid introducing new abstractions for one-off functionality.
+- Never remove existing functionality without explicitly asking.
+- If a requested change risks breaking another feature,
+  explain the tradeoff before implementing it.
+
+  ## Investigation
+
+- Before modifying code, inspect the relevant existing implementation.
+- Reuse existing hooks, signals, and utilities when possible.
+- Do not invent game APIs, node paths, or signal names.
+- If uncertain about a game's internal behavior, inspect the source.
+- Avoid reading entire large files when targeted searches suffice.
+- Do not modify the game's original files.
+
+## Communication Style
+
+- Be concise and direct.
+- Avoid lengthy explanations of straightforward changes.
+- Do not repeat the entire task back to me.
+- Do not explain basic programming concepts unless asked.
+- Assume I am an experienced software developer.
+- When changes are complete, summarize:
+  - What changed.
+  - What should be tested.
+  - Any remaining concerns.
+- Do not add unnecessary praise or filler.
+
+## Scope Discipline
+
+Implement only what was requested.
+
+Do not add speculative features, extra configuration,
+new dependencies, or unrelated refactors.
+
+If you identify a worthwhile improvement outside the
+requested scope, mention it briefly instead of implementing it.
+
 ## Current goals
 - ✅ Complete the shared shop-snapshot refactor while preserving working behavior.
 - ✅ Maintain Scavenger target notices and Black Belt Beetbud/Beetdown checks.
@@ -13,13 +55,17 @@ Creature Comforts (`creature_comforts`) is a GDScript mod for **Batomon Showdown
 - ✅ Add a trinket-gain panel that appears right-center on shop return, auto-hides after 10 seconds, using the NP_QoL drawing patterns.
 - ✅ Refactored trinket-gain panel to be battle-scoped: keeps a rolling pre-battle inventory snapshot (needed because the autobattler simulates the fight before the 500ms poll sees the battle state), diffs it against the last in-battle snapshot, filters out Junk trinkets, and shows a collapsible panel on the battle results screen (above the achievement toast) only when non-junk trinkets were earned. Uses the collapsible-panel pattern from examples/MyBattleStats/disabled_collapsible_panel.gd (header drag, -/+ toggle, height animation).
 - ✅ Add the post-battle achievement panel (Phase 1): battle-completion detection, placeholder achievement evaluation, and a bottom-right panel driven by a clearly marked temporary demo trigger, gated by the opt-in Achievement Notifications setting.
+- ✅ Add the "Big Dog, Best Dog" battle achievement: awards when a Cinnabark unit generates more than 1,000,000 shield in a single battle, read from `simulation.data.battle_units` (`team_id == 0`, `slot_index`, `shield_granted`) with species resolved through the player run's team slot.
+- ✅ Add "Herd U Liek Mudkipz" using the same Twins double-evolution rule as "Oh Yeah!", for Frillet (level 2) evolving into two level-3 Dewlotls.
+- ✅ Add "So I started blasting": Gentleman trainer owns a level-2 Rhizuka on Day 5 or earlier (`run.current_round`), checked from team + bench state.
+- ✅ Add "Six of a Kind" (Twins): by Day 6, the active team holds two distinct level-3 Beetdown, two distinct level-3 Dewlotl, and two distinct level-3 Furnadon (bench excluded, exact level 3, instance-id dedupe, never revoked).
 - ✅ Port NP_QoL's battle player HUD (HP / Wins / Day) into the mod, restyled to the shared dark-navy/gold panel look and text-only (no heart/badge/sun icons).
 
 ## Files
 | File | Responsibility |
 |---|---|
 | `mod.json` | Mod identity, version, descriptions, and settings declarations. |
-| `mod_main.gd` | Loader lifecycle, initialization, polling, phase transitions, catalog-driven rule registration, reminder label/highlight/trinket-panel/player-HUD/achievement management, per-poll achievement detection + persistence, battle-scoped trinket gain capture (rolling pre-battle baseline → in-battle diff), Junk filtering, and console/file output coordination. |
+| `mod_main.gd` | Loader lifecycle, initialization, polling, phase transitions, catalog-driven rule registration, reminder label/highlight/trinket-panel/player-HUD/achievement management, per-poll and per-battle achievement detection + shared award persistence, battle-scoped trinket gain capture (rolling pre-battle baseline → in-battle diff), Junk filtering, and console/file output coordination. |
 | `core/shop_snapshot.gd` | Shared capture of run, shop, team, and bench values, including identity, species, levels, types, prices, and slots. |
 | `core/shop_changes.gd` | Structured snapshot comparison for detecting shop state changes. |
 | `core/log_formatter.gd` | Readable names, summaries, detailed inspection, and change output. |
@@ -29,11 +75,11 @@ Creature Comforts (`creature_comforts`) is a GDScript mod for **Batomon Showdown
 | `advice/trainer_catalog.gd` | Declarative trainer definitions (id, display name, rule data) consumed by the rule factory. |
 | `advice/rule_factory.gd` | Builds rule instances from `trainer_catalog.gd`; supports per-trainer custom scripts via a `script` key. |
 | `hud/reminder_label.gd` | Compact top-bar label showing label-mode reminders for the current trainer. |
-| `hud/player_hud.gd` | Battle-only single-line HUD showing HP / Wins / Day, ported from NP_QoL and restyled to the shared dark-navy/gold panel look (text-only, no icons). Centered near the top of the battle screen; visibility driven by mod_main. |
+| `hud/player_hud.gd` | Battle-only single-line HUD showing HP / Wins / Day, ported from NP_QoL and restyled to the shared dark-navy/gold panel look (text-only, no icons). Panel width is fitted to the measured text (no fixed/trailing space) and re-centered when stats change. Centered near the top of the battle screen; visibility driven by mod_main. |
 | `hud/shop_highlight.gd` | Click-through overlay that outlines shop cards for highlight-mode advice (slot + offer instance id, resolved against live cards each frame). |
 | `hud/trinket_panel.gd` | Collapsible panel showing non-junk trinkets earned during a battle; appears on the battle results screen (above the achievement toast), auto-hides after 8 seconds. Uses the collapsible-panel pattern (header drag, -/+ toggle, height animation) adapted from examples/MyBattleStats/disabled_collapsible_panel.gd. |
 | `achievements/battle_completion_detector.gd` | Reports each battle's completion exactly once via `simulation.data.battle_over` (wins, losses, and draws); resets when leaving the battle phase. |
-| `achievements/achievement_evaluator.gd` | Poll-based achievement detection. Keeps a rolling team+bench species/level baseline and awards "Oh Yeah!" when the Twins trainer evolves a level-2 Beetbud into two level-3 Beetdowns (Beetdown count rises by ≥2). Returns structured achievements without persistence or UI side effects. |
+| `achievements/achievement_evaluator.gd` | Poll-based achievement detection. Run-scoped `poll(run)`: state-checks "So I started blasting" (Gentleman trainer + a level-2 Rhizuka on team/bench while `run.current_round` ≤ 5); awards "Six of a Kind" when the Twins hold two distinct exact-level-3 Beetdown, Dewlotl, and Furnadon on the active team (bench excluded, instance-id dedupe) while `run.current_round` ≤ 6; collects team+bench species/levels in one pass; and awards the Twins double-evolution achievements — "Oh Yeah!" (Beetbud → Beetdown) and "Herd U Liek Mudkipz" (Frillet → Dewlotl). The evolved-count baseline arms when a level-2 pre-evolution is seen and stays armed for 2 s because the game can apply the Twins double across separate 500 ms polls; the award fires when the evolved count rises by ≥2 from that baseline. Battle-scoped `poll_battle(state, run)`: awards "Big Dog, Best Dog" when a Cinnabark slot's summed `shield_granted` in the player's `battle_units` exceeds 1,000,000 (once per battle state); `reset_battle()` clears battle tracking. Returns structured achievements without persistence or UI side effects. |
 | `achievements/achievement_store.gd` | Simple JSON persistence for achievement completion at the mod root (`achievements.json`). Tracks completed/not-completed per achievement id with a completion timestamp; tolerates missing or corrupt files. |
 | `achievements/achievement_panel.gd` | Bottom-right achievement toast; auto-hides after ~4 seconds. Uses the NP_QoL / Trinket Panel drawing pattern. Displays only when the Achievement Notifications setting is enabled. |
 | `gd_checks.ps1` | Runs Godot checks across mod scripts; excludes example directories. |

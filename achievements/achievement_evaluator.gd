@@ -1,23 +1,66 @@
 extends RefCounted
 ## AchievementEvaluator - detects earned achievements from live run state.
 ##
-## Poll-based: mod_main calls poll(run) on every poll. Returns an Array of newly
-## earned achievement dictionaries (empty most polls). The caller owns persistence
-## (achievement_store) and display (achievement_panel).
+## Poll-based: mod_main calls poll(run) on every poll and poll_battle(state, run) while
+## in the battle state. Both return an Array of newly earned achievement dictionaries
+## (empty most polls). The caller owns persistence (achievement_store) and display
+## (achievement_panel).
 ##
-## First real achievement: "Oh Yeah!"
+## Achievements:
+## - "So I started blasting" (poll, run state)
+##   Trainer: Gentleman
+##   Trigger: a level-2 Rhizuka (the trainer's common level-2 strat) is owned no later
+##   than Day 5. Day is read from run.current_round (the field the mod already logs as
+##   "Day"). State-based: awards as soon as the condition is true.
+## - "Six of a Kind" (poll, run state)
 ##   Trainer: Twins
-##   Trigger: a level-2 Beetbud evolves into Beetdown at level 3. Twins doubles the
-##   leveled unit, so the evolution produces two level-3 Beetdowns ("two kool aid mans").
-##
-## Detection is transition-based: we keep the previous team+bench species/level state
-## and award when a level-2 Beetbud was present and the Beetdown count rose by at
-## least 2 (the Twins double). This avoids awarding on a plain Beetdown purchase.
+##   Trigger: the active team holds two distinct level-3 Beetdown, two distinct
+##   level-3 Dewlotl, and two distinct level-3 Furnadon on any day 1-6. Bench units do
+##   not count, levels must be exactly 3, and duplicate references to one unit are
+##   deduplicated by instance id. Extra units are allowed; once owned, selling or
+##   upgrading units does not revoke the award.
+## - "Oh Yeah!" / "Herd U Liek Mudkipz" (poll, run state)
+##   Trainer: Twins
+##   Trigger: a level-2 pre-evolution evolves into its level-3 form. Twins doubles the
+##   leveled unit, so the evolution produces two level-3 units.
+##     Beetbud (level 2) -> Beetdown (level 3)      -> "Oh Yeah!"
+##     Frillet (level 2) -> Dewlotl (level 3)       -> "Herd U Liek Mudkipz"
+##   Detection arms when the level-2 pre-evolution is seen and awards when the evolved
+##   count rises by at least 2 from that baseline. The game can apply the Twins double
+##   across several polls (see the runtime log: one Dewlotl appears, then the second on
+##   the next poll), so the baseline stays armed for a short window instead of requiring
+##   both copies in one poll. Arming avoids awarding on a plain purchase.
+## - "Big Dog, Best Dog" (poll_battle, battle state)
+##   Trigger: a Cinnabark unit generates more than 1,000,000 shield in one battle.
+##   Evaluated once the battle is over, so the toast lands on the results screen.
+##   Reads the visible battle simulation's unit records:
+##     battle_state.simulation.data.battle_units[]
+##       team_id == 0 (player side), slot_index (board slot), shield_granted
+##   These fields are the ones the verified examples/MyBattleStats mod reads.
+##   Species is resolved by mapping slot_index to the player run's team slot, because
+##   battle unit records do not expose a species key.
 
 const TWINS_TRAINER_ID := "twins"
 const BEETBUD_KEY := "monster.name.beetbud"
 const BEETDOWN_KEY := "monster.name.beetdown"
-const BEETBUD_EVOLVE_LEVEL := 2  # Beetbud at this level is the pre-evolution state
+const FRILLET_KEY := "monster.name.frillet"
+const DEWLOTL_KEY := "monster.name.dewlotl"
+const FURNADON_KEY := "monster.name.furnadon"  # species_id "furnadon" verified in run_save.json
+const PRE_EVOLVE_LEVEL := 2  # Pre-evolution at this level evolves into its level-3 form
+const EVOLUTION_ARM_WINDOW_MS := 2000  # Spans the game's multi-poll evolution animation
+
+const SIX_OF_A_KIND_LEVEL := 3       # Exact level, not "level 3 or higher"
+const SIX_OF_A_KIND_REQUIRED := 2    # Distinct level-3 units of each species
+const SIX_OF_A_KIND_DAY_LIMIT := 6   # Latest displayed day that still counts
+
+const GENTLEMAN_TRAINER_ID := "gentleman"
+const RHIZUKA_KEY := "monster.name.rhizuka"
+const RHIZUKA_MIN_LEVEL := 2   # The level-2 Rhizuka strat
+const GENTLEMAN_DAY_LIMIT := 5  # Latest day the level-2 Rhizuka still counts
+
+const CINNABARK_KEY := "monster.name.cinnabark"
+const PLAYER_TEAM_ID := 0  # battle_units team_id used for the player's side
+const BIG_DOG_SHIELD_THRESHOLD := 1000000.0  # Strictly over one million shield
 
 const OH_YEAH := {
 	"id": "oh_yeah",
@@ -25,9 +68,53 @@ const OH_YEAH := {
 	"description": "Made double kool aid man level 3s at once !",
 }
 
-var _prev_beetbud_lvl2 := 0
-var _prev_beetdown_count := 0
-var _has_prev := false
+const HERD_U_LIEK_MUDKIPZ := {
+	"id": "herd_u_liek_mudkipz",
+	"title": "Herd U Liek Mudkipz",
+	"description": "Made double Dewlotl level 3s at once !",
+}
+
+const SO_I_STARTED_BLASTING := {
+	"id": "so_i_started_blasting",
+	"title": "So I started blasting",
+	"description": "Got a level 2 Rhizuka by Day 5 !",
+}
+
+const SIX_OF_A_KIND := {
+	"id": "twins_six_of_a_kind",
+	"title": "Six of a Kind",
+	"description": "As the Twins, field two Level 3 Beetdown, two Level 3 Dewlotl, and two Level 3 Furnadon by the end of Day 6.",
+}
+
+const BIG_DOG := {
+	"id": "big_dog_best_dog",
+	"title": "Big Dog, Best Dog",
+	"description": "Reach over 1 mil shield with Cinnabark",
+}
+
+## Twins double-evolution achievements: same rule, different species pair.
+const EVOLUTION_ACHIEVEMENTS := [
+	{"achievement": OH_YEAH, "pre_key": BEETBUD_KEY, "post_key": BEETDOWN_KEY},
+	{"achievement": HERD_U_LIEK_MUDKIPZ, "pre_key": FRILLET_KEY, "post_key": DEWLOTL_KEY},
+]
+
+## Species that must each appear twice at level 3 for "Six of a Kind".
+const SIX_OF_A_KIND_SPECIES := [BEETDOWN_KEY, DEWLOTL_KEY, FURNADON_KEY]
+
+# Armed evolution baselines: achievement id -> {"baseline_post": int, "expires_ms": int}.
+var _evolution_armed: Dictionary = {}
+# Evolved-unit count from the previous poll, per achievement id.
+var _last_post_counts: Dictionary = {}
+
+# Gentleman Rhizuka achievement: awarded this run (suppresses repeat polling).
+var _rhizuka_awarded := false
+
+# Six of a Kind: awarded this run (suppresses repeat polling).
+var _six_of_a_kind_awarded := false
+
+# Big Dog tracking: award at most once per battle state instance.
+var _battle_state_id := 0
+var _big_dog_awarded := false
 
 
 ## Poll the run for newly earned achievements. Returns an Array of achievement dicts.
@@ -37,37 +124,226 @@ func poll(run) -> Array:
 		return []
 
 	var trainer_id := str(run.get("trainer_id")) if _has_property(run, "trainer_id") else ""
-	if trainer_id != TWINS_TRAINER_ID:
+	var is_gentleman := trainer_id == GENTLEMAN_TRAINER_ID
+	var is_twins := trainer_id == TWINS_TRAINER_ID
+	if not is_gentleman and not is_twins:
 		_reset()
 		return []
 
-	var counts := _count_species(run)
-	var beetbud_lvl2: int = int(counts.get("beetbud_lvl2", 0))
-	var beetdown_count: int = int(counts.get("beetdown", 0))
+	var owned := _collect_owned_species(run)
 
 	var earned: Array = []
-	if _has_prev:
-		# Evolution signature: a level-2 Beetbud was present and the Beetdown count
-		# rose by at least 2 (Twins doubles the leveled unit).
-		if _prev_beetbud_lvl2 > 0 and beetdown_count >= _prev_beetdown_count + 2:
-			earned.append(OH_YEAH.duplicate(true))
+	if is_gentleman:
+		earned.append_array(_poll_gentleman(run, owned))
+	else:
+		_rhizuka_awarded = false
 
-	_prev_beetbud_lvl2 = beetbud_lvl2
-	_prev_beetdown_count = beetdown_count
-	_has_prev = true
+	if not is_twins:
+		_reset_evolution_state()
+		_six_of_a_kind_awarded = false
+		return earned
+
+	var now := Time.get_ticks_msec()
+	for def in EVOLUTION_ACHIEVEMENTS:
+		var achievement: Dictionary = def["achievement"]
+		var id := str(achievement.get("id", ""))
+		var pre_record: Dictionary = owned.get(str(def["pre_key"]), {})
+		var post_record: Dictionary = owned.get(str(def["post_key"]), {})
+		var pre_levels: Dictionary = pre_record.get("levels", {})
+		var pre_count := int(pre_levels.get(PRE_EVOLVE_LEVEL, 0))
+		var post_count := int(post_record.get("count", 0))
+
+		# Arm on the level-2 pre-evolution, recording the evolved count to beat. The
+		# previous poll's count is the baseline so a same-poll double still counts.
+		var armed: Dictionary = _evolution_armed.get(id, {})
+		if pre_count > 0:
+			if armed.is_empty():
+				armed = {"baseline_post": int(_last_post_counts.get(id, post_count))}
+			armed["expires_ms"] = now + EVOLUTION_ARM_WINDOW_MS
+			_evolution_armed[id] = armed
+
+		if not armed.is_empty():
+			# Twins doubles the leveled unit, so the evolved count rises by 2. The two
+			# copies may land in separate polls, hence the armed window.
+			if post_count >= int(armed.get("baseline_post", 0)) + 2:
+				_evolution_armed.erase(id)
+				earned.append(achievement.duplicate(true))
+			elif now > int(armed.get("expires_ms", 0)):
+				_evolution_armed.erase(id)
+		_last_post_counts[id] = post_count
+
+	earned.append_array(_poll_six_of_a_kind(run))
 	return earned
 
 
+## Twins: two level-3 Beetdown, Dewlotl, and Furnadon on the active team by Day 6.
+func _poll_six_of_a_kind(run) -> Array:
+	if _six_of_a_kind_awarded:
+		return []
+
+	var day := int(run.get("current_round")) if _has_property(run, "current_round") else -1
+	if day < 1 or day > SIX_OF_A_KIND_DAY_LIMIT:
+		return []
+	if not _has_six_of_a_kind_team(run):
+		return []
+
+	_six_of_a_kind_awarded = true
+	return [SIX_OF_A_KIND.duplicate(true)]
+
+
+## Active team only: each required species has >= 2 distinct level-3 units.
+## Duplicate references to one owned unit are counted once via instance id.
+func _has_six_of_a_kind_team(run) -> bool:
+	if not _has_property(run, "team"):
+		return false
+	var team = run.get("team")
+	if not team is Array:
+		return false
+
+	var counts := {}
+	for species_key in SIX_OF_A_KIND_SPECIES:
+		counts[species_key] = 0
+
+	var seen := {}
+	for monster in team:
+		if monster == null or not is_instance_valid(monster):
+			continue
+		var instance_id: int = monster.get_instance_id()
+		if seen.has(instance_id):
+			continue
+		seen[instance_id] = true
+
+		var key := _monster_species_key(monster)
+		if not counts.has(key):
+			continue
+		var level := int(monster.get("level")) if _has_property(monster, "level") else 1
+		if level == SIX_OF_A_KIND_LEVEL:
+			counts[key] = int(counts[key]) + 1
+
+	for species_key in counts:
+		if int(counts[species_key]) < SIX_OF_A_KIND_REQUIRED:
+			return false
+	return true
+
+
+## Gentleman: owns a level-2 Rhizuka on Day 5 or earlier.
+func _poll_gentleman(run, owned: Dictionary) -> Array:
+	if _rhizuka_awarded:
+		return []
+
+	var day := int(run.get("current_round")) if _has_property(run, "current_round") else -1
+	if day < 1 or day > GENTLEMAN_DAY_LIMIT:
+		return []
+
+	var record: Dictionary = owned.get(RHIZUKA_KEY, {})
+	var levels: Dictionary = record.get("levels", {})
+	for level in levels:
+		if int(level) >= RHIZUKA_MIN_LEVEL:
+			_rhizuka_awarded = true
+			return [SO_I_STARTED_BLASTING.duplicate(true)]
+	return []
+
+
+## Poll the active battle state for battle-scoped achievements. Returns newly earned
+## achievement dicts. Called every poll while inside the battle state.
+##
+## Evaluated only once the battle has finished (simulation.data.battle_over) so the toast
+## appears on the results screen, matching the Achievement Notifications setting wording.
+func poll_battle(state, run) -> Array:
+	if state == null or not is_instance_valid(state):
+		reset_battle()
+		return []
+
+	var instance_id: int = state.get_instance_id()
+	if instance_id != _battle_state_id:
+		_battle_state_id = instance_id
+		_big_dog_awarded = false
+
+	if _big_dog_awarded:
+		return []
+	if run == null or not is_instance_valid(run):
+		return []
+
+	var sim = state.get("simulation") if _has_property(state, "simulation") else null
+	if sim == null or not is_instance_valid(sim):
+		return []
+	var data = sim.get("data") if _has_property(sim, "data") else null
+	if data == null or not _has_property(data, "battle_over") or not bool(data.get("battle_over")):
+		return []
+
+	var max_shield := _max_cinnabark_shield(data, run)
+	if max_shield > BIG_DOG_SHIELD_THRESHOLD:
+		_big_dog_awarded = true
+		return [BIG_DOG.duplicate(true)]
+	return []
+
+
+## Highest single-slot shield total generated by a Cinnabark on the player's side.
+## The fight is simulated up front, so these totals are final by the time it is over.
+func _max_cinnabark_shield(data, run) -> float:
+	if not _has_property(data, "battle_units"):
+		return 0.0
+	var units = data.get("battle_units")
+	if not units is Array:
+		return 0.0
+
+	var team = run.get("team") if _has_property(run, "team") else null
+	if not team is Array:
+		return 0.0
+
+	# Sum shield per board slot (Twins duplicates can share a slot).
+	var shield_by_slot := {}
+	for unit in units:
+		if unit == null or not is_instance_valid(unit):
+			continue
+		if not _has_property(unit, "team_id") or not _has_property(unit, "slot_index") or not _has_property(unit, "shield_granted"):
+			continue
+		var team_id = unit.get("team_id")
+		var slot_value = unit.get("slot_index")
+		var shield_value = unit.get("shield_granted")
+		if team_id == null or slot_value == null or shield_value == null:
+			continue
+		if int(team_id) != PLAYER_TEAM_ID:
+			continue
+		var slot := int(slot_value)
+		shield_by_slot[slot] = float(shield_by_slot.get(slot, 0.0)) + float(shield_value)
+
+	var best := 0.0
+	for slot in shield_by_slot.keys():
+		if slot < 0 or slot >= team.size():
+			continue
+		if not _is_cinnabark(team[slot]):
+			continue
+		best = maxf(best, float(shield_by_slot[slot]))
+	return best
+
+
+## Does this live team monster belong to the Cinnabark species?
+func _is_cinnabark(monster) -> bool:
+	return _monster_species_key(monster) == CINNABARK_KEY
+
+
+## Clear battle-scoped tracking. Call when leaving the battle phase.
+func reset_battle() -> void:
+	_battle_state_id = 0
+	_big_dog_awarded = false
+
+
 func _reset() -> void:
-	_prev_beetbud_lvl2 = 0
-	_prev_beetdown_count = 0
-	_has_prev = false
+	_reset_evolution_state()
+	_rhizuka_awarded = false
+	_six_of_a_kind_awarded = false
 
 
-## Count level-2 Beetbuds and all Beetdowns across team + bench.
-func _count_species(run) -> Dictionary:
-	var beetbud_lvl2 := 0
-	var beetdown := 0
+## Clear only the Twins evolution baselines (keeps the Gentleman flag).
+func _reset_evolution_state() -> void:
+	_evolution_armed.clear()
+	_last_post_counts.clear()
+
+
+## One pass over team + bench: species key -> {"count": int, "levels": {level: count}}.
+func _collect_owned_species(run) -> Dictionary:
+	var species := {}
 	for list_name in ["team", "bench"]:
 		if not _has_property(run, list_name):
 			continue
@@ -75,18 +351,28 @@ func _count_species(run) -> Dictionary:
 		if not list is Array:
 			continue
 		for monster in list:
-			if monster == null or not is_instance_valid(monster):
+			var key := _monster_species_key(monster)
+			if key.is_empty():
 				continue
-			var data = monster.get("data") if _has_property(monster, "data") else null
-			if data == null:
-				continue
-			var key := str(data.get("name_key")) if _has_property(data, "name_key") else ""
 			var level := int(monster.get("level")) if _has_property(monster, "level") else 1
-			if key == BEETBUD_KEY and level == BEETBUD_EVOLVE_LEVEL:
-				beetbud_lvl2 += 1
-			elif key == BEETDOWN_KEY:
-				beetdown += 1
-	return {"beetbud_lvl2": beetbud_lvl2, "beetdown": beetdown}
+			var record: Dictionary = species.get(key, {"count": 0, "levels": {}})
+			record["count"] = int(record["count"]) + 1
+			var levels: Dictionary = record["levels"]
+			levels[level] = int(levels.get(level, 0)) + 1
+			species[key] = record
+	return species
+
+
+## Species name_key of a live monster, or "" when unavailable.
+func _monster_species_key(monster) -> String:
+	if monster == null or not is_instance_valid(monster):
+		return ""
+	if not _has_property(monster, "data"):
+		return ""
+	var data = monster.get("data")
+	if data == null or not _has_property(data, "name_key"):
+		return ""
+	return str(data.get("name_key"))
 
 
 func _has_property(obj, property: String) -> bool:
