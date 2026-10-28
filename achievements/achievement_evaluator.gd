@@ -12,13 +12,6 @@ extends RefCounted
 ##   Trigger: a level-2 Rhizuka (the trainer's common level-2 strat) is owned no later
 ##   than Day 5. Day is read from run.current_round (the field the mod already logs as
 ##   "Day"). State-based: awards as soon as the condition is true.
-## - "Six of a Kind" (poll, run state)
-##   Trainer: Twins
-##   Trigger: the active team holds two distinct level-3 Beetdown, two distinct
-##   level-3 Dewlotl, and two distinct level-3 Furnadon on any day 1-6. Bench units do
-##   not count, levels must be exactly 3, and duplicate references to one unit are
-##   deduplicated by instance id. Extra units are allowed; once owned, selling or
-##   upgrading units does not revoke the award.
 ## - "Oh Yeah!" / "Herd U Liek Mudkipz" (poll, run state)
 ##   Trainer: Twins
 ##   Trigger: a level-2 pre-evolution evolves into its level-3 form. Twins doubles the
@@ -45,13 +38,8 @@ const BEETBUD_KEY := "monster.name.beetbud"
 const BEETDOWN_KEY := "monster.name.beetdown"
 const FRILLET_KEY := "monster.name.frillet"
 const DEWLOTL_KEY := "monster.name.dewlotl"
-const FURNADON_KEY := "monster.name.furnadon"  # species_id "furnadon" verified in run_save.json
 const PRE_EVOLVE_LEVEL := 2  # Pre-evolution at this level evolves into its level-3 form
 const EVOLUTION_ARM_WINDOW_MS := 2000  # Spans the game's multi-poll evolution animation
-
-const SIX_OF_A_KIND_LEVEL := 3       # Exact level, not "level 3 or higher"
-const SIX_OF_A_KIND_REQUIRED := 2    # Distinct level-3 units of each species
-const SIX_OF_A_KIND_DAY_LIMIT := 6   # Latest displayed day that still counts
 
 const GENTLEMAN_TRAINER_ID := "gentleman"
 const RHIZUKA_KEY := "monster.name.rhizuka"
@@ -80,12 +68,6 @@ const SO_I_STARTED_BLASTING := {
 	"description": "Got a level 2 Rhizuka by Day 5 !",
 }
 
-const SIX_OF_A_KIND := {
-	"id": "twins_six_of_a_kind",
-	"title": "Six of a Kind",
-	"description": "As the Twins, field two Level 3 Beetdown, two Level 3 Dewlotl, and two Level 3 Furnadon by the end of Day 6.",
-}
-
 const BIG_DOG := {
 	"id": "big_dog_best_dog",
 	"title": "Big Dog, Best Dog",
@@ -98,9 +80,6 @@ const EVOLUTION_ACHIEVEMENTS := [
 	{"achievement": HERD_U_LIEK_MUDKIPZ, "pre_key": FRILLET_KEY, "post_key": DEWLOTL_KEY},
 ]
 
-## Species that must each appear twice at level 3 for "Six of a Kind".
-const SIX_OF_A_KIND_SPECIES := [BEETDOWN_KEY, DEWLOTL_KEY, FURNADON_KEY]
-
 # Armed evolution baselines: achievement id -> {"baseline_post": int, "expires_ms": int}.
 var _evolution_armed: Dictionary = {}
 # Evolved-unit count from the previous poll, per achievement id.
@@ -108,9 +87,6 @@ var _last_post_counts: Dictionary = {}
 
 # Gentleman Rhizuka achievement: awarded this run (suppresses repeat polling).
 var _rhizuka_awarded := false
-
-# Six of a Kind: awarded this run (suppresses repeat polling).
-var _six_of_a_kind_awarded := false
 
 # Big Dog tracking: award at most once per battle state instance.
 var _battle_state_id := 0
@@ -140,7 +116,6 @@ func poll(run) -> Array:
 
 	if not is_twins:
 		_reset_evolution_state()
-		_six_of_a_kind_awarded = false
 		return earned
 
 	var now := Time.get_ticks_msec()
@@ -172,58 +147,7 @@ func poll(run) -> Array:
 				_evolution_armed.erase(id)
 		_last_post_counts[id] = post_count
 
-	earned.append_array(_poll_six_of_a_kind(run))
 	return earned
-
-
-## Twins: two level-3 Beetdown, Dewlotl, and Furnadon on the active team by Day 6.
-func _poll_six_of_a_kind(run) -> Array:
-	if _six_of_a_kind_awarded:
-		return []
-
-	var day := int(run.get("current_round")) if _has_property(run, "current_round") else -1
-	if day < 1 or day > SIX_OF_A_KIND_DAY_LIMIT:
-		return []
-	if not _has_six_of_a_kind_team(run):
-		return []
-
-	_six_of_a_kind_awarded = true
-	return [SIX_OF_A_KIND.duplicate(true)]
-
-
-## Active team only: each required species has >= 2 distinct level-3 units.
-## Duplicate references to one owned unit are counted once via instance id.
-func _has_six_of_a_kind_team(run) -> bool:
-	if not _has_property(run, "team"):
-		return false
-	var team = run.get("team")
-	if not team is Array:
-		return false
-
-	var counts := {}
-	for species_key in SIX_OF_A_KIND_SPECIES:
-		counts[species_key] = 0
-
-	var seen := {}
-	for monster in team:
-		if monster == null or not is_instance_valid(monster):
-			continue
-		var instance_id: int = monster.get_instance_id()
-		if seen.has(instance_id):
-			continue
-		seen[instance_id] = true
-
-		var key := _monster_species_key(monster)
-		if not counts.has(key):
-			continue
-		var level := int(monster.get("level")) if _has_property(monster, "level") else 1
-		if level == SIX_OF_A_KIND_LEVEL:
-			counts[key] = int(counts[key]) + 1
-
-	for species_key in counts:
-		if int(counts[species_key]) < SIX_OF_A_KIND_REQUIRED:
-			return false
-	return true
 
 
 ## Gentleman: owns a level-2 Rhizuka on Day 5 or earlier.
@@ -332,7 +256,6 @@ func reset_battle() -> void:
 func _reset() -> void:
 	_reset_evolution_state()
 	_rhizuka_awarded = false
-	_six_of_a_kind_awarded = false
 
 
 ## Clear only the Twins evolution baselines (keeps the Gentleman flag).

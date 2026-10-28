@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9014"
+const VERSION := "0.9017"
 const MOD_ID := "creature_comforts"
 const MOD_ID_OLD := "np_brainrot"  # Legacy ID for settings migration (one-time)
 const OUTPUT_DIR := "user://creature_comforts"
@@ -12,6 +12,9 @@ const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 
 # Polling and state tracking
 const POLL_INTERVAL_MS := 500
+
+# Battle result labels (from simulation.data.player_health)
+const BATTLE_RESULT_VICTORY := "VICTORY"
 
 # Advice display modes come from trainer_rules.gd BaseRule (single source)
 const TrainerRules = preload("advice/trainer_rules.gd")
@@ -38,13 +41,21 @@ var _battle_logged := false
 # IMPORTANT: this is an autobattler - the whole fight is simulated before the mod's 500ms poll
 # first sees the battle state, so the first battle poll already contains the battle-granted
 # trinkets. We therefore keep a rolling snapshot of the last NON-battle state (shop/event) and use
-# it as the "before battle" baseline. The end snapshot is refreshed while inside the battle state.
+# it as the "before battle" baseline. The end snapshot is frozen at battle_over.
+#
+# The panel is shown only after the battle state ends AND only for a VICTORY, never on the results
+# screen. The game applies battle-end trinket effects (Locked Box, Mysterious Chest) to
+# run.trinket_ids during the battle simulation, before battle_over is observable, so those gifts are
+# already in the battle snapshot and cannot be separated from real gains by timing. They only fire
+# on a defeat, so suppress the panel for non-victories; gains are still logged. The snapshot stays
+# frozen at battle_over so later event rewards never leak into the diff.
 var _pre_battle_trinket_state = null  # Dictionary: last trinket inventory seen outside battle
 var _battle_trinket_start = null      # Dictionary: baseline used for the current battle
-var _battle_trinket_end = null        # Dictionary: latest trinket inventory inside the battle
+var _battle_trinket_end = null        # Dictionary: trinket inventory frozen at battle_over
 var _battle_trinket_tracking := false
 var _battle_over_seen := false     # battle_over observed; end snapshot is frozen at this point
-var _battle_gains_logged := false  # Battle gains already logged this battle (log once after battle_over)
+var _battle_gains_logged := false  # Battle gains already logged this battle
+var _battle_result := ""           # VICTORY / DEFEAT / DRAW / UNKNOWN for the tracked battle
 var _initialization_started := false
 var _initialized := false
 
@@ -528,7 +539,7 @@ func _handle_shop_phase(state) -> void:
 	# Reset suppression and battle trinket tracking on trainer identity changes (new run)
 	if trainer_changed and _advisor != null:
 		_advisor.reset_suppression()
-		_finalize_battle_trinket_tracking()  # Prevent false gains from a previous run's inventory
+		_finalize_battle_trinket_tracking(false)  # Prevent false gains/panel from a previous run
 	
 	# Evaluate trainer advice (after logging, before updating snapshot)
 	_evaluate_trainer_advice(current_snapshot)
@@ -575,14 +586,15 @@ func _handle_battle_phase(state) -> void:
 		_battle_trinket_tracking = true
 		_battle_over_seen = false
 		_battle_gains_logged = false
+		_battle_result = ""
 		
 		_battle_logged = true
 	
 	# Freeze the battle-end snapshot the FIRST time battle_over is observed. The game pre-computes
 	# the following event's rewards during the results screen, applying them to run.trinket_ids
 	# before the event UI appears; continuing to refresh the end snapshot would leak those future
-	# event trinkets into the battle diff. Once frozen, keep refreshing the panel display only
-	# (idempotent show_gains) so it stays visible while the results screen remains.
+	# event trinkets into the battle diff. The panel itself is displayed later, when the battle
+	# state ends (see _finalize_battle_trinket_tracking).
 	if _battle_trinket_tracking:
 		if not _battle_over_seen and _battle_is_over(state):
 			var run = _get_run_data()
@@ -590,8 +602,6 @@ func _handle_battle_phase(state) -> void:
 				_battle_trinket_end = _capture_trinket_state(run)
 			_battle_over_seen = true
 			_log_message("BATTLE TRINKET GAINS | end snapshot frozen at battle_over: %s" % str(_battle_trinket_end.get("trinket_ids", [])))
-		if _battle_over_seen:
-			_update_battle_trinket_panel()
 	
 	# Reset transient overlay/suppression state on battle entry
 	_reset_transient_state(false, true, true)
@@ -608,7 +618,7 @@ func _check_battle_completion(state) -> void:
 	var sim = state.get("simulation") if _has_property(state, "simulation") else null
 	var battle_data = sim.get("data") if sim != null and _has_property(sim, "data") else null
 	
-	_log_battle_result(battle_data)
+	_battle_result = _log_battle_result(battle_data)
 
 
 ## Poll the run for newly earned achievements, persist them, and show the panel.
@@ -656,26 +666,27 @@ func _award_achievements(earned: Array) -> void:
 			_log_message("ACHIEVEMENT NOTIFICATION | suppressed (Achievement Notifications off)")
 
 
-func _log_battle_result(battle_data) -> void:
-	"""Log how the battle ended. Logging only; the panel is shown for any result."""
+## Log how the battle ended and return the result label.
+func _log_battle_result(battle_data) -> String:
 	if battle_data == null:
 		_log_message("BATTLE COMPLETE | result=UNKNOWN")
-		return
+		return "UNKNOWN"
 	
 	var player_health = battle_data.get("player_health")
 	if player_health == null or player_health.size() < 2:
 		_log_message("BATTLE COMPLETE | result=UNKNOWN | player_health unavailable")
-		return
+		return "UNKNOWN"
 	
 	var player_hp := int(player_health[0])
 	var enemy_hp := int(player_health[1])
 	
 	var result := "DRAW"
 	if player_hp > 0 and enemy_hp <= 0:
-		result = "VICTORY"
+		result = BATTLE_RESULT_VICTORY
 	elif player_hp <= 0 and enemy_hp > 0:
 		result = "DEFEAT"
 	_log_message("BATTLE COMPLETE | result=%s | player_hp=%d enemy_hp=%d" % [result, player_hp, enemy_hp])
+	return result
 
 
 const JUNK_TRINKET_ID := "junk"  # Verified in runtime log: trinket_ids contain "junk"
@@ -769,32 +780,18 @@ func _battle_is_over(state) -> bool:
 	return bool(data.get("battle_over"))
 
 
-## Refresh the trinket panel from battle gains. Only shows non-junk gains; hides otherwise.
-## Logs the battle's trinket gains once (after the first non-empty/over calculation).
-func _update_battle_trinket_panel() -> void:
-	if _battle_trinket_start == null:
-		return
-	var run = _get_run_data()
-	if run == null or not is_instance_valid(run):
-		return
-	var gains := _diff_trinket_states(_battle_trinket_start, _battle_trinket_end)
-	
-	# Log once per battle (this runs on the results screen, same timing as the achievement log)
-	if not _battle_gains_logged and (not gains["ids"].is_empty() or int(gains["counter"]) != 0):
-		_battle_gains_logged = true
-		_log_lines(_formatter.format_battle_trinket_gains(gains))
-	
-	_update_trinket_panel(gains)
-
-
-## Stop battle trinket tracking and hide the panel. Called when leaving the battle state
-## (and on trainer/run changes) so the next battle re-baselines cleanly.
-func _finalize_battle_trinket_tracking() -> void:
+## Stop battle trinket tracking. Called when leaving the battle state and on trainer/run changes.
+## Gains are always logged once. The panel is shown only for a VICTORY: defeat-triggered gift
+## trinkets (Locked Box, Mysterious Chest) apply their rewards to run.trinket_ids during the
+## battle simulation, so those rewards are already in the battle_over snapshot and would be
+## spoiled if the panel displayed them on a defeat.
+func _finalize_battle_trinket_tracking(show_panel := true) -> void:
 	if not _battle_trinket_tracking and _battle_trinket_start == null:
 		return
+	var panel_updated := false
+
 	# Use the frozen battle_over snapshot only; do NOT re-read the live inventory here because the
-	# game may already have applied the following event's rewards. Log if the live inventory grew
-	# after the freeze, so event-granted trinkets are visibly excluded (diagnostic only).
+	# game may already have applied the following event's rewards.
 	if _battle_trinket_start != null and _battle_trinket_end != null and _battle_over_seen:
 		var run = _get_run_data()
 		if run != null and is_instance_valid(run):
@@ -807,12 +804,22 @@ func _finalize_battle_trinket_tracking() -> void:
 			var post := _diff_trinket_states(_battle_trinket_end, live)
 			if not post["ids"].is_empty():
 				_log_message("BATTLE TRINKET GAINS | excluded post-battle additions: %s" % str(post["ids"]))
+			if show_panel and _battle_result != BATTLE_RESULT_VICTORY:
+				_log_message("BATTLE TRINKET GAINS | panel suppressed (result=%s)" % (_battle_result if not _battle_result.is_empty() else "UNKNOWN"))
+			elif show_panel:
+				# Shows only non-junk gains; hides itself when nothing eligible remains.
+				_update_trinket_panel(gains)
+				panel_updated = true
+
+	if not panel_updated:
+		_hide_trinket_panel()
+
 	_battle_trinket_start = null
 	_battle_trinket_end = null
 	_battle_trinket_tracking = false
 	_battle_over_seen = false
 	_battle_gains_logged = false
-	_hide_trinket_panel()
+	_battle_result = ""
 
 
 func _update_overlay_gate() -> void:
@@ -894,8 +901,9 @@ func _reset_transient_state(clear_suppression: bool, clear_reminders: bool, clea
 	if clear_reminders:
 		if _reminder_label != null:
 			_reminder_label.hide_all_reminders()
-		# Trinket panel now lives on the achievement layer (battle results screen) and is
-		# managed by _finalize_battle_trinket_tracking / auto-hide, not by this reset.
+		# Trinket panel lives on the achievement layer and is shown when leaving the battle
+		# state by _finalize_battle_trinket_tracking (not on the results screen), so this
+		# reset leaves it alone.
 	if clear_chimes:
 		_pending_chime_rule_ids.clear()
 	if clear_suppression and _advisor != null:
