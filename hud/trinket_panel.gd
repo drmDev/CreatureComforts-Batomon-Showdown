@@ -12,9 +12,9 @@ extends "comfort_panel.gd"
 ## own StyleBoxFlat + font (same NP_QoL drawing pattern as before), so it has no external skin
 ## dependency. It also keeps the earlier right/bottom auto-hide behaviour.
 ##
-## Appears bottom-right just above the achievement toast when the battle state ends and the
-## panel is shown, and auto-hides after a few seconds. It only shows when at least one non-junk
-## trinket was earned; that filtering is done by mod_main before calling show_gains().
+## Appears bottom-right when the battle state ends and the panel is shown, and auto-hides
+## after a few seconds. It only shows when at least one non-junk trinket was earned; that
+## filtering is done by mod_main before calling show_gains().
 
 const PANEL_WIDTH := 185.0
 const CONTENT_PADDING := 6.0
@@ -32,7 +32,7 @@ const DRAG_THRESHOLD := 3.0
 # Display
 const DISPLAY_DURATION_MS := 8000  # Auto-hide after 8 seconds on the results screen
 const MARGIN_RIGHT := 10.0
-const MARGIN_BOTTOM := 130.0       # Sits above the bottom-right achievement toast
+const MARGIN_BOTTOM := 130.0       # Leaves room for a bottom-right toast from a companion mod
 
 const HEADER_BG := Color("#2b3a52")      # Slightly lighter navy for the header bar
 const INK_COLOR := Color("#ecf0f1")      # "-" / "+" glyph colour
@@ -105,7 +105,7 @@ func show_gains(entries: Array) -> void:
 	var first_show := not visible
 	_entries = entries
 	if first_show:
-		# Start each battle expanded and positioned above the achievement toast.
+		# Start each battle expanded and positioned above the bottom-right toast area.
 		reveal = 1.0
 		minimized = false
 		_content_key = key

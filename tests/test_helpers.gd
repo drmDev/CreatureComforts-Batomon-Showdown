@@ -1,8 +1,8 @@
 extends RefCounted
 ## TestHelpers - fakes and builders shared by the Creature Comforts tests.
 ##
-## FakeObject exists because achievement_evaluator.gd guards with is_instance_valid(),
-## which returns false for Dictionaries. Fakes must be Object instances (RefCounted).
+## FakeObject exists because the rules guard with is_instance_valid(), which returns
+## false for Dictionaries. Fakes must be Object instances (RefCounted).
 
 const AdviceContext = preload("../advice/advice_context.gd")
 
@@ -48,43 +48,6 @@ class FakeFormatter:
 
 	func format_item_name(item_id: String) -> String:
 		return item_id.replace("_", " ").capitalize()
-
-
-## Build a monster fake for the achievement evaluator: needs `data.name_key` and `level`.
-static func monster(name_key: String, level: int = 1):
-	return FakeObject.new({
-		"data": FakeObject.new({"name_key": name_key}),
-		"level": level,
-	})
-
-
-## Build a run fake for the achievement evaluator.
-static func run(trainer_id: String, day: int, team: Array = [], bench: Array = []):
-	return FakeObject.new({
-		"trainer_id": trainer_id,
-		"current_round": day,
-		"team": team,
-		"bench": bench,
-	})
-
-
-## Build a battle unit fake for poll_battle.
-static func battle_unit(team_id: int, slot_index: int, shield_granted: float):
-	return FakeObject.new({
-		"team_id": team_id,
-		"slot_index": slot_index,
-		"shield_granted": shield_granted,
-	})
-
-
-## Build a battle state fake: state.simulation.data.battle_units + battle_over.
-static func battle_state(units: Array, battle_over: bool = true):
-	var data := FakeObject.new({
-		"battle_units": units,
-		"battle_over": battle_over,
-	})
-	var sim := FakeObject.new({"data": data})
-	return FakeObject.new({"simulation": sim})
 
 
 ## Build an AdviceContext for trainer-rule tests.

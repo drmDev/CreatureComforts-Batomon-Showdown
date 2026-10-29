@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9031"
+const VERSION := "0.9032"
 const MOD_ID := "creature_comforts"
 const MOD_ID_OLD := "np_brainrot"  # Legacy ID for settings migration (one-time)
 const OUTPUT_DIR := "user://creature_comforts"
@@ -84,11 +84,9 @@ var _initialized := false
 # Settings (defaults match mod.json)
 const DEFAULT_DEBUG_LOGGING := true
 const DEFAULT_DEEP_INSPECTION := true
-const DEFAULT_ACHIEVEMENT_NOTIFICATIONS := false
 
 var _debug_logging := DEFAULT_DEBUG_LOGGING
 var _deep_inspection := DEFAULT_DEEP_INSPECTION
-var _achievement_notifications := DEFAULT_ACHIEVEMENT_NOTIFICATIONS
 var _settings_load_attempted := false
 var _settings_warning_shown := false
 
@@ -129,12 +127,12 @@ const INCOME_PER_DAY := 5
 # Player HUD (battle-only HP / Wins / Day line, ported from NP_QoL)
 var _player_hud = null
 
-# Achievement system: poll-based detection + JSON persistence + bottom-right panel
-var _battle_completion = null
-var _achievement_evaluator = null
-var _achievement_store = null
-var _achievement_panel = null
-var _achievement_layer: CanvasLayer = null
+# Results layer: hosts the trinket-gain panel so it can show over the battle results screen.
+var _results_layer: CanvasLayer = null
+
+# Battle completion logging: report each battle's result exactly once.
+var _battle_completion_state_id := 0
+var _battle_completion_reported := false
 
 
 func mod_ready() -> void:
@@ -169,7 +167,6 @@ func _load_settings() -> void:
 		# Load from the current mod ID.
 		_debug_logging = mod_loader.get_config(MOD_ID, "debug_logging", DEFAULT_DEBUG_LOGGING)
 		_deep_inspection = mod_loader.get_config(MOD_ID, "deep_inspection", DEFAULT_DEEP_INSPECTION)
-		_achievement_notifications = mod_loader.get_config(MOD_ID, "achievement_notifications", DEFAULT_ACHIEVEMENT_NOTIFICATIONS)
 		
 		# Legacy migration: adopt a value stored under the old mod ID only when the
 		# current setting is still at its default. get_config() returns the default
@@ -186,16 +183,9 @@ func _load_settings() -> void:
 			if old_deep != _deep_inspection:
 				_deep_inspection = old_deep
 				migrated = true
-		if _achievement_notifications == DEFAULT_ACHIEVEMENT_NOTIFICATIONS:
-			var old_achievement = mod_loader.get_config(MOD_ID_OLD, "achievement_notifications", DEFAULT_ACHIEVEMENT_NOTIFICATIONS)
-			if old_achievement != _achievement_notifications:
-				_achievement_notifications = old_achievement
-				migrated = true
-		
 		if migrated and mod_loader.has_method("set_config"):
 			mod_loader.set_config(MOD_ID, "debug_logging", _debug_logging)
 			mod_loader.set_config(MOD_ID, "deep_inspection", _deep_inspection)
-			mod_loader.set_config(MOD_ID, "achievement_notifications", _achievement_notifications)
 			print("Creature Comforts: migrated settings from '%s' to '%s'" % [MOD_ID_OLD, MOD_ID])
 		
 		# Connect to config_changed signal for live updates
@@ -238,8 +228,8 @@ func _initialize_mod() -> void:
 	# Create battle player HUD
 	_setup_player_hud()
 	
-	# Create achievement panel system (Phase 1)
-	_setup_achievement_panel()
+	# Create the results layer for the trinket-gain panel
+	_setup_results_panel()
 	
 	# Setup notification sound
 	_setup_pika_sound()
@@ -267,7 +257,7 @@ func _initialize_mod() -> void:
 	_log_message("=".repeat(80))
 	_log_message("Creature Comforts %s - Trainer Advice System" % VERSION)
 	_log_message("Initialized at %s" % _formatter.get_timestamp())
-	_log_message("Settings: Debug Logging: %s | Deep Inspection: %s | Achievement Notifications: %s" % [_debug_logging, _deep_inspection, _achievement_notifications])
+	_log_message("Settings: Debug Logging: %s | Deep Inspection: %s" % [_debug_logging, _deep_inspection])
 	_log_message("Log file: %s" % abs_log_path)
 	_log_message("=".repeat(80))
 	
@@ -289,12 +279,6 @@ func _on_config_changed(mod_id: String, key: String, value) -> void:
 			if value is bool:
 				_deep_inspection = value
 				_log_message("Setting changed: Deep Inspection = %s" % _deep_inspection)
-		"achievement_notifications":
-			if value is bool:
-				_achievement_notifications = value
-				_log_message("Setting changed: Achievement Notifications = %s" % _achievement_notifications)
-				if not _achievement_notifications and _achievement_panel != null:
-					_achievement_panel.hide_panel()
 
 
 func _setup_advisor() -> void:
@@ -357,37 +341,19 @@ func _setup_player_hud() -> void:
 	layer.add_child(_player_hud)
 
 
-func _setup_achievement_panel() -> void:
-	"""Initialize the achievement detection, persistence, and panel system."""
-	var BattleCompletionDetector = load("res://mods/CreatureComforts/achievements/battle_completion_detector.gd")
-	_battle_completion = BattleCompletionDetector.new()
-	
-	var AchievementEvaluator = load("res://mods/CreatureComforts/achievements/achievement_evaluator.gd")
-	_achievement_evaluator = AchievementEvaluator.new(_has_property)
-	
-	# Pass the mod root so achievements.json stays at the mod root even though the
-	# store script now lives in achievements/.
-	var AchievementStore = load("res://mods/CreatureComforts/achievements/achievement_store.gd")
-	_achievement_store = AchievementStore.new(str(get_script().resource_path).get_base_dir())
-	
+func _setup_results_panel() -> void:
+	"""Initialize the results layer that hosts the trinket-gain panel."""
 	# Separate layer from _reminder_layer: the overlay gate hides reminders outside the
-	# shop, but the achievement panel must be visible after battles (over the results screen).
-	_achievement_layer = CanvasLayer.new()
-	_achievement_layer.layer = 100
-	_achievement_layer.name = "CreatureComforts_Achievements"
-	add_child(_achievement_layer)
+	# shop, but the trinket panel must be visible after battles (over the results screen).
+	_results_layer = CanvasLayer.new()
+	_results_layer.layer = 100
+	_results_layer.name = "CreatureComforts_Results"
+	add_child(_results_layer)
 	
-	var AchievementPanel = load("res://mods/CreatureComforts/achievements/achievement_panel.gd")
-	_achievement_panel = AchievementPanel.new()
-	_achievement_panel.name = "AchievementPanel"
-	_achievement_layer.add_child(_achievement_panel)
-
-	# Collapsible trinket-gain panel lives on the achievement layer so it shows on the
-	# battle results screen (same timing as the achievement toast), above it.
 	var TrinketPanel = load("res://mods/CreatureComforts/hud/trinket_panel.gd")
 	_trinket_panel = TrinketPanel.new()
 	_trinket_panel.name = "TrinketPanel"
-	_achievement_layer.add_child(_trinket_panel)
+	_results_layer.add_child(_trinket_panel)
 
 
 func _setup_pika_sound() -> void:
@@ -437,14 +403,10 @@ func _inspect_current_phase() -> void:
 	# shop gate, but hide it directly whenever the shop is not the current phase.
 	if not _script_is(state, SHOP_SCRIPT) and _shop_income_panel != null:
 		_shop_income_panel.hide_panel()
-	_poll_achievements()
 	if not is_battle:
 		# Reset battle-scoped tracking only when actually leaving the battle phase.
 		if _last_phase == "battle":
-			if _battle_completion != null:
-				_battle_completion.reset()
-			if _achievement_evaluator != null:
-				_achievement_evaluator.reset_battle()
+			_reset_battle_completion()
 		# Leaving the battle state (event, shop, or other): stop battle trinket tracking.
 		_finalize_battle_trinket_tracking()
 		# Keep a rolling "last state outside battle" snapshot. The battle is simulated before the
@@ -639,8 +601,6 @@ func _update_shop_income(run) -> void:
 func _handle_battle_phase(state) -> void:
 	# Battle completion detection (win/loss/draw) - independent of replay logging
 	_check_battle_completion(state)
-	# Battle-scoped achievements (Big Dog, Best Dog) - read from the battle simulation
-	_poll_battle_achievements(state)
 	
 	# Check if replay data is ready
 	var player = state.get("_replay_p1_data") if _has_property(state, "_replay_p1_data") else null
@@ -697,60 +657,31 @@ func _handle_battle_phase(state) -> void:
 
 func _check_battle_completion(state) -> void:
 	"""Detect battle completion once and log the result."""
-	if _battle_completion == null:
-		return
-	if not _battle_completion.poll(state):
+	if state == null or not is_instance_valid(state):
+		_reset_battle_completion()
 		return
 	
+	var instance_id: int = state.get_instance_id()
+	if instance_id != _battle_completion_state_id:
+		_battle_completion_state_id = instance_id
+		_battle_completion_reported = false
+	
+	if _battle_completion_reported:
+		return
+	if not _battle_is_over(state):
+		return
+	
+	_battle_completion_reported = true
 	var sim = state.get("simulation") if _has_property(state, "simulation") else null
 	var battle_data = sim.get("data") if sim != null and _has_property(sim, "data") else null
 	
 	_battle_result = _log_battle_result(battle_data)
 
 
-## Poll the run for newly earned achievements, persist them, and show the panel.
-## Runs every poll (the Twins transformation happens in the shop, but polling all
-## phases keeps the team-state baseline current).
-func _poll_achievements() -> void:
-	if _achievement_evaluator == null:
-		return
-	var run = _get_run_data()
-	if run == null or not is_instance_valid(run):
-		return
-	
-	_award_achievements(_achievement_evaluator.poll(run))
-
-
-## Poll the active battle for battle-scoped achievements (Big Dog, Best Dog).
-func _poll_battle_achievements(state) -> void:
-	if _achievement_evaluator == null:
-		return
-	var run = _get_run_data()
-	if run == null or not is_instance_valid(run):
-		return
-	
-	_award_achievements(_achievement_evaluator.poll_battle(state, run))
-
-
-## Persist and display newly earned achievements (deduplicated by the store).
-func _award_achievements(earned: Array) -> void:
-	if _achievement_store == null or _achievement_panel == null:
-		return
-	for achievement in earned:
-		var id := str(achievement.get("id", ""))
-		if id.is_empty() or _achievement_store.is_completed(id):
-			continue
-		var title := str(achievement.get("title", ""))
-		var description := str(achievement.get("description", ""))
-		if title.is_empty() or description.is_empty():
-			continue
-		
-		_achievement_store.mark_completed(id)
-		_log_message("ACHIEVEMENT EARNED | %s | %s" % [id, title])
-		if _achievement_notifications:
-			_achievement_panel.show_achievement(title, description)
-		else:
-			_log_message("ACHIEVEMENT NOTIFICATION | suppressed (Achievement Notifications off)")
+## Clear battle-completion tracking so a later battle is reported again.
+func _reset_battle_completion() -> void:
+	_battle_completion_state_id = 0
+	_battle_completion_reported = false
 
 
 ## Log how the battle ended and return the result label.
@@ -1159,7 +1090,7 @@ func _reset_transient_state(clear_suppression: bool, clear_reminders: bool, clea
 	if clear_reminders:
 		if _reminder_label != null:
 			_reminder_label.hide_all_reminders()
-		# Trinket panel lives on the achievement layer and is shown when leaving the battle
+		# Trinket panel lives on the results layer and is shown when leaving the battle
 		# state by _finalize_battle_trinket_tracking (not on the results screen), so this
 		# reset leaves it alone.
 	if clear_chimes:

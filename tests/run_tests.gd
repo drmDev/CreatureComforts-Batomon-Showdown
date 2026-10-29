@@ -6,7 +6,6 @@ extends SceneTree
 ## Exits 0 when all tests pass, 1 otherwise.
 
 var _test_scripts := {
-	"achievement_evaluator": preload("test_achievement_evaluator.gd"),
 	"trainer_rules": preload("test_trainer_rules.gd"),
 }
 
