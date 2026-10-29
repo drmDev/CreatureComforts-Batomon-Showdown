@@ -370,6 +370,10 @@ func format_battle_trinket_gains(gains: Dictionary) -> Array[String]:
 	else:
 		lines.append("    (none)")
 
+	var newly_used: Array = gains.get("newly_used", [])
+	if not newly_used.is_empty():
+		lines.append("      (one-shots consumed: %s)" % _format_flat_value(newly_used))
+
 	return lines
 
 

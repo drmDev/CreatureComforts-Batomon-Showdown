@@ -9,12 +9,12 @@
 extends RefCounted
 
 ## Add timestamps to Deep Inspection snapshot-change output.
-const DEBUG_LOGGING := false
+const DEBUG_LOGGING := true
 
 ## Discover and log additional properties of game objects (types, keywords, abilities).
 ## Off by default: deep inspection uses reflection (get_property_list) and is expensive.
 ## Toggle on at runtime with Ctrl+Shift+I only when you need it.
-const DEEP_INSPECTION := false
+const DEEP_INSPECTION := true
 
 ## Runtime toggle key (Godot Key enum; combined with Ctrl+Shift in mod_main).
 const TOGGLE_DEBUG_KEY := Key.KEY_D

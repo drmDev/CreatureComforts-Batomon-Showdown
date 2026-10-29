@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9049"
+const VERSION := "0.9056"
 const MOD_ID := "creature_comforts"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
@@ -23,6 +23,8 @@ const TrainerRules = preload("advice/trainer_rules.gd")
 # Junk trinket id lives in the formatter (single source for the panel filter + log)
 const LogFormatterScript = preload("core/log_formatter.gd")
 const JUNK_TRINKET_ID := LogFormatterScript.JUNK_TRINKET_ID
+# Pure battle-scoped trinket diff logic (unit-tested)
+const TrinketGains = preload("core/trinket_gains.gd")
 # Dev-only toggle defaults (not user-facing settings)
 const DevConfig = preload("dev/dev_config.gd")
 
@@ -66,19 +68,16 @@ var _battle_logged := false
 # trinkets. We therefore keep a rolling snapshot of the last NON-battle state (shop/event) and use
 # it as the "before battle" baseline. The end snapshot is frozen at battle_over.
 #
-# The panel is shown only after the battle state ends AND only for a VICTORY, never on the results
-# screen. The game applies battle-end trinket effects (Locked Box, Mysterious Chest) to
-# run.trinket_ids during the battle simulation, before battle_over is observable, so those gifts are
-# already in the battle snapshot and cannot be separated from real gains by timing. They only fire
-# on a defeat, so suppress the panel for non-victories; gains are still logged. The snapshot stays
-# frozen at battle_over so later event rewards never leak into the diff.
+# The panel shows mid-combat gains for any result. It is suppressed when a gift-generating one-shot
+# trinket (Locked Box / Mysterious Chest) was consumed during the battle: the game applies the gift
+# to trinket_ids during the simulation but reveals it later, so showing it would spoil the gift.
+# The snapshot stays frozen at battle_over so later event rewards never leak into the diff.
 var _pre_battle_trinket_state = null  # Dictionary: last trinket inventory seen outside battle
 var _battle_trinket_start = null      # Dictionary: baseline used for the current battle
 var _battle_trinket_end = null        # Dictionary: trinket inventory frozen at battle_over
 var _battle_trinket_tracking := false
 var _battle_over_seen := false     # battle_over observed; end snapshot is frozen at this point
 var _battle_gains_logged := false  # Battle gains already logged this battle
-var _battle_result := ""           # VICTORY / DEFEAT / DRAW / UNKNOWN for the tracked battle
 var _initialization_started := false
 var _initialized := false
 
@@ -97,6 +96,7 @@ var _settings_load_attempted := false
 
 # Logging
 var _log_path := ""
+var _log_file: FileAccess = null  # Kept open for the session; avoids open/close per line
 var _formatter = null
 
 # Trainer advice system
@@ -140,8 +140,7 @@ const BASE_INCOME := 35
 const INCOME_PER_DAY := 5
 
 # One-shot trinkets worth reminding about while still held (id -> short description).
-# IDs follow the game's snake_case convention (e.g. "treasure_map"). mod_main logs the
-# held ids once per distinct inventory when none match, to confirm the real ids.
+# IDs follow the game's snake_case convention (e.g. "treasure_map").
 const TRACKED_TRINKET_DESCRIPTIONS := {
 	"mini_duplicator": "Next non-unique trinket gift: +1 copy",
 	"mega_duplicator": "Next non-unique trinket gift: +2 copies",
@@ -173,6 +172,9 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	if get_tree() != null and get_tree().node_added.is_connected(_on_node_added_transition):
 		get_tree().node_added.disconnect(_on_node_added_transition)
+	if _log_file != null:
+		_log_file.close()
+		_log_file = null
 
 
 func _load_settings() -> void:
@@ -255,6 +257,13 @@ func _initialize_mod() -> void:
 			push_error("Creature Comforts: Cannot create log file %s: %s" % [abs_log_path, error_string(FileAccess.get_open_error())])
 			return
 		file.close()
+
+	# Keep one append handle open for the session instead of reopening per line.
+	_log_file = FileAccess.open(_log_path, FileAccess.READ_WRITE)
+	if _log_file == null:
+		push_error("Creature Comforts: Cannot open log file %s: %s" % [abs_log_path, error_string(FileAccess.get_open_error())])
+		return
+	_log_file.seek_end()
 	
 	_initialized = true
 	
@@ -629,7 +638,7 @@ func _handle_shop_phase(state) -> void:
 	
 	_update_shop_income(run)
 	_update_trinket_reminders(run)
-	
+
 	# (overlay visibility is handled every frame by _update_overlay_gate)
 	
 	_last_phase = "shop"
@@ -758,7 +767,6 @@ func _handle_battle_phase(state) -> void:
 		_battle_trinket_tracking = true
 		_battle_over_seen = false
 		_battle_gains_logged = false
-		_battle_result = ""
 		
 		_battle_logged = true
 	
@@ -800,7 +808,7 @@ func _check_battle_completion(state) -> void:
 	var sim = state.get("simulation") if _has_property(state, "simulation") else null
 	var battle_data = sim.get("data") if sim != null and _has_property(sim, "data") else null
 	
-	_battle_result = _log_battle_result(battle_data)
+	_log_battle_result(battle_data)
 
 
 ## Clear battle-completion tracking so a later battle is reported again.
@@ -809,16 +817,16 @@ func _reset_battle_completion() -> void:
 	_battle_completion_reported = false
 
 
-## Log how the battle ended and return the result label.
-func _log_battle_result(battle_data) -> String:
+## Log how the battle ended.
+func _log_battle_result(battle_data) -> void:
 	if battle_data == null:
 		_log_event("BATTLE COMPLETE | %s" % BATTLE_RESULT_UNKNOWN)
-		return BATTLE_RESULT_UNKNOWN
+		return
 	
 	var player_health = battle_data.get("player_health")
 	if player_health == null or player_health.size() < 2:
 		_log_event("BATTLE COMPLETE | %s | HP unavailable" % BATTLE_RESULT_UNKNOWN)
-		return BATTLE_RESULT_UNKNOWN
+		return
 	
 	var player_hp := int(player_health[0])
 	var enemy_hp := int(player_health[1])
@@ -829,39 +837,23 @@ func _log_battle_result(battle_data) -> String:
 	elif player_hp <= 0 and enemy_hp > 0:
 		result = BATTLE_RESULT_DEFEAT
 	_log_event("BATTLE COMPLETE | %s | HP %d" % [result, player_hp])
-	return result
 
 
-## Capture the trinket inventory (ids + gained counter) as a plain snapshot dict.
+## Capture the trinket inventory (ids, gained counter, consumed one-shots) as a plain snapshot.
 func _capture_trinket_state(run) -> Dictionary:
 	var snapshot := {}
 	var ids = run.get("trinket_ids") if _has_property(run, "trinket_ids") else []
-	# Copy the list so the battle_over snapshot stays frozen if the game mutates the live inventory.
+	# Copy the lists so the battle_over snapshot stays frozen if the game mutates the live data.
 	snapshot["trinket_ids"] = ids.duplicate() if ids != null else []
 	snapshot["trinkets_gained_total"] = int(run.get("trinkets_gained_total")) if _has_property(run, "trinkets_gained_total") else 0
+	var used = run.get("used_trinket_ids") if _has_property(run, "used_trinket_ids") else []
+	snapshot["used_trinket_ids"] = used.duplicate() if used != null else []
 	return snapshot
 
 
-## Diff trinkets gained between two captured states (inventory diff + counter delta).
-## Handles duplicates via count-based matching. Returns {"ids": [], "counter": int}.
+## Diff trinkets gained between two captured states (inventory diff + counter delta + newly used).
 func _diff_trinket_states(before: Dictionary, after: Dictionary) -> Dictionary:
-	var gained_ids: Array = []
-
-	var before_counts := {}
-	for tid in before.get("trinket_ids", []):
-		before_counts[tid] = before_counts.get(tid, 0) + 1
-
-	var after_ids: Array = after.get("trinket_ids", [])
-	for tid in after_ids:
-		var remaining = before_counts.get(tid, 0)
-		if remaining > 0:
-			before_counts[tid] = remaining - 1
-		else:
-			gained_ids.append(tid)
-
-	var counter_delta: int = int(after.get("trinkets_gained_total", 0)) - int(before.get("trinkets_gained_total", 0))
-
-	return {"ids": gained_ids, "counter": counter_delta}
+	return TrinketGains.diff_states(before, after)
 
 
 ## Update the trinket panel from a gains dict, showing only non-junk trinkets.
@@ -917,10 +909,10 @@ func _battle_is_over(state) -> bool:
 
 
 ## Stop battle trinket tracking. Called when leaving the battle state and on trainer/run changes.
-## Gains are always logged once. The panel is shown only for a VICTORY: defeat-triggered gift
-## trinkets (Locked Box, Mysterious Chest) apply their rewards to run.trinket_ids during the
-## battle simulation, so those rewards are already in the battle_over snapshot and would be
-## spoiled if the panel displayed them on a defeat.
+## Gains are always logged once. The panel shows mid-combat gains for any result, but is suppressed
+## when a gift-generating one-shot trinket (Locked Box / Mysterious Chest) was consumed during the
+## battle: the game applies the gift to trinket_ids during the simulation and reveals it later, so
+## showing it would spoil the gift. _update_trinket_panel() filters junk.
 func _finalize_battle_trinket_tracking(show_panel := true) -> void:
 	if not _battle_trinket_tracking and _battle_trinket_start == null:
 		return
@@ -944,11 +936,15 @@ func _finalize_battle_trinket_tracking(show_panel := true) -> void:
 				var post := _diff_trinket_states(_battle_trinket_end, live)
 				if not post["ids"].is_empty():
 					_log_message("BATTLE TRINKET GAINS | excluded post-battle additions: %s" % str(post["ids"]))
-				if show_panel and _battle_result != BATTLE_RESULT_VICTORY:
-					_log_message("BATTLE TRINKET GAINS | panel suppressed (result=%s)" % (_battle_result if not _battle_result.is_empty() else BATTLE_RESULT_UNKNOWN))
-			if show_panel and _battle_result == BATTLE_RESULT_VICTORY:
-				# Shows only non-junk gains; hides itself when nothing eligible remains.
-				panel_updated = _update_trinket_panel(gains)
+			if show_panel:
+				if TrinketGains.has_gift_trinket(gains["newly_used"]):
+					# Gift contents are applied during the simulation but revealed later; do not
+					# spoil them in the panel.
+					if _deep_inspection:
+						_log_message("BATTLE TRINKET GAINS | panel suppressed (gift generated: %s)" % str(gains["newly_used"]))
+				else:
+					# Shows only non-junk gains; hides itself when nothing eligible remains.
+					panel_updated = _update_trinket_panel(gains)
 
 	if not panel_updated:
 		_hide_trinket_panel()
@@ -958,7 +954,6 @@ func _finalize_battle_trinket_tracking(show_panel := true) -> void:
 	_battle_trinket_tracking = false
 	_battle_over_seen = false
 	_battle_gains_logged = false
-	_battle_result = ""
 
 
 func _update_overlay_gate() -> void:
@@ -1327,17 +1322,10 @@ func _get_run_data():
 
 
 func _log_message(message: String) -> void:
-	if _log_path.is_empty():
+	if _log_file == null:
 		return
-	
-	var file := FileAccess.open(_log_path, FileAccess.READ_WRITE)
-	if file == null:
-		push_warning("Creature Comforts: Cannot open log file: " + error_string(FileAccess.get_open_error()))
-		return
-	
-	file.seek_end()
-	file.store_line(message)
-	file.close()
+	_log_file.store_line(message)
+	_log_file.flush()
 
 
 func _is_loaded_by_mod_loader() -> bool:
