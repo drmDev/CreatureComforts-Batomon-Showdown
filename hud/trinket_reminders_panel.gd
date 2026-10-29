@@ -6,6 +6,8 @@ extends "collapsible_panel.gd"
 ## panel; each trinket shows its name + quantity on the first line and its short description
 ## underneath. The expanded/collapsed choice persists across show/hide cycles and only resets
 ## to collapsed on a new run. The whole tab disappears when no relevant trinkets are held.
+## When a new alerting trinket appears (first show, or after the list was cleared), the caller
+## expands the panel via expand() and plays the notification chime.
 ##
 ## Collapsible header mechanics live in collapsible_panel.gd. This subclass supplies the
 ## top-left anchoring, the "Trinkets (N)" title, the two-line rows, and the tab width.
@@ -64,6 +66,11 @@ func show_reminders(entries: Array) -> void:
 	_apply_size()
 	visible = true
 	queue_redraw()
+
+
+## Expand the panel (used when a new alerting trinket appears). Animates like a manual toggle.
+func expand() -> void:
+	set_minimized(false)
 
 
 ## Hide the panel immediately, keeping the collapsed state for the next appearance.

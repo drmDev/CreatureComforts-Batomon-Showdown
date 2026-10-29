@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9039"
+const VERSION := "0.9041"
 const MOD_ID := "creature_comforts"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
@@ -90,6 +90,11 @@ var _deep_inspection := DevConfig.DEEP_INSPECTION
 var _dev_toggle_debug_was_down := false
 var _dev_toggle_inspect_was_down := false
 
+# User-facing setting (declared in mod.json): outline shop cards matching Shop Targets advice.
+const DEFAULT_SHOP_HIGHLIGHTS := false
+var _shop_highlights_enabled := DEFAULT_SHOP_HIGHLIGHTS
+var _settings_load_attempted := false
+
 # Logging
 var _log_path := ""
 var _formatter = null
@@ -109,6 +114,8 @@ var _pika_player: AudioStreamPlayer = null
 
 # Chime queue: rule_ids whose day reminder fired since the last play
 var _pending_chime_rule_ids: Dictionary = {}
+# Trinket-reminder chime queued until the overlay gate opens
+var _pending_trinket_reminder_chime := false
 
 # Trainer display names (built from the trainer catalog)
 var _trainer_display_names: Dictionary = {}
@@ -122,6 +129,7 @@ var _shop_income_panel = null
 # Shop-only trinket reminders panel (top-left; shows unused one-shot trinkets)
 var _trinket_reminders_panel = null
 var _last_trinket_reminder_log_key := ""  # Diagnostic: last logged inventory id set
+var _trinket_reminders_alerted := false  # True while the current non-empty list has been announced
 
 # Daily income schedule (user-verified: Day 1 base income is 35, +5 per day).
 # Trinket/passive gold_gain bonuses are added on top.
@@ -164,10 +172,39 @@ func _exit_tree() -> void:
 		get_tree().node_added.disconnect(_on_node_added_transition)
 
 
+func _load_settings() -> void:
+	"""Read the user-facing shop_highlights setting from ModLoader once at startup."""
+	if not is_inside_tree() or _settings_load_attempted:
+		return
+	_settings_load_attempted = true
+	
+	var mod_loader = get_node_or_null("/root/ModLoader")
+	if mod_loader == null or not mod_loader.has_method("get_config"):
+		return  # Keep the default (disabled) when the config API is unavailable
+	
+	_shop_highlights_enabled = bool(mod_loader.get_config(MOD_ID, "shop_highlights", DEFAULT_SHOP_HIGHLIGHTS))
+	
+	if mod_loader.has_signal("config_changed") and not mod_loader.is_connected("config_changed", _on_config_changed):
+		mod_loader.connect("config_changed", _on_config_changed)
+
+
+func _on_config_changed(mod_id: String, key: String, value) -> void:
+	"""Apply live user-setting changes from ModLoader."""
+	if mod_id != MOD_ID:
+		return
+	if key == "shop_highlights" and value is bool:
+		_shop_highlights_enabled = value
+		if not _shop_highlights_enabled:
+			_clear_shop_highlights()
+
+
 func _initialize_mod() -> void:
 	if _initialization_started:
 		return
 	_initialization_started = true
+	
+	# Load user-facing settings
+	_load_settings()
 	
 	# Create formatter
 	_formatter = LogFormatterScript.new(_has_property)
@@ -496,12 +533,13 @@ func _evaluate_trainer_advice(snapshot) -> void:
 
 
 func _try_play_chime() -> void:
-	"""Play the notification sound once, only when the overlay is on screen and a chime-flagged (day) reminder is queued."""
-	if _pending_chime_rule_ids.is_empty():
+	"""Play the notification sound once, only when the overlay is on screen and a chime is queued."""
+	if _pending_chime_rule_ids.is_empty() and not _pending_trinket_reminder_chime:
 		return
 	if _overlay_gate_reason.is_empty():
 		_play_pika()
 		_pending_chime_rule_ids.clear()
+		_pending_trinket_reminder_chime = false
 
 
 func _handle_shop_phase(state) -> void:
@@ -545,6 +583,8 @@ func _handle_shop_phase(state) -> void:
 		if _trinket_reminders_panel != null:
 			_trinket_reminders_panel.reset_for_run()
 		_last_trinket_reminder_log_key = ""
+		_trinket_reminders_alerted = false
+		_pending_trinket_reminder_chime = false
 	
 	# Evaluate trainer advice (after logging, before updating snapshot)
 	_evaluate_trainer_advice(current_snapshot)
@@ -612,10 +652,18 @@ func _update_trinket_reminders(run) -> void:
 
 	if entries.is_empty():
 		_trinket_reminders_panel.hide_panel()
+		_trinket_reminders_alerted = false  # A later regain re-triggers the alert
+		_pending_trinket_reminder_chime = false  # Nothing left to announce
 		_log_unmatched_trinket_ids(held)
 		return
 
 	_trinket_reminders_panel.show_reminders(entries)
+	# First appearance, or first after the list was cleared: expand and chime once.
+	if not _trinket_reminders_alerted:
+		_trinket_reminders_alerted = true
+		_trinket_reminders_panel.expand()
+		_pending_trinket_reminder_chime = true
+		_try_play_chime()
 	# Take over the reminder label's top-left spot while the panel is visible. This runs after
 	# _evaluate_trainer_advice, so the label cannot re-show underneath this poll.
 	if _reminder_label != null:
@@ -1102,6 +1150,9 @@ func _update_shop_highlights(all_active: Array) -> void:
 	"""Convert active highlight-mode advice into highlight targets (slot index + offer instance id)."""
 	if _shop_highlight == null:
 		return
+	if not _shop_highlights_enabled:
+		_clear_shop_highlights()
+		return
 	
 	var targets: Array = []
 	var seen := {}
@@ -1136,6 +1187,7 @@ func _reset_transient_state(clear_suppression: bool, clear_reminders: bool, clea
 		# reset leaves it alone.
 	if clear_chimes:
 		_pending_chime_rule_ids.clear()
+		_pending_trinket_reminder_chime = false
 	if clear_suppression and _advisor != null:
 		_advisor.reset_suppression()
 
