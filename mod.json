@@ -1,23 +1,7 @@
 {
 	"id": "creature_comforts",
 	"name": "Creature Comforts",
-	"version": "0.9037",
+	"version": "0.9039",
 	"author": "NescapePlan",
-	"description": "QoL and Fun",
-	"settings": [
-		{
-			"key": "debug_logging",
-			"label": "Debug Logging",
-			"type": "bool",
-			"default": true,
-			"description": "Include timestamps, change reasons, and additional context in logs"
-		},
-		{
-			"key": "deep_inspection",
-			"label": "Deep Inspection",
-			"type": "bool",
-			"default": true,
-			"description": "Discover and log additional properties of game objects (types, keywords, abilities)"
-		}
-	]
+	"description": "Quality of Life improvements for the mons"
 }

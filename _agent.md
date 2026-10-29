@@ -61,7 +61,8 @@ requested scope, mention it briefly instead of implementing it.
 ## Files
 | File | Responsibility |
 |---|---|
-| `mod.json` | Mod identity, version, descriptions, and settings declarations. |
+| `mod.json` | Mod identity, version, and description. No user-facing settings. |
+| `dev/dev_config.gd` | Dev-only startup defaults for `debug_logging` / `deep_inspection` and the runtime toggle key constants. `deep_inspection` defaults off (reflection is expensive). Not user-facing; intentionally absent from `mod.json`. |
 | `mod_main.gd` | Loader lifecycle, initialization, polling, phase transitions, catalog-driven rule registration, reminder label/highlight/trinket-panel/trinket-reminders/player-HUD/shop-income management, battle-scoped trinket gain capture (rolling pre-battle baseline → in-battle diff), Junk filtering, and console/file output coordination. |
 | `core/shop_snapshot.gd` | Shared capture of run, shop, team, and bench values, including identity, species, levels, types, and slots. |
 | `core/shop_changes.gd` | Structured snapshot comparison for detecting shop state changes. |

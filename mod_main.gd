@@ -2,9 +2,8 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9037"
+const VERSION := "0.9039"
 const MOD_ID := "creature_comforts"
-const MOD_ID_OLD := "np_brainrot"  # Legacy ID for settings migration (one-time)
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
@@ -24,6 +23,8 @@ const TrainerRules = preload("advice/trainer_rules.gd")
 # Junk trinket id lives in the formatter (single source for the panel filter + log)
 const LogFormatterScript = preload("core/log_formatter.gd")
 const JUNK_TRINKET_ID := LogFormatterScript.JUNK_TRINKET_ID
+# Dev-only toggle defaults (not user-facing settings)
+const DevConfig = preload("dev/dev_config.gd")
 
 # Shop card highlight overlay (outlines shop cards matching active highlight-mode advice)
 var _shop_highlight = null
@@ -81,14 +82,13 @@ var _battle_result := ""           # VICTORY / DEFEAT / DRAW / UNKNOWN for the t
 var _initialization_started := false
 var _initialized := false
 
-# Settings (defaults match mod.json)
-const DEFAULT_DEBUG_LOGGING := true
-const DEFAULT_DEEP_INSPECTION := true
-
-var _debug_logging := DEFAULT_DEBUG_LOGGING
-var _deep_inspection := DEFAULT_DEEP_INSPECTION
-var _settings_load_attempted := false
-var _settings_warning_shown := false
+# Dev-only toggles (not user-facing settings). Startup defaults come from
+# dev/dev_config.gd; flip them live with the key combos in _handle_dev_toggles().
+var _debug_logging := DevConfig.DEBUG_LOGGING
+var _deep_inspection := DevConfig.DEEP_INSPECTION
+# Rising-edge state for the Ctrl+Shift dev toggle keys (Input has no key "just pressed" query).
+var _dev_toggle_debug_was_down := false
+var _dev_toggle_inspect_was_down := false
 
 # Logging
 var _log_path := ""
@@ -164,60 +164,10 @@ func _exit_tree() -> void:
 		get_tree().node_added.disconnect(_on_node_added_transition)
 
 
-func _load_settings() -> void:
-	if not is_inside_tree():
-		return
-	
-	if _settings_load_attempted:
-		return
-	
-	var mod_loader = get_node_or_null("/root/ModLoader")
-	if mod_loader == null:
-		return
-	
-	_settings_load_attempted = true
-	
-	if mod_loader.has_method("get_config"):
-		# Load from the current mod ID.
-		_debug_logging = mod_loader.get_config(MOD_ID, "debug_logging", DEFAULT_DEBUG_LOGGING)
-		_deep_inspection = mod_loader.get_config(MOD_ID, "deep_inspection", DEFAULT_DEEP_INSPECTION)
-		
-		# Legacy migration: adopt a value stored under the old mod ID only when the
-		# current setting is still at its default. get_config() returns the default
-		# when a key is absent, so this is the best available "unset" signal; it
-		# prevents an installed legacy pack from clobbering a user's current choice.
-		var migrated := false
-		if _debug_logging == DEFAULT_DEBUG_LOGGING:
-			var old_debug = mod_loader.get_config(MOD_ID_OLD, "debug_logging", DEFAULT_DEBUG_LOGGING)
-			if old_debug != _debug_logging:
-				_debug_logging = old_debug
-				migrated = true
-		if _deep_inspection == DEFAULT_DEEP_INSPECTION:
-			var old_deep = mod_loader.get_config(MOD_ID_OLD, "deep_inspection", DEFAULT_DEEP_INSPECTION)
-			if old_deep != _deep_inspection:
-				_deep_inspection = old_deep
-				migrated = true
-		if migrated and mod_loader.has_method("set_config"):
-			mod_loader.set_config(MOD_ID, "debug_logging", _debug_logging)
-			mod_loader.set_config(MOD_ID, "deep_inspection", _deep_inspection)
-			print("Creature Comforts: migrated settings from '%s' to '%s'" % [MOD_ID_OLD, MOD_ID])
-		
-		# Connect to config_changed signal for live updates
-		if mod_loader.has_signal("config_changed") and not mod_loader.is_connected("config_changed", _on_config_changed):
-			mod_loader.connect("config_changed", _on_config_changed)
-	elif not _settings_warning_shown:
-		# Fallback if ModLoader doesn't support config API - keep defaults
-		_settings_warning_shown = true
-		push_warning("Creature Comforts: ModLoader.get_config() not available, using defaults")
-
-
 func _initialize_mod() -> void:
 	if _initialization_started:
 		return
 	_initialization_started = true
-	
-	# Load settings if not already loaded
-	_load_settings()
 	
 	# Create formatter
 	_formatter = LogFormatterScript.new(_has_property)
@@ -271,28 +221,11 @@ func _initialize_mod() -> void:
 	_log_message("=".repeat(80))
 	_log_message("Creature Comforts %s - Trainer Advice System" % VERSION)
 	_log_message("Initialized at %s" % _formatter.get_timestamp())
-	_log_message("Settings: Debug Logging: %s | Deep Inspection: %s" % [_debug_logging, _deep_inspection])
+	_log_message("Dev toggles: Debug Logging: %s | Deep Inspection: %s" % [_debug_logging, _deep_inspection])
 	_log_message("Log file: %s" % abs_log_path)
 	_log_message("=".repeat(80))
 	
 	print("Creature Comforts %s loaded - logging to %s" % [VERSION, abs_log_path])
-
-
-func _on_config_changed(mod_id: String, key: String, value) -> void:
-	"""Handle live config changes from ModLoader."""
-	# Accept both old and new mod IDs during the migration window
-	if mod_id != MOD_ID and mod_id != MOD_ID_OLD:
-		return
-	
-	match key:
-		"debug_logging":
-			if value is bool:
-				_debug_logging = value
-				_log_message("Setting changed: Debug Logging = %s" % _debug_logging)
-		"deep_inspection":
-			if value is bool:
-				_deep_inspection = value
-				_log_message("Setting changed: Deep Inspection = %s" % _deep_inspection)
 
 
 func _setup_advisor() -> void:
@@ -402,11 +335,31 @@ func _process(_delta: float) -> void:
 		return
 	_update_overlay_gate()
 	
+	_handle_dev_toggles()
+	
 	var now := Time.get_ticks_msec()
 	if now < _next_poll:
 		return
 	_next_poll = now + POLL_INTERVAL_MS
 	_inspect_current_phase()
+
+
+## Dev-only runtime toggles (not user-facing). Hold Ctrl+Shift and tap the
+## configured key to flip a toggle; the change is written to the log immediately.
+func _handle_dev_toggles() -> void:
+	var modifier_held := Input.is_key_pressed(Key.KEY_CTRL) and Input.is_key_pressed(Key.KEY_SHIFT)
+	var debug_down := modifier_held and Input.is_key_pressed(DevConfig.TOGGLE_DEBUG_KEY)
+	var inspect_down := modifier_held and Input.is_key_pressed(DevConfig.TOGGLE_INSPECT_KEY)
+	
+	if debug_down and not _dev_toggle_debug_was_down:
+		_debug_logging = not _debug_logging
+		_log_message("Dev toggle: Debug Logging = %s" % _debug_logging)
+	if inspect_down and not _dev_toggle_inspect_was_down:
+		_deep_inspection = not _deep_inspection
+		_log_message("Dev toggle: Deep Inspection = %s" % _deep_inspection)
+	
+	_dev_toggle_debug_was_down = debug_down
+	_dev_toggle_inspect_was_down = inspect_down
 
 
 func _inspect_current_phase() -> void:
@@ -705,8 +658,8 @@ func _handle_battle_phase(state) -> void:
 		
 		if _deep_inspection:
 			_log_lines(_formatter.format_deep_inspect_battle(state, player, opponent))
-			# Trinket state at battle entry
-			_log_lines(_formatter.format_battle_trinket_state(_get_run_data()))
+		# Trinket state at battle entry (core log, runs regardless of deep inspection)
+		_log_lines(_formatter.format_battle_trinket_state(_get_run_data()))
 		
 		# Battle-scoped trinket baseline. The fight is simulated before our first poll sees the
 		# battle state, so prefer the last snapshot taken OUTSIDE battle (shop/event); only fall
