@@ -229,25 +229,6 @@ func _draw_title(r: Rect2) -> void:
 	_draw_text_shadow(Vector2(r.position.x, baseline), t, VALUE_COLOR, TITLE_FONT_SIZE)
 
 
-## Trim `text` with an ellipsis so it fits `max_w` at `font_size` (Overrun-style, per character).
-func _fit_text(font: Font, text: String, font_size: int, max_w: float) -> String:
-	if max_w <= 0.0:
-		return ""
-	if font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x <= max_w:
-		return text
-	var dots := "..."
-	var lo := 0
-	var hi := text.length()
-	while lo < hi:
-		var mid := (lo + hi + 1) / 2
-		var s := text.left(mid).strip_edges(false, true) + dots
-		if font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x <= max_w:
-			lo = mid
-		else:
-			hi = mid - 1
-	return text.left(lo).strip_edges(false, true) + dots if lo > 0 else dots
-
-
 func _gui_input(event) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:

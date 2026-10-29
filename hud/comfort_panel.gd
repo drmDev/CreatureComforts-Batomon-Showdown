@@ -52,3 +52,22 @@ func _connect_viewport_resize(handler: Callable) -> void:
 func _draw_text_shadow(pos: Vector2, text: String, color: Color, font_size: int, align := HORIZONTAL_ALIGNMENT_LEFT, width := -1.0) -> void:
 	draw_string(_text_font, pos + Vector2(0.0, 1.0), text, align, width, font_size, SHADOW_COLOR)
 	draw_string(_text_font, pos, text, align, width, font_size, color)
+
+
+## Trim `text` with an ellipsis so it fits `max_w` at `font_size` (per character).
+func _fit_text(font: Font, text: String, font_size: int, max_w: float) -> String:
+	if max_w <= 0.0:
+		return ""
+	if font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x <= max_w:
+		return text
+	var dots := "..."
+	var lo := 0
+	var hi := text.length()
+	while lo < hi:
+		var mid := (lo + hi + 1) / 2
+		var s := text.left(mid).strip_edges(false, true) + dots
+		if font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x <= max_w:
+			lo = mid
+		else:
+			hi = mid - 1
+	return text.left(lo).strip_edges(false, true) + dots if lo > 0 else dots

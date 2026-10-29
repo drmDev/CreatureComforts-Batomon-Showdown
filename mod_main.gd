@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9032"
+const VERSION := "0.9036"
 const MOD_ID := "creature_comforts"
 const MOD_ID_OLD := "np_brainrot"  # Legacy ID for settings migration (one-time)
 const OUTPUT_DIR := "user://creature_comforts"
@@ -119,10 +119,24 @@ var _trinket_panel = null
 # Shop income panel (near bottom-center, shop-only, shows daily income)
 var _shop_income_panel = null
 
+# Shop-only trinket reminders panel (top-left; shows unused one-shot trinkets)
+var _trinket_reminders_panel = null
+var _last_trinket_reminder_log_key := ""  # Diagnostic: last logged inventory id set
+
 # Daily income schedule (user-verified: Day 1 base income is 35, +5 per day).
 # Trinket/passive gold_gain bonuses are added on top.
 const BASE_INCOME := 35
 const INCOME_PER_DAY := 5
+
+# One-shot trinkets worth reminding about while still held (id -> short description).
+# IDs follow the game's snake_case convention (e.g. "treasure_map"). mod_main logs the
+# held ids once per distinct inventory when none match, to confirm the real ids.
+const TRACKED_TRINKET_DESCRIPTIONS := {
+	"mini_duplicator": "Next non-unique trinket gift: +1 copy",
+	"mega_duplicator": "Next non-unique trinket gift: +2 copies",
+	"treasure_map": "Next trinket gift: +1 rarity tier",
+	"upgrade_disc": "Next monster purchase: +1 level",
+}
 
 # Player HUD (battle-only HP / Wins / Day line, ported from NP_QoL)
 var _player_hud = null
@@ -326,6 +340,13 @@ func _setup_reminder_panel() -> void:
 	_shop_income_panel = ShopIncomePanel.new()
 	_shop_income_panel.name = "ShopIncomePanel"
 	_reminder_layer.add_child(_shop_income_panel)
+
+	# Top-left trinket reminders; shares the reminder label's spot and is shop-gated.
+	# Added after the label so it draws on top while visible.
+	var TrinketRemindersPanel = load("res://mods/CreatureComforts/hud/trinket_reminders_panel.gd")
+	_trinket_reminders_panel = TrinketRemindersPanel.new()
+	_trinket_reminders_panel.name = "TrinketRemindersPanel"
+	_reminder_layer.add_child(_trinket_reminders_panel)
 	
 func _setup_player_hud() -> void:
 	"""Initialize the battle-only player HUD (HP / Wins / Day)."""
@@ -399,10 +420,13 @@ func _inspect_current_phase() -> void:
 	
 	var is_battle := _script_is(state, BATTLE_SCRIPT)
 	_update_player_hud(state, is_battle)
-	# Defensive fallback: the income panel is normally hidden by the reminder layer's
-	# shop gate, but hide it directly whenever the shop is not the current phase.
-	if not _script_is(state, SHOP_SCRIPT) and _shop_income_panel != null:
-		_shop_income_panel.hide_panel()
+	# Defensive fallback: the income and trinket-reminder panels are normally hidden by the
+	# reminder layer's shop gate, but hide them directly whenever the shop is not the current phase.
+	if not _script_is(state, SHOP_SCRIPT):
+		if _shop_income_panel != null:
+			_shop_income_panel.hide_panel()
+		if _trinket_reminders_panel != null:
+			_trinket_reminders_panel.hide_panel()
 	if not is_battle:
 		# Reset battle-scoped tracking only when actually leaving the battle phase.
 		if _last_phase == "battle":
@@ -561,14 +585,19 @@ func _handle_shop_phase(state) -> void:
 			_log_lines(_formatter.format_snapshot_changes(comparison, run, manager, _debug_logging))
 	
 	# Reset suppression and battle trinket tracking on trainer identity changes (new run)
-	if trainer_changed and _advisor != null:
-		_advisor.reset_suppression()
+	if trainer_changed:
+		if _advisor != null:
+			_advisor.reset_suppression()
 		_finalize_battle_trinket_tracking(false)  # Prevent false gains/panel from a previous run
+		if _trinket_reminders_panel != null:
+			_trinket_reminders_panel.reset_for_run()
+		_last_trinket_reminder_log_key = ""
 	
 	# Evaluate trainer advice (after logging, before updating snapshot)
 	_evaluate_trainer_advice(current_snapshot)
 	
 	_update_shop_income(run)
+	_update_trinket_reminders(run)
 	
 	# (overlay visibility is handled every frame by _update_overlay_gate)
 	
@@ -596,6 +625,65 @@ func _update_shop_income(run) -> void:
 	if _shop_income_panel == null:
 		return
 	_shop_income_panel.set_income(_compute_daily_income(run))
+
+
+## Refresh the top-left trinket reminders from the player's held one-shot trinkets.
+## Runs every shop poll, so gained/consumed/sold trinkets update immediately. While the
+## panel is visible it takes over the reminder label's spot (the label is hidden).
+func _update_trinket_reminders(run) -> void:
+	if _trinket_reminders_panel == null:
+		return
+
+	# Accept any iterable (Array or PackedStringArray), matching _capture_trinket_state.
+	var held = run.get("trinket_ids") if _has_property(run, "trinket_ids") else []
+	if held == null:
+		held = []
+
+	# Count tracked ids (one-shot trinkets are removed from trinket_ids when consumed).
+	var counts := {}
+	for tid in held:
+		var key := str(tid)
+		if TRACKED_TRINKET_DESCRIPTIONS.has(key):
+			counts[key] = counts.get(key, 0) + 1
+
+	var entries: Array = []
+	for tid in TRACKED_TRINKET_DESCRIPTIONS.keys():
+		var count: int = int(counts.get(tid, 0))
+		if count <= 0:
+			continue
+		entries.append({
+			"name": _formatter.format_trinket_name(tid),
+			"count": count,
+			"desc": TRACKED_TRINKET_DESCRIPTIONS[tid],
+		})
+
+	if entries.is_empty():
+		_trinket_reminders_panel.hide_panel()
+		_log_unmatched_trinket_ids(held)
+		return
+
+	_trinket_reminders_panel.show_reminders(entries)
+	# Take over the reminder label's top-left spot while the panel is visible. This runs after
+	# _evaluate_trainer_advice, so the label cannot re-show underneath this poll.
+	if _reminder_label != null:
+		_reminder_label.visible = false
+
+
+## Diagnostic: the tracked ids follow the game's snake_case convention, but if the real ids
+## differ the panel never populates. When a non-empty inventory matches nothing, log the held
+## ids once per distinct inventory set so the real ids can be confirmed from inspect.log.
+func _log_unmatched_trinket_ids(held) -> void:
+	if held == null or held.is_empty():
+		return
+	var key_parts: Array[String] = []
+	for tid in held:
+		key_parts.append(str(tid))
+	key_parts.sort()
+	var key := "|".join(key_parts)
+	if key == _last_trinket_reminder_log_key:
+		return
+	_last_trinket_reminder_log_key = key
+	_log_message("TRINKET REMINDERS | no tracked trinket matched; held ids: %s" % str(held))
 
 
 func _handle_battle_phase(state) -> void:
