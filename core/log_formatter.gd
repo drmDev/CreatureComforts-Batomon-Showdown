@@ -187,34 +187,32 @@ func _timestamp_prefix(debug_logging: bool) -> String:
 	return "[%s] " % get_time_short() if debug_logging else ""
 
 
-func format_phase_entry(phase: String, run, manager, debug_logging: bool) -> Array[String]:
-	var lines: Array[String] = []
-	var timestamp := _timestamp_prefix(debug_logging)
-	lines.append("\n%s%s PHASE" % [timestamp, phase])
-
-	# Log trainer
+func format_phase_entry(phase: String, run) -> String:
+	"""Concise one-line phase entry: SHOP | trainer | Day | Gold | Lives | Wins, or BATTLE | Day."""
 	var trainer: Variant = run.get("trainer_id") if _has_prop.call(run, "trainer_id") else "?"
-	lines.append("  Trainer: %s" % trainer)
+	var day: Variant = run.get("current_round") if _has_prop.call(run, "current_round") else "?"
+	if phase == "SHOP":
+		var gold: Variant = run.get("gold") if _has_prop.call(run, "gold") else "?"
+		var lives: Variant = run.get("lives") if _has_prop.call(run, "lives") else "?"
+		var wins: Variant = run.get("current_wins") if _has_prop.call(run, "current_wins") else "?"
+		return "SHOP | %s | Day %s | Gold %s | Lives %s | Wins %s" % [trainer, day, gold, lives, wins]
+	return "BATTLE | Day %s" % day
 
-	# Log concise run state
+
+func format_phase_snapshot(phase: String, run, manager) -> Array[String]:
+	"""Full run/shop/team/bench snapshot, used only under Deep Inspection."""
+	var lines: Array[String] = []
 	var day: Variant = run.get("current_round") if _has_prop.call(run, "current_round") else "?"
 	var wins: Variant = run.get("current_wins") if _has_prop.call(run, "current_wins") else "?"
 	var lives: Variant = run.get("lives") if _has_prop.call(run, "lives") else "?"
 	var gold: Variant = run.get("gold") if _has_prop.call(run, "gold") else "?"
 	var rank: Variant = run.get("shop_rank") if _has_prop.call(run, "shop_rank") else "?"
 	var battle_hp: Variant = run.get("player_hp") if _has_prop.call(run, "player_hp") else "?"
-
 	lines.append("  Day %s | Rank %s | Lives %s | Battle HP %s | Wins %s | Gold %s" % [day, rank, lives, battle_hp, wins, gold])
-
-	# Log shop offers if in shop phase
 	if phase == "SHOP" and manager != null:
-		lines.append("")
 		lines.append_array(format_shop_offers(manager, run, false))
-
-	# Log team and bench
 	lines.append_array(format_team_compact(run))
 	lines.append_array(format_bench_compact(run))
-
 	return lines
 
 

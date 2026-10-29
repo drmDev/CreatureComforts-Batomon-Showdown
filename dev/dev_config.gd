@@ -9,7 +9,7 @@
 extends RefCounted
 
 ## Include timestamps, change reasons, and additional context in logs.
-const DEBUG_LOGGING := true
+const DEBUG_LOGGING := false
 
 ## Discover and log additional properties of game objects (types, keywords, abilities).
 ## Off by default: deep inspection uses reflection (get_property_list) and is expensive.
