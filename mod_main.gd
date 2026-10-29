@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9041"
+const VERSION := "0.9044"
 const MOD_ID := "creature_comforts"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
@@ -111,11 +111,12 @@ var _changes_comparer = null
 var _reminder_label = null
 var _reminder_layer: CanvasLayer = null
 var _pika_player: AudioStreamPlayer = null
+var _poke_item_player: AudioStreamPlayer = null
 
 # Chime queue: rule_ids whose day reminder fired since the last play
 var _pending_chime_rule_ids: Dictionary = {}
-# Trinket-reminder chime queued until the overlay gate opens
-var _pending_trinket_reminder_chime := false
+# Trinket-reminder sound queued until the overlay gate opens
+var _pending_trinket_reminder_sound := false
 
 # Trainer display names (built from the trainer catalog)
 var _trainer_display_names: Dictionary = {}
@@ -348,7 +349,7 @@ func _setup_results_panel() -> void:
 
 
 func _setup_pika_sound() -> void:
-	"""Initialize notification sound for new reminders."""
+	"""Initialize notification sounds for day reminders and trinket reminders."""
 	var base_dir := str(get_script().resource_path).get_base_dir()
 	var path := base_dir.path_join("assets/sounds/pika.ogg")
 	
@@ -360,11 +361,25 @@ func _setup_pika_sound() -> void:
 	if _pika_player.stream == null:
 		push_warning("Creature Comforts: Failed to load notification sound: " + path)
 
+	var poke_path := base_dir.path_join("assets/sounds/poke_item_found.ogg")
+	_poke_item_player = AudioStreamPlayer.new()
+	_poke_item_player.stream = AudioStreamOggVorbis.load_from_file(poke_path)
+	_poke_item_player.volume_db = -6.0
+	add_child(_poke_item_player)
+	if _poke_item_player.stream == null:
+		push_warning("Creature Comforts: Failed to load trinket notification sound: " + poke_path)
+
 
 func _play_pika() -> void:
-	"""Play notification sound for new reminders."""
+	"""Play notification sound for new day reminders."""
 	if _pika_player != null and _pika_player.stream != null:
 		_pika_player.play()
+
+
+func _play_poke_item() -> void:
+	"""Play notification sound for new trinket reminders."""
+	if _poke_item_player != null and _poke_item_player.stream != null:
+		_poke_item_player.play()
 
 
 func _process(_delta: float) -> void:
@@ -533,13 +548,16 @@ func _evaluate_trainer_advice(snapshot) -> void:
 
 
 func _try_play_chime() -> void:
-	"""Play the notification sound once, only when the overlay is on screen and a chime is queued."""
-	if _pending_chime_rule_ids.is_empty() and not _pending_trinket_reminder_chime:
+	"""Play queued notification sounds once the overlay is on screen."""
+	if _pending_chime_rule_ids.is_empty() and not _pending_trinket_reminder_sound:
 		return
 	if _overlay_gate_reason.is_empty():
-		_play_pika()
-		_pending_chime_rule_ids.clear()
-		_pending_trinket_reminder_chime = false
+		if not _pending_chime_rule_ids.is_empty():
+			_play_pika()
+			_pending_chime_rule_ids.clear()
+		if _pending_trinket_reminder_sound:
+			_play_poke_item()
+			_pending_trinket_reminder_sound = false
 
 
 func _handle_shop_phase(state) -> void:
@@ -584,7 +602,7 @@ func _handle_shop_phase(state) -> void:
 			_trinket_reminders_panel.reset_for_run()
 		_last_trinket_reminder_log_key = ""
 		_trinket_reminders_alerted = false
-		_pending_trinket_reminder_chime = false
+		_pending_trinket_reminder_sound = false
 	
 	# Evaluate trainer advice (after logging, before updating snapshot)
 	_evaluate_trainer_advice(current_snapshot)
@@ -653,7 +671,7 @@ func _update_trinket_reminders(run) -> void:
 	if entries.is_empty():
 		_trinket_reminders_panel.hide_panel()
 		_trinket_reminders_alerted = false  # A later regain re-triggers the alert
-		_pending_trinket_reminder_chime = false  # Nothing left to announce
+		_pending_trinket_reminder_sound = false  # Nothing left to announce
 		_log_unmatched_trinket_ids(held)
 		return
 
@@ -662,7 +680,7 @@ func _update_trinket_reminders(run) -> void:
 	if not _trinket_reminders_alerted:
 		_trinket_reminders_alerted = true
 		_trinket_reminders_panel.expand()
-		_pending_trinket_reminder_chime = true
+		_pending_trinket_reminder_sound = true
 		_try_play_chime()
 	# Take over the reminder label's top-left spot while the panel is visible. This runs after
 	# _evaluate_trainer_advice, so the label cannot re-show underneath this poll.
@@ -1187,7 +1205,7 @@ func _reset_transient_state(clear_suppression: bool, clear_reminders: bool, clea
 		# reset leaves it alone.
 	if clear_chimes:
 		_pending_chime_rule_ids.clear()
-		_pending_trinket_reminder_chime = false
+		_pending_trinket_reminder_sound = false
 	if clear_suppression and _advisor != null:
 		_advisor.reset_suppression()
 

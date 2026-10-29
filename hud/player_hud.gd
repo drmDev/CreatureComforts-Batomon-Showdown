@@ -3,9 +3,12 @@ extends "comfort_panel.gd"
 ##
 ## Ported from NP_QoL's player_hud.gd, but restyled to match Creature Comforts'
 ## other panels (dark navy background, gold border, Consolas font, light shadow).
-## This version is text-only: no heart / badge / sun icons, just labels and values.
 ##
-## Displays as a single line: "HP 3 | Wins 2 | Day 4"
+## Icons: the game's own heart and trophy textures are loaded from the packed UI
+## textures; the calendar icon is loaded from the mod's assets. A missing icon falls
+## back to its text label.
+##
+## Displays as a single line: "[heart] 3  [trophy] 2  [calendar] 4"
 ## Shown only while a battle is active (mod_main controls visibility).
 
 const CONTENT_PADDING := 4.0
@@ -16,10 +19,14 @@ const TOP_OFFSET := 244.0   # Fixed distance from the top of the battle screen
 
 const LABEL_GAP := 3.0
 const GROUP_GAP := 8.0
-const SEPARATOR := " | "
+const ICON_SIZE := 10.0
+const ICON_GAP := 2.0
 
 var _player_stats: Dictionary = {}
 var _panel_style: StyleBoxFlat
+var _heart_texture: Texture2D = null
+var _trophy_texture: Texture2D = null
+var _calendar_texture: Texture2D = null
 
 
 func _init() -> void:
@@ -27,6 +34,10 @@ func _init() -> void:
 	visible = false
 	_setup_styles()
 	_text_font = _build_panel_font()
+	# Verified game asset paths (packed in batomon_showdown.pck).
+	_heart_texture = load("res://assets/ui/textures/shop/lives_icon.png")
+	_trophy_texture = load("res://assets/ui/textures/shop/wins_icon.png")
+	_calendar_texture = _load_texture("../assets/icons/calendar.png")
 	# Width is fitted to the measured label/value text; start with the placeholder widths.
 	size = Vector2(_measure_content_width({}), CONTENT_PADDING + ROW_HEIGHT + CONTENT_PADDING)
 
@@ -43,6 +54,16 @@ func _setup_styles() -> void:
 	_panel_style.set_border_width_all(1)
 	_panel_style.set_corner_radius_all(3)
 	_panel_style.set_content_margin_all(CONTENT_PADDING)
+
+
+## Load a mod-local PNG at runtime (loose mod assets are not imported by the game).
+func _load_texture(relative_path: String) -> Texture2D:
+	var base_dir := str(get_script().resource_path).get_base_dir()
+	var path := base_dir.path_join(relative_path)
+	var image := Image.load_from_file(path)
+	if image == null:
+		return null
+	return ImageTexture.create_from_image(image)
 
 
 ## Update the displayed stats. Expected keys: hp, wins, day (values are pre-formatted strings).
@@ -62,17 +83,16 @@ func _measure_content_width(stats: Dictionary) -> float:
 	var day := str(stats.get("day", "?"))
 
 	var content_width := 0.0
-	content_width += _stat_group_width("HP", hp) + GROUP_GAP
-	content_width += _text_width(SEPARATOR)
-	content_width += _stat_group_width("Wins", wins) + GROUP_GAP
-	content_width += _text_width(SEPARATOR)
-	content_width += _stat_group_width("Day", day)
+	content_width += _stat_group_width("HP", hp, _heart_texture) + GROUP_GAP
+	content_width += _stat_group_width("Wins", wins, _trophy_texture) + GROUP_GAP
+	content_width += _stat_group_width("Day", day, _calendar_texture)
 
 	return ceilf(CONTENT_PADDING + CONTENT_INSET + content_width + CONTENT_INSET + CONTENT_PADDING)
 
 
-func _stat_group_width(label: String, value: String) -> float:
-	return _text_width(label) + LABEL_GAP + _text_width(value)
+func _stat_group_width(label: String, value: String, icon: Texture2D) -> float:
+	var lead := ICON_SIZE + ICON_GAP if icon != null else _text_width(label) + LABEL_GAP
+	return lead + _text_width(value)
 
 
 func _text_width(text: String) -> float:
@@ -113,19 +133,22 @@ func _draw_stats_row() -> void:
 	var wins := str(_player_stats.get("wins", "?"))
 	var day := str(_player_stats.get("day", "?"))
 
-	cursor_x = _draw_stat(cursor_x, baseline, "HP", hp)
-	cursor_x = _draw_separator(cursor_x, baseline)
-	cursor_x = _draw_stat(cursor_x, baseline, "Wins", wins)
-	cursor_x = _draw_separator(cursor_x, baseline)
-	_draw_stat(cursor_x, baseline, "Day", day)
+	cursor_x = _draw_stat(cursor_x, row_top, baseline, "HP", hp, _heart_texture)
+	cursor_x = _draw_stat(cursor_x, row_top, baseline, "Wins", wins, _trophy_texture)
+	_draw_stat(cursor_x, row_top, baseline, "Day", day, _calendar_texture)
 
 
-## Draw "Label Value" and return the x cursor after the group.
-func _draw_stat(start_x: float, baseline: float, label: String, value: String) -> float:
+## Draw "[icon] Value" (or "Label Value" when the icon is unavailable) and return the x cursor.
+func _draw_stat(start_x: float, row_top: float, baseline: float, label: String, value: String, icon: Texture2D) -> float:
 	var cursor_x := start_x
 
-	_draw_text_shadow(Vector2(cursor_x, baseline), label, LABEL_COLOR, FONT_SIZE)
-	cursor_x += _text_width(label) + LABEL_GAP
+	if icon != null:
+		var icon_y := row_top + (ROW_HEIGHT - ICON_SIZE) * 0.5
+		draw_texture_rect(icon, Rect2(Vector2(cursor_x, icon_y), Vector2(ICON_SIZE, ICON_SIZE)), false)
+		cursor_x += ICON_SIZE + ICON_GAP
+	else:
+		_draw_text_shadow(Vector2(cursor_x, baseline), label, LABEL_COLOR, FONT_SIZE)
+		cursor_x += _text_width(label) + LABEL_GAP
 
 	_draw_text_shadow(Vector2(cursor_x, baseline), value, VALUE_COLOR, FONT_SIZE)
 	cursor_x += _text_width(value) + GROUP_GAP
@@ -133,6 +156,3 @@ func _draw_stat(start_x: float, baseline: float, label: String, value: String) -
 	return cursor_x
 
 
-func _draw_separator(start_x: float, baseline: float) -> float:
-	_draw_text_shadow(Vector2(start_x, baseline), SEPARATOR, LABEL_COLOR, FONT_SIZE)
-	return start_x + _text_width(SEPARATOR)
