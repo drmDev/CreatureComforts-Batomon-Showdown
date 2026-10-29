@@ -20,6 +20,7 @@ const TOP_OFFSET := 244.0   # Fixed distance from the top of the battle screen
 const LABEL_GAP := 3.0
 const GROUP_GAP := 8.0
 const ICON_SIZE := 10.0
+const CALENDAR_ICON_SIZE := 13  # Calendar art has ~20% transparent padding; draw it larger to match
 const ICON_GAP := 2.0
 
 var _player_stats: Dictionary = {}
@@ -91,8 +92,13 @@ func _measure_content_width(stats: Dictionary) -> float:
 
 
 func _stat_group_width(label: String, value: String, icon: Texture2D) -> float:
-	var lead := ICON_SIZE + ICON_GAP if icon != null else _text_width(label) + LABEL_GAP
+	var lead := _icon_size(icon) + ICON_GAP if icon != null else _text_width(label) + LABEL_GAP
 	return lead + _text_width(value)
+
+
+## Display size for an icon; the calendar art has more transparent padding than the game icons.
+func _icon_size(icon: Texture2D) -> float:
+	return CALENDAR_ICON_SIZE if icon == _calendar_texture else ICON_SIZE
 
 
 func _text_width(text: String) -> float:
@@ -143,9 +149,10 @@ func _draw_stat(start_x: float, row_top: float, baseline: float, label: String, 
 	var cursor_x := start_x
 
 	if icon != null:
-		var icon_y := row_top + (ROW_HEIGHT - ICON_SIZE) * 0.5
-		draw_texture_rect(icon, Rect2(Vector2(cursor_x, icon_y), Vector2(ICON_SIZE, ICON_SIZE)), false)
-		cursor_x += ICON_SIZE + ICON_GAP
+		var icon_size := _icon_size(icon)
+		var icon_y := row_top + (ROW_HEIGHT - icon_size) * 0.5
+		draw_texture_rect(icon, Rect2(Vector2(cursor_x, icon_y), Vector2(icon_size, icon_size)), false)
+		cursor_x += icon_size + ICON_GAP
 	else:
 		_draw_text_shadow(Vector2(cursor_x, baseline), label, LABEL_COLOR, FONT_SIZE)
 		cursor_x += _text_width(label) + LABEL_GAP
