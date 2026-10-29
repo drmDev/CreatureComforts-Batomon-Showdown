@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9048"
+const VERSION := "0.9049"
 const MOD_ID := "creature_comforts"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
@@ -235,8 +235,8 @@ func _initialize_mod() -> void:
 	# Create the results layer for the trinket-gain panel
 	_setup_results_panel()
 	
-	# Setup notification sound
-	_setup_pika_sound()
+	# Setup notification sounds
+	_setup_notification_sounds()
 	
 	# Create output directory
 	var dir_path := ProjectSettings.globalize_path(OUTPUT_DIR)
@@ -320,7 +320,8 @@ func _setup_reminder_panel() -> void:
 	_trinket_reminders_panel = TrinketRemindersPanel.new()
 	_trinket_reminders_panel.name = "TrinketRemindersPanel"
 	_reminder_layer.add_child(_trinket_reminders_panel)
-	
+
+
 func _setup_player_hud() -> void:
 	"""Initialize the battle-only player HUD (HP / Wins / Day)."""
 	var PlayerHud = load("res://mods/CreatureComforts/hud/player_hud.gd")
@@ -350,7 +351,7 @@ func _setup_results_panel() -> void:
 	_results_layer.add_child(_trinket_panel)
 
 
-func _setup_pika_sound() -> void:
+func _setup_notification_sounds() -> void:
 	"""Initialize notification sounds for day reminders and trinket reminders."""
 	var base_dir := str(get_script().resource_path).get_base_dir()
 	var path := base_dir.path_join("assets/sounds/pika.ogg")
@@ -834,7 +835,9 @@ func _log_battle_result(battle_data) -> String:
 ## Capture the trinket inventory (ids + gained counter) as a plain snapshot dict.
 func _capture_trinket_state(run) -> Dictionary:
 	var snapshot := {}
-	snapshot["trinket_ids"] = run.get("trinket_ids") if _has_property(run, "trinket_ids") else []
+	var ids = run.get("trinket_ids") if _has_property(run, "trinket_ids") else []
+	# Copy the list so the battle_over snapshot stays frozen if the game mutates the live inventory.
+	snapshot["trinket_ids"] = ids.duplicate() if ids != null else []
 	snapshot["trinkets_gained_total"] = int(run.get("trinkets_gained_total")) if _has_property(run, "trinkets_gained_total") else 0
 	return snapshot
 
@@ -1214,6 +1217,7 @@ func _reset_transient_state(clear_suppression: bool, clear_reminders: bool, clea
 	if clear_reminders:
 		if _reminder_label != null:
 			_reminder_label.hide_all_reminders()
+		_last_reminder_rule_ids.clear()
 		# Trinket panel lives on the results layer and is shown when leaving the battle
 		# state by _finalize_battle_trinket_tracking (not on the results screen), so this
 		# reset leaves it alone.

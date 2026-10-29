@@ -39,16 +39,6 @@ func _ready() -> void:
 	_gem_texture = _load_texture("../assets/icons/gem.png")
 
 
-## Load a mod-local PNG at runtime (loose mod assets are not imported by the game).
-func _load_texture(relative_path: String) -> Texture2D:
-	var base_dir := str(get_script().resource_path).get_base_dir()
-	var path := base_dir.path_join(relative_path)
-	var image := Image.load_from_file(path)
-	if image == null:
-		return null
-	return ImageTexture.create_from_image(image)
-
-
 ## Height of the panel when fully expanded (two lines per entry).
 func full_height() -> float:
 	var rows := float(_entries.size())

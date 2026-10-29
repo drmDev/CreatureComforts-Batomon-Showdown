@@ -8,7 +8,7 @@
 
 extends RefCounted
 
-## Include timestamps, change reasons, and additional context in logs.
+## Add timestamps to Deep Inspection snapshot-change output.
 const DEBUG_LOGGING := false
 
 ## Discover and log additional properties of game objects (types, keywords, abilities).

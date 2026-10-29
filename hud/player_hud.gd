@@ -57,18 +57,10 @@ func _setup_styles() -> void:
 	_panel_style.set_content_margin_all(CONTENT_PADDING)
 
 
-## Load a mod-local PNG at runtime (loose mod assets are not imported by the game).
-func _load_texture(relative_path: String) -> Texture2D:
-	var base_dir := str(get_script().resource_path).get_base_dir()
-	var path := base_dir.path_join(relative_path)
-	var image := Image.load_from_file(path)
-	if image == null:
-		return null
-	return ImageTexture.create_from_image(image)
-
-
 ## Update the displayed stats. Expected keys: hp, wins, day (values are pre-formatted strings).
 func update_stats(new_stats: Dictionary) -> void:
+	if new_stats == _player_stats:
+		return
 	_player_stats = new_stats
 	var fitted_width := _measure_content_width(new_stats)
 	if not is_equal_approx(size.x, fitted_width):

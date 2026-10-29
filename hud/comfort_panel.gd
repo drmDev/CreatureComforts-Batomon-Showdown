@@ -41,6 +41,17 @@ func _build_panel_font() -> Font:
 	return font
 
 
+## Load a mod-local PNG at runtime (loose mod assets are not imported by the game).
+## The path is relative to the calling subclass script's directory.
+func _load_texture(relative_path: String) -> Texture2D:
+	var base_dir := str(get_script().resource_path).get_base_dir()
+	var path := base_dir.path_join(relative_path)
+	var image := Image.load_from_file(path)
+	if image == null:
+		return null
+	return ImageTexture.create_from_image(image)
+
+
 ## Connect the viewport resize signal once (safe to call from _ready).
 func _connect_viewport_resize(handler: Callable) -> void:
 	var viewport := get_viewport()
