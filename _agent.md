@@ -84,6 +84,8 @@ requested scope, mention it briefly instead of implementing it.
 | `achievements/achievement_store.gd` | Simple JSON persistence for achievement completion at the mod root (`achievements.json`). Tracks completed/not-completed per achievement id with a completion timestamp; tolerates missing or corrupt files. |
 | `achievements/achievement_panel.gd` | Bottom-right achievement toast; auto-hides after ~4 seconds. Uses the NP_QoL / Trinket Panel drawing pattern. Displays only when the Achievement Notifications setting is enabled. |
 | `gd_checks.ps1` | Runs Godot checks across mod scripts; excludes example directories. |
+| `run_tests.ps1` | Runs the headless unit-test suite (`tests/run_tests.gd`) with the same Godot binary as `gd_checks.ps1`; propagates the exit code. |
+| `tests/` | Zero-dependency unit tests for pure logic (`achievement_evaluator.gd`, `trainer_rules.gd`): `test_runner.gd` (assertions + `test_*` discovery), `test_helpers.gd` (Object fakes/builders), `run_tests.gd` (SceneTree entry point), and per-target test suites. |
 | `examples/` | Sample/test material, separate from production script checks. |
 
 ## Working conventions
@@ -96,6 +98,7 @@ requested scope, mention it briefly instead of implementing it.
 - Suppress unchanged notices; reset on new shop visits and actual trainer/run changes.
 - Keep crash tracing temporary and disabled during normal use.
 - Run GDScript checks on every changed helper as well as the main script. Parse success does not establish runtime correctness.
+- Run `run_tests.ps1` after changing the achievement evaluator or trainer rules; it runs headless and exits non-zero on failure.
 - The user performs gameplay tests; report actual checks separately from pending runtime validation.
 - Make one focused change at a time and keep related explanations together.
 ```

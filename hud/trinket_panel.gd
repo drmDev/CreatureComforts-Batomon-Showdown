@@ -54,9 +54,6 @@ var _dragged := false
 var _press_pos := Vector2.ZERO
 var _tween: Tween
 
-# Optional logger (a Callable that writes to the mod log file); console print always happens.
-var _log: Callable
-
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -87,18 +84,6 @@ func _setup_styles() -> void:
 	_button_style.set_content_margin_all(2)
 
 
-## Optional file logger hook (mod_main passes its _log_message Callable).
-func set_logger(fn: Callable) -> void:
-	_log = fn
-
-
-func _debug(msg: String) -> void:
-	var line := "TrinketPanel: " + msg
-	print("Creature Comforts " + line)
-	if _log.is_valid():
-		_log.call(line)
-
-
 ## Height of the panel when fully expanded (depends on the number of entries).
 func full_height() -> float:
 	return HEAD_H + CONTENT_PADDING + ROW_HEIGHT * float(_entries.size()) \
@@ -126,11 +111,9 @@ func show_gains(entries: Array) -> void:
 		_content_key = key
 		_apply_size()
 		_anchor_bottom_right()
-		_debug("show first pos=%s size=%s viewport=%s entries=%d" % [position, size, get_viewport().get_visible_rect().size, entries.size()])
 	elif key != _content_key:
 		_content_key = key
 		_apply_size()
-		_debug("show update pos=%s size=%s entries=%d" % [position, size, entries.size()])
 	_hide_at_ms = Time.get_ticks_msec() + DISPLAY_DURATION_MS
 	visible = true
 	queue_redraw()
@@ -192,7 +175,6 @@ func set_minimized(on: bool, animate := true) -> void:
 			reveal = v
 			_apply_size()
 			queue_redraw(), reveal, target, ANIM_SEC).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	_debug("toggle minimized=%s reveal=%.2f pos=%s size=%s" % [minimized, reveal, position, size])
 
 
 func toggle() -> void:
@@ -276,15 +258,12 @@ func _gui_input(event) -> void:
 			_press_pos = event.position
 		elif _pressing:
 			_pressing = false
-			if _dragged:
-				_debug("drag end pos=%s" % position)
-			else:
+			if not _dragged:
 				toggle()
 		accept_event()
 	elif event is InputEventMouseMotion and _pressing:
 		if not _dragged and event.position.distance_to(_press_pos) >= DRAG_THRESHOLD:
 			_dragged = true
-			_debug("drag start pos=%s press_pos=%s" % [position, _press_pos])
 		if _dragged:
 			# event.relative is the mouse delta in screen space; using it (instead of comparing
 			# local event.position against a fixed press point) avoids the feedback loop that made

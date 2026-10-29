@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9026"
+const VERSION := "0.9031"
 const MOD_ID := "creature_comforts"
 const MOD_ID_OLD := "np_brainrot"  # Legacy ID for settings migration (one-time)
 const OUTPUT_DIR := "user://creature_comforts"
@@ -33,10 +33,26 @@ const GATE_NOT_SHOP := "not in shop"
 const GATE_SETTLING := "shop settling after transition"
 const GATE_SEARCH := "opponent search (CancelButton visible)"
 const GATE_BATTLE_STARTING := "battle starting (BattleButton hidden)"
+const GATE_OVERLAY := "ui overlay open"
+const GATE_PAUSED := "game paused"
+const GATE_VIEW_NOT_READY := "shop view not ready"
+const GATE_VIEW_HIDDEN := "shop view hidden"
+const GATE_TRANSITION := "transition hold"
 const SHOP_SETTLE_MS := 1200  # Overlay stays hidden this long after the shop state appears (transition fade-in)
+
+# Candidate overlay node names checked as direct children of the shop view and the
+# main scene. Missing names are harmless. The UI diagnostics log which candidates
+# exist (and their paths) so the real Settings/Batopedia node names can be confirmed.
+# Confirmed modal overlay nodes (the interaction-lock check is the primary gate;
+# this list is a fallback for overlays that do not set the lock).
+const OVERLAY_NODE_NAMES := ["DexUI", "SettingsMenu"]
 
 var _overlay_gate_reason := ""
 var _shop_since_ms := 0  # When the current shop state first appeared (0 = not in shop)
+var _gate_hold_until_ms := 0  # Transition signal hold: keep the overlay hidden until this tick
+var _search_end_hold_until_ms := 0  # Brief hold after search ends, before the battle transition fires
+var _view_member_cache: Dictionary = {}  # "view_id:name" -> resolved node (or null)
+var _transition_nodes: Dictionary = {}  # instance ids of nodes already connected to transition_requested
 
 var _next_poll := 0
 var _last_phase := ""
@@ -131,6 +147,11 @@ func _ready() -> void:
 		_initialize_mod()
 
 
+func _exit_tree() -> void:
+	if get_tree() != null and get_tree().node_added.is_connected(_on_node_added_transition):
+		get_tree().node_added.disconnect(_on_node_added_transition)
+
+
 func _load_settings() -> void:
 	if not is_inside_tree():
 		return
@@ -210,6 +231,9 @@ func _initialize_mod() -> void:
 	
 	# Create reminder label system
 	_setup_reminder_panel()
+	
+	# Listen for the game's transition signal so battle start hides the overlay immediately
+	_setup_transition_listener()
 	
 	# Create battle player HUD
 	_setup_player_hud()
@@ -363,8 +387,6 @@ func _setup_achievement_panel() -> void:
 	var TrinketPanel = load("res://mods/CreatureComforts/hud/trinket_panel.gd")
 	_trinket_panel = TrinketPanel.new()
 	_trinket_panel.name = "TrinketPanel"
-	# Route panel position/drag/toggle diagnostics into the mod log as well as the console.
-	_trinket_panel.set_logger(Callable(self, "_log_message"))
 	_achievement_layer.add_child(_trinket_panel)
 
 
@@ -404,8 +426,17 @@ func _inspect_current_phase() -> void:
 	var main = get_tree().current_scene
 	var state = main.get("current_state") if _has_property(main, "current_state") else null
 	
+	# The transition hold only needs to survive the shop→battle fade. Once the
+	# phase actually leaves the shop, clear it so a later shop visit is unaffected.
+	if not _script_is(state, SHOP_SCRIPT):
+		_gate_hold_until_ms = 0
+	
 	var is_battle := _script_is(state, BATTLE_SCRIPT)
 	_update_player_hud(state, is_battle)
+	# Defensive fallback: the income panel is normally hidden by the reminder layer's
+	# shop gate, but hide it directly whenever the shop is not the current phase.
+	if not _script_is(state, SHOP_SCRIPT) and _shop_income_panel != null:
+		_shop_income_panel.hide_panel()
 	_poll_achievements()
 	if not is_battle:
 		# Reset battle-scoped tracking only when actually leaving the battle phase.
@@ -554,6 +585,7 @@ func _handle_shop_phase(state) -> void:
 	
 	if phase_changed:
 		_battle_logged = false
+		_view_member_cache.clear()
 		_log_phase_entry("SHOP", run, manager)
 		if _deep_inspection:
 			_log_lines(_formatter.format_deep_inspect_shop(manager, run))
@@ -873,9 +905,17 @@ func _update_overlay_gate() -> void:
 		return
 	
 	var reason := _compute_overlay_gate_reason()
+	# Opponent found: the search gate just closed and the battle transition is about
+	# to fire. Keep the overlay closed briefly so the panel cannot flash in the gap.
+	if reason.is_empty() and _overlay_gate_reason == GATE_SEARCH:
+		_search_end_hold_until_ms = Time.get_ticks_msec() + 2000
+	if reason.is_empty() and Time.get_ticks_msec() < _search_end_hold_until_ms:
+		reason = GATE_TRANSITION
 	if reason == _overlay_gate_reason:
 		return
 	
+	if _debug_logging:
+		_log_message("OVERLAY GATE | '%s' -> '%s'" % [_overlay_gate_reason, reason])
 	_overlay_gate_reason = reason
 	_reminder_layer.visible = reason.is_empty()
 	if reason.is_empty():
@@ -884,6 +924,12 @@ func _update_overlay_gate() -> void:
 
 func _compute_overlay_gate_reason() -> String:
 	"""Empty string = overlay allowed. Cheap checks only (runs every frame)."""
+	# A transition signal fired recently: keep the overlay closed until the state changes.
+	if Time.get_ticks_msec() < _gate_hold_until_ms:
+		return GATE_TRANSITION
+	if get_tree().paused:
+		return GATE_PAUSED
+	
 	var main = get_tree().current_scene
 	if main == null:
 		_shop_since_ms = 0
@@ -900,17 +946,184 @@ func _compute_overlay_gate_reason() -> String:
 	if now - _shop_since_ms < SHOP_SETTLE_MS:
 		return GATE_SETTLING
 	
-	# While searching for an opponent the shop's Cancel button replaces the Battle button
-	var view = state.get("view")
-	if view is Node and is_instance_valid(view):
-		var cancel = view.get_node_or_null("CancelButton")
-		if cancel is CanvasItem and cancel.is_visible_in_tree():
-			return GATE_SEARCH
-		# After the search succeeds the shop stays up while the game transitions to battle
-		var battle_button = view.get_node_or_null("BattleButton")
-		if battle_button is CanvasItem and not battle_button.is_visible_in_tree():
-			return GATE_BATTLE_STARTING
+	var view = state.get("view") if _has_property(state, "view") else null
+	if view == null or not is_instance_valid(view) or not view is Node:
+		return GATE_VIEW_NOT_READY
+	if not view.is_node_ready():
+		return GATE_VIEW_NOT_READY
+	if view is CanvasItem and not view.is_visible_in_tree():
+		return GATE_VIEW_HIDDEN
+	
+	# The shop's own transition animation (fade to black) is the authoritative
+	# "shop is leaving" signal. It can outlast the signal-based hold.
+	if _is_shop_transition_active(view):
+		return GATE_TRANSITION
+	
+	# The shop's own interaction lock covers search, opponent-found, level-up
+	# choices, Dex/Settings, and other modal states.
+	if _has_property(view, "_is_interaction_locked") and bool(view.get("_is_interaction_locked")):
+		return GATE_OVERLAY + " (interaction locked)"
+	
+	# Modal overlays (Batopedia/Dex, Settings, pause) do not change current_state.
+	var overlay := _find_visible_overlay(view, main)
+	if not overlay.is_empty():
+		return "%s (%s)" % [GATE_OVERLAY, overlay]
+	
+	# While searching for an opponent the shop's Cancel button replaces the Battle button.
+	# Resolve via the view's properties first, then direct child, then a recursive search.
+	var cancel = _get_view_member(view, ["cancel_button", "CancelButton"], "CancelButton")
+	if cancel is CanvasItem and cancel.is_visible_in_tree():
+		return GATE_SEARCH
+	# After the search succeeds the shop stays up while the game transitions to battle
+	var battle_button = _get_view_member(view, ["battle_button", "BattleButton"], "BattleButton")
+	if battle_button is CanvasItem and not battle_button.is_visible_in_tree():
+		return GATE_BATTLE_STARTING
 	return ""
+
+
+## Is the shop's own fade/transition animation currently active?
+## `transition_anim` is the view's AnimationPlayer; the `Transition` node is the
+## visual overlay fallback.
+func _is_shop_transition_active(view) -> bool:
+	if view == null or not is_instance_valid(view) or not view is Node:
+		return false
+	var anim = view.get("transition_anim") if _has_property(view, "transition_anim") else null
+	if anim is AnimationPlayer:
+		return anim.is_playing()
+	var trans = view.get_node_or_null("Transition")
+	if trans is CanvasItem and trans.is_visible_in_tree() and trans.modulate.a > 0.01:
+		return true
+	return false
+
+
+## Direct-child overlay probe. Cheap enough to run every frame.
+func _find_visible_overlay(view, main) -> String:
+	for name in OVERLAY_NODE_NAMES:
+		var node = _get_direct_child(view, name)
+		if node == null:
+			node = _get_direct_child(main, name)
+		if _node_is_visible(node):
+			return name
+	# Fallback for unknown overlay names: only consider CanvasLayer/Window roots,
+	# so ordinary Controls (e.g. a "SettingsButton") cannot false-positive.
+	for root in [view, main]:
+		if root == null or not is_instance_valid(root) or not root is Node:
+			continue
+		for child in root.get_children():
+			if not (child is CanvasLayer or child is Window):
+				continue
+			if not _node_is_visible(child):
+				continue
+			# Ignore empty persistent layers; only a layer with visible content counts.
+			if child is CanvasLayer:
+				var has_visible_child := false
+				for grandchild in child.get_children():
+					if grandchild is CanvasItem and grandchild.is_visible_in_tree():
+						has_visible_child = true
+						break
+				if not has_visible_child:
+					continue
+			var lower := str(child.name).to_lower()
+			if lower.begins_with("dex") or lower.contains("batopedia") or lower.contains("settings") or lower.contains("pause"):
+				return str(child.name)
+	return ""
+
+
+func _get_direct_child(root, name: String):
+	if root == null or not is_instance_valid(root) or not root is Node:
+		return null
+	return root.get_node_or_null(name)
+
+
+func _node_is_visible(node) -> bool:
+	if node == null or not is_instance_valid(node):
+		return false
+	if node is CanvasLayer:
+		return node.visible
+	if node is Window:
+		return node.visible
+	if node is CanvasItem:
+		return node.is_visible_in_tree()
+	return false
+
+
+## Resolve a shop-view member by property name, then direct child, then recursive search.
+## Results (including misses) are cached per view instance and cleared on shop entry.
+func _get_view_member(view, property_names: Array, node_name: String):
+	if view == null or not is_instance_valid(view) or not view is Node:
+		return null
+	var cache_key := "%d:%s" % [view.get_instance_id(), node_name]
+	if _view_member_cache.has(cache_key):
+		var cached = _view_member_cache[cache_key]
+		if cached != null and is_instance_valid(cached):
+			return cached
+		if cached == null and not view.is_node_ready():
+			return null
+		_view_member_cache.erase(cache_key)
+	
+	for prop in property_names:
+		if _has_property(view, prop):
+			var value = view.get(prop)
+			if value != null and is_instance_valid(value):
+				_view_member_cache[cache_key] = value
+				return value
+	
+	var direct = view.get_node_or_null(node_name)
+	if direct != null:
+		_view_member_cache[cache_key] = direct
+		return direct
+	
+	var found = view.find_child(node_name, true, false)
+	if found != null or view.is_node_ready():
+		_view_member_cache[cache_key] = found
+	return found
+
+
+## Connect to the game's transition signal (verified in examples/MyBattleStats) so
+## battle start hides the overlay immediately, independent of button visibility.
+func _setup_transition_listener() -> void:
+	if get_tree() == null:
+		return
+	if not get_tree().node_added.is_connected(_on_node_added_transition):
+		get_tree().node_added.connect(_on_node_added_transition)
+	_scan_transition_nodes(get_tree().root)
+
+
+func _scan_transition_nodes(node: Node) -> void:
+	if node == null or not is_instance_valid(node):
+		return
+	_on_node_added_transition(node)
+	for child in node.get_children():
+		_scan_transition_nodes(child)
+
+
+func _on_node_added_transition(node: Node) -> void:
+	if node == null or not is_instance_valid(node):
+		return
+	if not node.has_signal("transition_requested"):
+		return
+	if not node.has_method("request_transition"):
+		return
+	var id := node.get_instance_id()
+	if _transition_nodes.has(id):
+		return
+	_transition_nodes[id] = true
+	node.transition_requested.connect(_on_transition_requested)
+
+
+func _on_transition_requested(target: String, data) -> void:
+	var keys := ""
+	if data is Dictionary:
+		keys = str(data.keys())
+	if _debug_logging:
+		_log_message("TRANSITION | target=%s data_keys=%s" % [target, keys])
+	if target == "battle":
+		# The shop state can remain current for the whole fade-to-black; hold the
+		# overlay closed long enough to cover the transition, then let the phase
+		# change clear it (see _inspect_current_phase).
+		_gate_hold_until_ms = Time.get_ticks_msec() + 5000
+		if _reminder_layer != null:
+			_reminder_layer.visible = false
 
 
 func _update_shop_highlights(all_active: Array) -> void:

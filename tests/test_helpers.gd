@@ -1,0 +1,109 @@
+extends RefCounted
+## TestHelpers - fakes and builders shared by the Creature Comforts tests.
+##
+## FakeObject exists because achievement_evaluator.gd guards with is_instance_valid(),
+## which returns false for Dictionaries. Fakes must be Object instances (RefCounted).
+
+const AdviceContext = preload("../advice/advice_context.gd")
+
+
+## RefCounted whose properties are backed by a Dictionary. Works with the probe
+## callable below (which uses the `in` operator, consulting _has/_get).
+class FakeObject:
+	extends RefCounted
+	var _props: Dictionary
+
+	func _init(props: Dictionary = {}) -> void:
+		_props = props
+
+	func _get(property: StringName):
+		return _props.get(property)
+
+	func _has(property: StringName) -> bool:
+		return _props.has(property)
+
+	func set_prop(property: String, value) -> void:
+		_props[property] = value
+
+
+## Property probe mirroring mod_main._has_property semantics for FakeObject and
+## real Objects alike. Pass as the `_has_prop` Callable to the evaluator.
+static func probe(obj, property: String) -> bool:
+	if obj == null:
+		return false
+	return property in obj
+
+
+## Minimal formatter for trainer rules: only the two methods rules call.
+class FakeFormatter:
+	extends RefCounted
+
+	func format_species_name(species_key: String) -> String:
+		if species_key.is_empty():
+			return "Unknown"
+		var name := species_key
+		if "." in name:
+			name = name.split(".")[-1]
+		return name.capitalize()
+
+	func format_item_name(item_id: String) -> String:
+		return item_id.replace("_", " ").capitalize()
+
+
+## Build a monster fake for the achievement evaluator: needs `data.name_key` and `level`.
+static func monster(name_key: String, level: int = 1):
+	return FakeObject.new({
+		"data": FakeObject.new({"name_key": name_key}),
+		"level": level,
+	})
+
+
+## Build a run fake for the achievement evaluator.
+static func run(trainer_id: String, day: int, team: Array = [], bench: Array = []):
+	return FakeObject.new({
+		"trainer_id": trainer_id,
+		"current_round": day,
+		"team": team,
+		"bench": bench,
+	})
+
+
+## Build a battle unit fake for poll_battle.
+static func battle_unit(team_id: int, slot_index: int, shield_granted: float):
+	return FakeObject.new({
+		"team_id": team_id,
+		"slot_index": slot_index,
+		"shield_granted": shield_granted,
+	})
+
+
+## Build a battle state fake: state.simulation.data.battle_units + battle_over.
+static func battle_state(units: Array, battle_over: bool = true):
+	var data := FakeObject.new({
+		"battle_units": units,
+		"battle_over": battle_over,
+	})
+	var sim := FakeObject.new({"data": data})
+	return FakeObject.new({"simulation": sim})
+
+
+## Build an AdviceContext for trainer-rule tests.
+static func context(trainer_id: String, day: int, shop_items: Array = [], team_monsters: Array = []):
+	var ctx := AdviceContext.new()
+	ctx.trainer_id = trainer_id
+	ctx.day = day
+	ctx.shop_items = shop_items
+	ctx.team_monsters = team_monsters
+	return ctx
+
+
+static func shop_monster(slot: int, name_key: String, types: Array = [], instance_id: int = 0):
+	return AdviceContext.ShopItem.new(slot, name_key, "", true, instance_id, types)
+
+
+static func shop_item(slot: int, item_id: String, instance_id: int = 0):
+	return AdviceContext.ShopItem.new(slot, "", item_id, false, instance_id, [])
+
+
+static func team_monster(slot: int, name_key: String, level: int, types: Array = []):
+	return AdviceContext.Monster.new(slot, name_key, level, types)

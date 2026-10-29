@@ -55,6 +55,15 @@ func set_income(value: int) -> void:
 	queue_redraw()
 
 
+## Hide the panel immediately. The overlay gate normally controls visibility; this is a
+## defensive fallback for non-shop phases (battle, event, menu).
+func hide_panel() -> void:
+	if not visible:
+		return
+	visible = false
+	queue_redraw()
+
+
 func _anchor_bottom_center() -> void:
 	var viewport := get_viewport()
 	if viewport == null:
