@@ -7,7 +7,7 @@ const TEXT_COLOR := Color("#ecf0f1")
 const SHADOW_COLOR := Color("#2c3e50")
 const SHADOW_OFFSET := Vector2(1, 1)
 const MAX_WIDTH := 130.0
-const TOP_BAR_Y := 2.0 
+const TOP_BAR_Y := 1.5 
 const LEFT_MARGIN := 55.0  # Just right of backpack icon
 
 const BG_COLOR := Color("#1a2332")  # Dark navy

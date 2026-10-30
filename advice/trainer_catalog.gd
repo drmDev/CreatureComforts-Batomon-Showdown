@@ -96,7 +96,7 @@ const TRAINER_DEFINITIONS := [
 				"rule_id": "mad_scientist_day6",
 				"day": 6,
 				"severity": "WARNING",
-				"message": "🧪 MAD SCIENTIST: Your active team transforms into random Legendaries on Day 7!",
+				"message": "MAD SCIENTIST: Your active team transforms into random Legendaries on Day 7!",
 				"reminder": "Tomorrow: Legendary transformation!"
 			}
 		]
@@ -110,7 +110,7 @@ const TRAINER_DEFINITIONS := [
 				"rule_id": "gamer_day8",
 				"day": 8,
 				"severity": "NOTICE",
-				"message": "🎮 GAMER: A Mythical monster arrives on Day 9!",
+				"message": "GAMER: A Mythical monster arrives on Day 9!",
 				"reminder": "Tomorrow: Mythical monster!"
 			}
 		]
@@ -124,7 +124,7 @@ const TRAINER_DEFINITIONS := [
 				"rule_id": "gentleman_day3",
 				"day": 3,
 				"severity": "NOTICE",
-				"message": "🎩 GENTLEMAN: Common and Uncommon monsters stop appearing in shops starting Day 4!",
+				"message": "GENTLEMAN: Common and Uncommon monsters stop appearing in shops starting Day 4!",
 				"reminder": "Tomorrow: No Common/Uncommon shops!"
 			}
 		]

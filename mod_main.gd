@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9056"
+const VERSION := "0.9061"
 const MOD_ID := "creature_comforts"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
@@ -323,12 +323,21 @@ func _setup_reminder_panel() -> void:
 	_shop_income_panel.name = "ShopIncomePanel"
 	_reminder_layer.add_child(_shop_income_panel)
 
-	# Top-left trinket reminders; shares the reminder label's spot and is shop-gated.
-	# Added after the label so it draws on top while visible.
+	# Left-aligned trinket reminders ~10% down the screen; shop-gated. Added after the label
+	# so it draws on top while visible.
 	var TrinketRemindersPanel = load("res://mods/CreatureComforts/hud/trinket_reminders_panel.gd")
 	_trinket_reminders_panel = TrinketRemindersPanel.new()
 	_trinket_reminders_panel.name = "TrinketRemindersPanel"
+	_trinket_reminders_panel.layout_debug.connect(_on_trinket_panel_layout_debug)
 	_reminder_layer.add_child(_trinket_reminders_panel)
+
+
+## Debug Logging only: write the trinket panel's one-shot layout snapshot.
+func _on_trinket_panel_layout_debug(message: String) -> void:
+	if not _debug_logging:
+		return
+	for line in message.split("\n"):
+		_log_message(line)
 
 
 func _setup_player_hud() -> void:
@@ -668,8 +677,8 @@ func _update_shop_income(run) -> void:
 
 
 ## Refresh the top-left trinket reminders from the player's held one-shot trinkets.
-## Runs every shop poll, so gained/consumed/sold trinkets update immediately. While the
-## panel is visible it takes over the reminder label's spot (the label is hidden).
+## Runs every shop poll, so gained/consumed/sold trinkets update immediately. The reminder
+## label stays visible at the top; the panel sits below it.
 func _update_trinket_reminders(run) -> void:
 	if _trinket_reminders_panel == null:
 		return
@@ -698,7 +707,8 @@ func _update_trinket_reminders(run) -> void:
 		})
 
 	if entries.is_empty():
-		_trinket_reminders_panel.hide_panel()
+		# Zero reminders: hide and reset to collapsed so a later regain starts collapsed.
+		_trinket_reminders_panel.reset_collapsed()
 		_trinket_reminders_alerted = false  # A later regain re-triggers the alert
 		_pending_trinket_reminder_sound = false  # Nothing left to announce
 		_log_trinket_reminder_changes(entries)
@@ -706,16 +716,12 @@ func _update_trinket_reminders(run) -> void:
 
 	_trinket_reminders_panel.show_reminders(entries)
 	_log_trinket_reminder_changes(entries)
-	# First appearance, or first after the list was cleared: expand and chime once.
+	# First appearance, or first after the list was cleared: chime once. The panel stays
+	# collapsed; the player expands it manually.
 	if not _trinket_reminders_alerted:
 		_trinket_reminders_alerted = true
-		_trinket_reminders_panel.expand()
 		_pending_trinket_reminder_sound = true
 		_try_play_chime()
-	# Take over the reminder label's top-left spot while the panel is visible. This runs after
-	# _evaluate_trainer_advice, so the label cannot re-show underneath this poll.
-	if _reminder_label != null:
-		_reminder_label.visible = false
 
 
 ## Log only trinket-reminder additions, updates, and removals (not repeated polls).

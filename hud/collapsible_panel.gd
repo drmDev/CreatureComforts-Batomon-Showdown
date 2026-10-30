@@ -116,8 +116,14 @@ func toggle() -> void:
 	set_minimized(not minimized)
 
 
+## Width of the header bar and its button. Defaults to the panel width; subclasses can keep
+## the header compact (e.g. only as wide as the collapsed tab) while the body stays wider.
+func header_width() -> float:
+	return size.x
+
+
 func button_rect() -> Rect2:
-	return Rect2(Vector2(size.x - 8 - BTN - 3, 2.0), Vector2(BTN, BTN))
+	return Rect2(Vector2(header_width() - 8 - BTN - 3, 2.0), Vector2(BTN, BTN))
 
 
 func _draw() -> void:
@@ -134,8 +140,9 @@ func _draw() -> void:
 		_panel_style.draw(ci, Rect2(Vector2(0, 4), Vector2(w, maxf(size.y - 4, 8))))
 		_draw_body(w)
 
-	# Header bar
-	_header_style.draw(ci, Rect2(Vector2(7, 0), Vector2(w - 14, HEAD_H)))
+	# Header bar (may be narrower than the body; see header_width())
+	var hw := header_width()
+	_header_style.draw(ci, Rect2(Vector2(7, 0), Vector2(hw - 14, HEAD_H)))
 	_draw_title(Rect2(Vector2(12, 0), Vector2(button_rect().position.x - 16, HEAD_H)))
 
 	# -/+ button
