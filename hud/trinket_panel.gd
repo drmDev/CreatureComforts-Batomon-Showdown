@@ -5,6 +5,9 @@ extends "collapsible_panel.gd"
 ## after a few seconds. It only shows when at least one non-junk trinket was earned; that
 ## filtering is done by mod_main before calling show_gains().
 ##
+## Gift content from a consumed Locked Box / Mysterious Chest is excluded upstream (it is
+## applied after the frozen battle_over snapshot), so this panel only receives legitimate gains.
+##
 ## Collapsible header mechanics (header bar, -/+ toggle, drag, animated reveal, shared styling)
 ## live in collapsible_panel.gd. This subclass supplies the bottom-right anchoring, the
 ## single-line "Nx name" rows, and the results-screen auto-hide timer.

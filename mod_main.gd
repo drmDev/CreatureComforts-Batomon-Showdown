@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9062"
+const VERSION := "0.9066"
 const MOD_ID := "creature_comforts"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
@@ -65,9 +65,9 @@ var _battle_logged := false
 # trinkets. We therefore keep a rolling snapshot of the last NON-battle state (shop/event) and use
 # it as the "before battle" baseline. The end snapshot is frozen at battle_over.
 #
-# The panel shows mid-combat gains for any result. It is suppressed when a gift-generating one-shot
-# trinket (Locked Box / Mysterious Chest) was consumed during the battle: the game applies the gift
-# to trinket_ids during the simulation but reveals it later, so showing it would spoil the gift.
+# The panel shows mid-combat gains for any result. Gift content from a consumed Locked Box /
+# Mysterious Chest is applied after the frozen battle_over snapshot, so it never appears in the
+# ids diff and cannot be spoiled; legitimate gains are still shown.
 # The snapshot stays frozen at battle_over so later event rewards never leak into the diff.
 var _pre_battle_trinket_state = null  # Dictionary: last trinket inventory seen outside battle
 var _battle_trinket_start = null      # Dictionary: baseline used for the current battle
@@ -123,6 +123,9 @@ var _shop_income_panel = null
 var _trinket_reminders_panel = null
 var _trinket_reminders_alerted := false  # True while the current non-empty list has been announced
 var _last_trinket_reminder_entries: Dictionary = {}  # name -> count, for change-only logging
+
+# Shop-only rank odds button + popup (bottom-left; shows rarity odds for all ranks)
+var _rank_odds_panel = null
 # Label reminders currently shown (rule_id -> text), for change-only logging
 var _last_reminder_rule_ids: Dictionary = {}
 
@@ -288,6 +291,13 @@ func _setup_reminder_panel() -> void:
 	_trinket_reminders_panel.layout_debug.connect(_on_trinket_panel_layout_debug)
 	_reminder_layer.add_child(_trinket_reminders_panel)
 
+	# Bottom-left rank odds button + popup; shop-gated like the other shop panels.
+	var RankOddsPanel = load("res://mods/CreatureComforts/hud/rank_odds_panel.gd")
+	_rank_odds_panel = RankOddsPanel.new()
+	_rank_odds_panel.name = "RankOddsPanel"
+	_rank_odds_panel.log_line.connect(_log_event)
+	_reminder_layer.add_child(_rank_odds_panel)
+
 
 ## Debug Logging only: write the trinket panel's one-shot layout snapshot.
 func _on_trinket_panel_layout_debug(message: String) -> void:
@@ -410,6 +420,8 @@ func _inspect_current_phase() -> void:
 			_shop_income_panel.hide_panel()
 		if _trinket_reminders_panel != null:
 			_trinket_reminders_panel.hide_panel()
+		if _rank_odds_panel != null:
+			_rank_odds_panel.hide_panel()
 	if not is_battle:
 		# Reset battle-scoped tracking only when actually leaving the battle phase.
 		if _last_phase == "battle":
@@ -578,6 +590,8 @@ func _handle_shop_phase(state) -> void:
 		# Trinket gains are battle-scoped now (tracked during the battle state only), so no
 		# shop-to-shop inventory diff happens here; the trinket panel shows on the results screen.
 		_reset_transient_state(true, false, false)  # Reset suppression for new shop visit
+		if _rank_odds_panel != null:
+			_rank_odds_panel.reset_for_shop()
 	elif _last_snapshot != null and _deep_inspection:
 		# Full snapshot diffs are troubleshooting detail, not regular event logging.
 		var comparison = _changes_comparer.compare(_last_snapshot, current_snapshot)
@@ -601,6 +615,7 @@ func _handle_shop_phase(state) -> void:
 	
 	_update_shop_income(run)
 	_update_trinket_reminders(run)
+	_update_rank_odds(run)
 
 	# (overlay visibility is handled every frame by _update_overlay_gate)
 	
@@ -628,6 +643,14 @@ func _update_shop_income(run) -> void:
 	if _shop_income_panel == null:
 		return
 	_shop_income_panel.set_income(_compute_daily_income(run))
+
+
+## Refresh the bottom-left rank odds button with the current shop rank.
+func _update_rank_odds(run) -> void:
+	if _rank_odds_panel == null:
+		return
+	var rank := int(run.get("shop_rank")) if _has_property(run, "shop_rank") else 1
+	_rank_odds_panel.set_rank(rank)
 
 
 ## Refresh the top-left trinket reminders from the player's held one-shot trinkets.
@@ -822,11 +845,7 @@ func _diff_trinket_states(before: Dictionary, after: Dictionary) -> Dictionary:
 func _update_trinket_panel(gains: Dictionary) -> bool:
 	if _trinket_panel == null:
 		return false
-	var ids: Array = gains.get("ids", [])
-	var shown_ids: Array = []
-	for tid in ids:
-		if str(tid) != JUNK_TRINKET_ID:
-			shown_ids.append(tid)
+	var shown_ids: Array = TrinketGains.displayable_ids(gains.get("ids", []), JUNK_TRINKET_ID)
 	if shown_ids.is_empty():
 		_hide_trinket_panel()
 		return false
@@ -869,10 +888,10 @@ func _battle_is_over(state) -> bool:
 
 
 ## Stop battle trinket tracking. Called when leaving the battle state and on trainer/run changes.
-## Gains are always logged once. The panel shows mid-combat gains for any result, but is suppressed
-## when a gift-generating one-shot trinket (Locked Box / Mysterious Chest) was consumed during the
-## battle: the game applies the gift to trinket_ids during the simulation and reveals it later, so
-## showing it would spoil the gift. _update_trinket_panel() filters junk.
+## Gains are always logged once. The panel shows mid-combat gains for any result. Gift content from
+## a consumed Locked Box / Mysterious Chest is applied after the frozen battle_over snapshot, so it
+## never appears in the ids diff and cannot be spoiled; legitimate gains are still shown.
+## _update_trinket_panel() filters junk.
 func _finalize_battle_trinket_tracking(show_panel := true) -> void:
 	if not _battle_trinket_tracking and _battle_trinket_start == null:
 		return
@@ -897,14 +916,14 @@ func _finalize_battle_trinket_tracking(show_panel := true) -> void:
 				if not post["ids"].is_empty():
 					_log_message("BATTLE TRINKET GAINS | excluded post-battle additions: %s" % str(post["ids"]))
 			if show_panel:
-				if TrinketGains.has_gift_trinket(gains["newly_used"]):
-					# Gift contents are applied during the simulation but revealed later; do not
-					# spoil them in the panel.
-					if _deep_inspection:
-						_log_message("BATTLE TRINKET GAINS | panel suppressed (gift generated: %s)" % str(gains["newly_used"]))
-				else:
-					# Shows only non-junk gains; hides itself when nothing eligible remains.
-					panel_updated = _update_trinket_panel(gains)
+				# Gift content is applied after the frozen battle_over snapshot, so it never
+				# appears in the ids diff. Show the legitimate gains; the panel hides itself
+				# when nothing non-junk remains.
+				if _deep_inspection and TrinketGains.has_gift_trinket(gains["newly_used"]):
+					_log_message("BATTLE TRINKET GAINS | gift pending (%s), %d trinket(s) withheld; showing %d gained" % [
+						str(gains["newly_used"]), TrinketGains.withheld_count(gains), gains["ids"].size()
+					])
+				panel_updated = _update_trinket_panel(gains)
 
 	if not panel_updated:
 		_hide_trinket_panel()

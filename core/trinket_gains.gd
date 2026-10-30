@@ -5,9 +5,9 @@ extends RefCounted
 ## and reports gained ids, the counter delta, and one-shot trinkets consumed during the span.
 ## No game objects or scene-tree access, so it is unit-testable.
 
-# One-shot trinkets that generate a gift when consumed. The game applies the gift to
-# trinket_ids during the battle simulation but reveals it later, so the trinket-gain panel
-# must not show it. run.used_trinket_ids records the consumption.
+# One-shot trinkets that generate a gift when consumed. The gift is applied after the frozen
+# battle_over snapshot, so it never appears in the ids diff; run.used_trinket_ids records the
+# consumption and has_gift_trinket() is used for diagnostics only.
 const GIFT_TRINKET_IDS := ["locked_box", "mysterious_chest"]
 
 
@@ -42,3 +42,20 @@ static func has_gift_trinket(newly_used: Array, gift_ids: Array = GIFT_TRINKET_I
 		if str(tid) in gift_ids:
 			return true
 	return false
+
+
+## Acquisitions counted by the counter that are not present in the frozen inventory diff.
+## A consumed Locked Box / Mysterious Chest gift is applied after battle_over, so it shows up
+## here as a positive gap and is never rendered by the panel. Clamped at 0.
+static func withheld_count(gains: Dictionary) -> int:
+	var ids: Array = gains.get("ids", [])
+	return maxi(0, int(gains.get("counter", 0)) - ids.size())
+
+
+## Ids the trinket-gain panel may render: everything except junk, order preserved.
+static func displayable_ids(ids: Array, junk_id: String) -> Array:
+	var shown: Array = []
+	for tid in ids:
+		if str(tid) != junk_id:
+			shown.append(tid)
+	return shown
