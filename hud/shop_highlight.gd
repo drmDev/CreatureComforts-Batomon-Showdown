@@ -3,6 +3,9 @@ extends Control
 ## Holds only plain values (slot index + offer instance id) and a resolver Callable.
 ## Every frame it asks the resolver for the current rectangles of cards whose live content
 ## still matches the recorded offer, so a stale highlight is never drawn on the wrong card.
+##
+## NOT WIRED UP IN v1. Shop-card highlighting is deferred to a v2 release; this overlay is
+## retained (isolated) so the feature can be re-enabled without re-tangling mod_main.
 
 const OUTLINE_COLOR := Color(1.0, 0.85, 0.2, 0.95)
 const FILL_COLOR := Color(1.0, 0.85, 0.2, 0.12)

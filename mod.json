@@ -1,16 +1,7 @@
 {
 	"id": "creature_comforts",
 	"name": "Creature Comforts",
-	"version": "0.9061",
+	"version": "0.9062",
 	"author": "NescapePlan",
-	"description": "Quality of Life improvements for the mons",
-	"settings": [
-		{
-			"key": "shop_highlights",
-			"label": "Shop Highlights",
-			"type": "bool",
-			"default": false,
-			"description": "Outline shop cards that match active trainer advice (Shop Targets rules)"
-		}
-	]
+	"description": "Quality of Life improvements for the mons"
 }

@@ -2,7 +2,7 @@ extends Node
 ## Creature Comforts - Trainer Advice System
 ## Inspects game state objects during Shop and Battle phases with configurable detail levels.
 
-const VERSION := "0.9061"
+const VERSION := "0.9062"
 const MOD_ID := "creature_comforts"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
@@ -28,10 +28,7 @@ const TrinketGains = preload("core/trinket_gains.gd")
 # Dev-only toggle defaults (not user-facing settings)
 const DevConfig = preload("dev/dev_config.gd")
 
-# Shop card highlight overlay (outlines shop cards matching active highlight-mode advice)
-var _shop_highlight = null
-
-# Overlay gate: hides reminders/highlights while the shop is not on screen or not interactive
+# Overlay gate: hides reminders while the shop is not on screen or not interactive
 const GATE_NOT_SHOP := "not in shop"
 const GATE_SETTLING := "shop settling after transition"
 const GATE_SEARCH := "opponent search (CancelButton visible)"
@@ -88,11 +85,6 @@ var _deep_inspection := DevConfig.DEEP_INSPECTION
 # Rising-edge state for the Ctrl+Shift dev toggle keys (Input has no key "just pressed" query).
 var _dev_toggle_debug_was_down := false
 var _dev_toggle_inspect_was_down := false
-
-# User-facing setting (declared in mod.json): outline shop cards matching Shop Targets advice.
-const DEFAULT_SHOP_HIGHLIGHTS := false
-var _shop_highlights_enabled := DEFAULT_SHOP_HIGHLIGHTS
-var _settings_load_attempted := false
 
 # Logging
 var _log_path := ""
@@ -177,39 +169,10 @@ func _exit_tree() -> void:
 		_log_file = null
 
 
-func _load_settings() -> void:
-	"""Read the user-facing shop_highlights setting from ModLoader once at startup."""
-	if not is_inside_tree() or _settings_load_attempted:
-		return
-	_settings_load_attempted = true
-	
-	var mod_loader = get_node_or_null("/root/ModLoader")
-	if mod_loader == null or not mod_loader.has_method("get_config"):
-		return  # Keep the default (disabled) when the config API is unavailable
-	
-	_shop_highlights_enabled = bool(mod_loader.get_config(MOD_ID, "shop_highlights", DEFAULT_SHOP_HIGHLIGHTS))
-	
-	if mod_loader.has_signal("config_changed") and not mod_loader.is_connected("config_changed", _on_config_changed):
-		mod_loader.connect("config_changed", _on_config_changed)
-
-
-func _on_config_changed(mod_id: String, key: String, value) -> void:
-	"""Apply live user-setting changes from ModLoader."""
-	if mod_id != MOD_ID:
-		return
-	if key == "shop_highlights" and value is bool:
-		_shop_highlights_enabled = value
-		if not _shop_highlights_enabled:
-			_clear_shop_highlights()
-
-
 func _initialize_mod() -> void:
 	if _initialization_started:
 		return
 	_initialization_started = true
-	
-	# Load user-facing settings
-	_load_settings()
 	
 	# Create formatter
 	_formatter = LogFormatterScript.new(_has_property)
@@ -310,12 +273,6 @@ func _setup_reminder_panel() -> void:
 	_reminder_label = ReminderLabel.new()
 	_reminder_label.name = "ReminderLabel"
 	_reminder_layer.add_child(_reminder_label)
-	
-	var ShopHighlight = load("res://mods/CreatureComforts/hud/shop_highlight.gd")
-	_shop_highlight = ShopHighlight.new()
-	_shop_highlight.name = "ShopHighlight"
-	_shop_highlight.setup(_resolve_highlight_rects)
-	_reminder_layer.add_child(_shop_highlight)
 	
 	# Bottom-center income readout; the reminder layer's shop gate controls visibility.
 	var ShopIncomePanel = load("res://mods/CreatureComforts/hud/shop_income_panel.gd")
@@ -565,9 +522,6 @@ func _evaluate_trainer_advice(snapshot) -> void:
 		_log_reminder_changes(reminders_to_show)
 	
 	_try_play_chime()
-	
-	# Outline shop cards matching active highlight-mode advice
-	_update_shop_highlights(all_active)
 
 
 ## Log only label-reminder additions, updates, and removals (not repeated polls).
@@ -623,7 +577,7 @@ func _handle_shop_phase(state) -> void:
 			_log_lines(_formatter.format_deep_inspect_shop(manager, run))
 		# Trinket gains are battle-scoped now (tracked during the battle state only), so no
 		# shop-to-shop inventory diff happens here; the trinket panel shows on the results screen.
-		_reset_transient_state(true, false, false)  # Reset suppression + highlights for new shop visit
+		_reset_transient_state(true, false, false)  # Reset suppression for new shop visit
 	elif _last_snapshot != null and _deep_inspection:
 		# Full snapshot diffs are troubleshooting detail, not regular event logging.
 		var comparison = _changes_comparer.compare(_last_snapshot, current_snapshot)
@@ -963,7 +917,7 @@ func _finalize_battle_trinket_tracking(show_panel := true) -> void:
 
 
 func _update_overlay_gate() -> void:
-	"""Every frame: hide the whole reminder/highlight layer unless the shop is on screen and interactive."""
+	"""Every frame: hide the whole reminder layer unless the shop is on screen and interactive."""
 	if _reminder_layer == null:
 		return
 	
@@ -1182,39 +1136,8 @@ func _on_transition_requested(target: String, data) -> void:
 			_reminder_layer.visible = false
 
 
-func _update_shop_highlights(all_active: Array) -> void:
-	"""Convert active highlight-mode advice into highlight targets (slot index + offer instance id)."""
-	if _shop_highlight == null:
-		return
-	if not _shop_highlights_enabled:
-		_clear_shop_highlights()
-		return
-	
-	var targets: Array = []
-	var seen := {}
-	for advice in all_active:
-		var display: String = advice.get("display", TrainerRules.BaseRule.DISPLAY_NONE)
-		if display != TrainerRules.BaseRule.DISPLAY_HIGHLIGHT and display != TrainerRules.BaseRule.DISPLAY_BOTH:
-			continue
-		var slots: Array = advice.get("matched_indices", [])
-		var ids: Array = advice.get("matched_ids", [])
-		for i in range(mini(slots.size(), ids.size())):
-			var slot_index := int(slots[i])
-			if seen.has(slot_index):
-				continue
-			seen[slot_index] = true
-			targets.append({"slot": slot_index, "id": int(ids[i])})
-	_shop_highlight.set_targets(targets)
-
-
-func _clear_shop_highlights() -> void:
-	if _shop_highlight != null:
-		_shop_highlight.clear_targets()
-
-
 func _reset_transient_state(clear_suppression: bool, clear_reminders: bool, clear_chimes: bool) -> void:
 	"""Reset overlay/suppression state shared across phase transitions."""
-	_clear_shop_highlights()
 	if clear_reminders:
 		if _reminder_label != null:
 			_reminder_label.hide_all_reminders()
@@ -1227,51 +1150,6 @@ func _reset_transient_state(clear_suppression: bool, clear_reminders: bool, clea
 		_pending_trinket_reminder_sound = false
 	if clear_suppression and _advisor != null:
 		_advisor.reset_suppression()
-
-
-func _resolve_highlight_rects(targets: Array) -> Array:
-	"""Called every frame by the overlay: current rects for cards still showing the recorded offer.
-	Reads state.view.shop_slots[slot_index].current_content and compares instance ids, retaining nothing."""
-	var rects: Array = []
-	if targets.is_empty():
-		return rects
-	
-	var main = get_tree().current_scene
-	if main == null:
-		return rects
-	var state = main.get("current_state")
-	if not _script_is(state, SHOP_SCRIPT):
-		return rects
-	
-	var view = state.get("view")
-	if view == null or not is_instance_valid(view) or not view is Node:
-		return rects
-	
-	# Do not draw over the Dex overlay
-	var dex = view.get_node_or_null("DexUI")
-	if dex is CanvasItem and dex.is_visible_in_tree():
-		return rects
-	
-	var slots = view.get("shop_slots")
-	if not slots is Array:
-		return rects
-	
-	for target in targets:
-		var slot_index: int = target["slot"]
-		if slot_index < 0 or slot_index >= slots.size():
-			continue
-		var slot = slots[slot_index]
-		if not is_instance_valid(slot) or not slot is Control:
-			continue
-		if not slot.is_visible_in_tree():
-			continue
-		var content = slot.get("current_content")
-		if typeof(content) != TYPE_OBJECT or not is_instance_valid(content):
-			continue
-		if content.get_instance_id() != int(target["id"]):
-			continue
-		rects.append(slot.get_global_rect())
-	return rects
 
 
 func _log_phase_entry(phase: String, run, manager = null) -> void:
