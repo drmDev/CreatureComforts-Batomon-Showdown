@@ -25,9 +25,9 @@ const GEM_SIZE := 10.0
 const GEM_GAP := 2.0
 const DEBUG_SETTLE_SEC := 0.2  # Wait past the reveal tween before logging the settled layout
 
-# Left-aligned with hud/reminder_label.gd, but ~10% down the screen so both can show at once.
+# Left-aligned with hud/reminder_label.gd but slightly lower
 const LEFT_MARGIN := 55.0
-const TOP_OFFSET_RATIO := 0.15
+const TOP_OFFSET_RATIO := 0.125
 const FALLBACK_TOP_OFFSET := 100.0
 
 ## Emitted with a one-shot layout snapshot for Debug Logging (mod_main filters on _debug_logging).
