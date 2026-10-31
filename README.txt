@@ -1,4 +1,4 @@
-Creature Comforts v1.0 - Quality of Life Mod for Batomon Showdown
+Creature Comforts v1.1 - Quality of Life Mod for Batomon Showdown
 =================================================================
 
 Creature Comforts adds helpful reminders and quality-of-life improvements to
