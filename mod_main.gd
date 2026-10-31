@@ -1,7 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "1.003"
-const MOD_ID := "creature_comforts"
+const VERSION := "1.004"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
@@ -127,6 +126,10 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	# Drop the loader subscription so a freed mod node is never called back.
+	if _mod_config != null:
+		_mod_config.teardown()
+		_mod_config = null
 	if _log_file != null:
 		_log_file.close()
 		_log_file = null
@@ -833,10 +836,6 @@ func _capture_trinket_state(run) -> Dictionary:
 	return snapshot
 
 
-func _diff_trinket_states(before: Dictionary, after: Dictionary) -> Dictionary:
-	return TrinketGains.diff_states(before, after)
-
-
 func _update_trinket_panel(gains: Dictionary) -> bool:
 	if _trinket_panel == null:
 		return false
@@ -897,7 +896,7 @@ func _finalize_battle_trinket_tracking(show_panel := true) -> void:
 	if _battle_trinket_start != null and _battle_trinket_end != null and _battle_over_seen:
 		var run = _get_run_data()
 		if run != null and is_instance_valid(run):
-			var gains := _diff_trinket_states(_battle_trinket_start, _battle_trinket_end)
+			var gains := TrinketGains.diff_states(_battle_trinket_start, _battle_trinket_end)
 			if not _battle_gains_logged and (not gains["ids"].is_empty() or int(gains["counter"]) != 0):
 				_battle_gains_logged = true
 				for tid in gains["ids"]:
@@ -907,7 +906,7 @@ func _finalize_battle_trinket_tracking(show_panel := true) -> void:
 			if _deep_inspection:
 				# Diagnostic: changes applied after the freeze (e.g. event rewards) are excluded.
 				var live := _capture_trinket_state(run)
-				var post := _diff_trinket_states(_battle_trinket_end, live)
+				var post := TrinketGains.diff_states(_battle_trinket_end, live)
 				if not post["ids"].is_empty():
 					_log_message("BATTLE TRINKET GAINS | excluded post-battle additions: %s" % str(post["ids"]))
 			if show_panel:

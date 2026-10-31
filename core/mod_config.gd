@@ -48,6 +48,15 @@ func setup(loader) -> void:
 		_loader.config_changed.connect(_on_loader_config_changed)
 
 
+## Disconnect from the Mod Loader. Called when the mod node leaves the tree so a
+## freed mod is never called back through the loader's config_changed signal.
+func teardown() -> void:
+	if _loader != null and _loader.has_signal("config_changed"):
+		if _loader.config_changed.is_connected(_on_loader_config_changed):
+			_loader.config_changed.disconnect(_on_loader_config_changed)
+	_loader = null
+
+
 ## True when the feature is enabled. Unknown keys fall back to enabled.
 func is_enabled(key: String) -> bool:
 	if not DEFAULTS.has(key):

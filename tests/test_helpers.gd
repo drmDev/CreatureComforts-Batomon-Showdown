@@ -1,31 +1,6 @@
 extends RefCounted
-## FakeObject exists because the rules guard with is_instance_valid(), which returns
-## false for Dictionaries. Fakes must be Object instances (RefCounted).
 
 const AdviceContext = preload("../advice/advice_context.gd")
-
-
-class FakeObject:
-	extends RefCounted
-	var _props: Dictionary
-
-	func _init(props: Dictionary = {}) -> void:
-		_props = props
-
-	func _get(property: StringName):
-		return _props.get(property)
-
-	func _has(property: StringName) -> bool:
-		return _props.has(property)
-
-	func set_prop(property: String, value) -> void:
-		_props[property] = value
-
-
-static func probe(obj, property: String) -> bool:
-	if obj == null:
-		return false
-	return property in obj
 
 
 class FakeFormatter:
