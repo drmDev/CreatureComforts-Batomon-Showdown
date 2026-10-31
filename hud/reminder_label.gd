@@ -1,15 +1,17 @@
 extends PanelContainer
 
+const Style = preload("../core/style.gd")
+
 const FONT_SIZE := 9
-const TEXT_COLOR := Color("#ecf0f1")
-const SHADOW_COLOR := Color("#2c3e50")
+const TEXT_COLOR := Style.VALUE_COLOR
+const SHADOW_COLOR := Style.SHADOW_COLOR
 const SHADOW_OFFSET := Vector2(1, 1)
 const MAX_WIDTH := 130.0
 const TOP_BAR_Y := 0.90
 const LEFT_MARGIN := 55.0  # Just right of backpack icon
 
-const BG_COLOR := Color("#1a2332")
-const BORDER_COLOR := Color("#f39c12")
+const BG_COLOR := Style.BG_COLOR
+const BORDER_COLOR := Style.BORDER_COLOR
 const BORDER_WIDTH := 1
 const PADDING := 3
 

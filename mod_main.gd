@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "1.1"
+const VERSION := "1.117"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
@@ -50,6 +50,10 @@ var _initialized := false
 # User-facing feature toggles (centralized in core/mod_config.gd).
 var _mod_config = null
 
+# Investigation diagnostics: catalog dump runs once, on the first shop entry
+# with Debug Logging on (so it works even if logging was toggled after startup).
+var _catalog_diagnostics_logged := false
+
 # Dev-only toggles (not user-facing settings). Startup defaults come from
 # dev/dev_config.gd; flip them live with the key combos in _handle_dev_toggles().
 var _debug_logging := DevConfig.DEBUG_LOGGING
@@ -90,6 +94,8 @@ var _trinket_reminders_alerted := false
 var _last_trinket_reminder_entries: Dictionary = {}  # name -> count, for change-only logging
 
 var _rank_odds_panel = null
+var _watchlist_panel = null
+var _shop_highlight = null
 var _last_reminder_rule_ids: Dictionary = {}
 
 # Trinket/passive gold_gain bonuses are added on top of the base schedule.
@@ -151,6 +157,7 @@ func _initialize_mod() -> void:
 	
 	_setup_advisor()
 	_setup_reminder_panel()
+	_setup_shop_highlight()
 	# Owns the shop-overlay gate: visibility checks, transition listeners, timers, view cache
 	_setup_shop_overlay_gate()
 	_setup_player_hud()
@@ -189,6 +196,11 @@ func _initialize_mod() -> void:
 	_log_message("Log file: %s" % abs_log_path)
 	_log_message("=".repeat(80))
 	
+	if _debug_logging:
+		# Investigation diagnostics for the shop-highlighting feature. Deferred so
+		# autoloads such as GameDatabase exist. Safe to remove once confirmed.
+		call_deferred("_log_catalog_diagnostics")
+	
 	print("Creature Comforts %s loaded - logging to %s" % [VERSION, abs_log_path])
 
 
@@ -207,6 +219,260 @@ func _feature_enabled(key: String) -> bool:
 	if _mod_config == null:
 		return true
 	return _mod_config.is_enabled(key)
+
+
+## --- Investigation diagnostics (shop highlighting) -------------------------
+## Gated by Debug Logging. These dump the unknown catalog/card APIs so the
+## feature can be built against real data. Remove once the details are known.
+
+func _log_catalog_diagnostics() -> void:
+	_catalog_diagnostics_logged = true
+	_log_message("GAMEDB DIAG | === begin ===")
+	var db = get_node_or_null("/root/GameDatabase")
+	if db == null:
+		_log_message("GAMEDB DIAG | /root/GameDatabase not found")
+	else:
+		var db_script: Script = db.get_script()
+		_log_message("GAMEDB DIAG | node=%s class=%s script=%s" % [
+			db.name, db.get_class(), str(db_script.resource_path) if db_script != null else "(none)"])
+		for prop in db.get_property_list():
+			if int(prop.get("usage", 0)) & PROPERTY_USAGE_SCRIPT_VARIABLE:
+				_log_message("GAMEDB DIAG | var %s: %s" % [
+					str(prop.get("name", "")), type_string(int(prop.get("type", TYPE_NIL)))])
+		var tokens := ["species", "monster", "batomon", "catalog", "icon", "portrait", "sprite", "item", "get_all", "all_"]
+		var method_names: Array = []
+		for method in db.get_method_list():
+			var mname := str(method.get("name", ""))
+			if mname.begins_with("_"):
+				continue
+			for token in tokens:
+				if mname.to_lower().contains(token):
+					method_names.append(mname)
+					break
+		_log_message("GAMEDB DIAG | interesting methods (%d): %s" % [method_names.size(), ", ".join(method_names)])
+		# Catalog shape for the watchlist filters.
+		if "items_db" in db:
+			var items = db.get("items_db")
+			if items is Array:
+				_log_message("CATALOG DIAG | items_db size=%d" % items.size())
+				if not items.is_empty() and items[0] != null:
+					var item_vars: Array = []
+					for prop in items[0].get_property_list():
+						if int(prop.get("usage", 0)) & PROPERTY_USAGE_SCRIPT_VARIABLE:
+							item_vars.append(str(prop.get("name", "")))
+					_log_message("CATALOG DIAG | first item vars: %s" % ", ".join(item_vars))
+		if "items_by_pool" in db:
+			var pools = db.get("items_by_pool")
+			if pools is Dictionary:
+				_log_message("CATALOG DIAG | items_by_pool keys: %s" % ", ".join(pools.keys()))
+		if db.has_method("get_all_species"):
+			var species_list = db.get_all_species()
+			if species_list is Array:
+				if not species_list.is_empty() and species_list[0] != null:
+					var species_vars: Array = []
+					for prop in species_list[0].get_property_list():
+						if int(prop.get("usage", 0)) & PROPERTY_USAGE_SCRIPT_VARIABLE:
+							species_vars.append(str(prop.get("name", "")))
+					_log_message("CATALOG DIAG | first species vars: %s" % ", ".join(species_vars))
+				var histogram := {}
+				for s in species_list:
+					if s == null:
+						continue
+					var tier := int(s.get("tier")) if "tier" in s else 0
+					histogram[tier] = histogram.get(tier, 0) + 1
+				_log_message("CATALOG DIAG | species count=%d tier histogram=%s" % [species_list.size(), str(histogram)])
+		# Region discovery: species have no direct region field; inspect sets/packs.
+		if db.has_method("get_all_species"):
+			var region_species = db.get_all_species()
+			if region_species is Array and not region_species.is_empty() and region_species[0] != null:
+				if "sets" in region_species[0]:
+					_log_message("REGION DIAG | sample species.sets = %s" % str(region_species[0].get("sets")))
+		if "sets_db" in db:
+			var sets = db.get("sets_db")
+			if sets is Array and not sets.is_empty() and sets[0] != null:
+				var set_vars: Array = []
+				for prop in sets[0].get_property_list():
+					if int(prop.get("usage", 0)) & PROPERTY_USAGE_SCRIPT_VARIABLE:
+						set_vars.append(str(prop.get("name", "")))
+				_log_message("REGION DIAG | first set vars: %s" % ", ".join(set_vars))
+			if sets is Array:
+				var set_info: Array = []
+				for s in sets:
+					if s == null:
+						continue
+					var sid := str(s.get("id")) if "id" in s else "?"
+					var sname := str(s.get("name")) if "name" in s else "?"
+					set_info.append("%s=%s" % [sid, sname])
+				_log_message("REGION DIAG | sets: %s" % ", ".join(set_info))
+		if db.has_method("get_all_species"):
+			var region_species = db.get_all_species()
+			if region_species is Array:
+				var samples: Array = []
+				for s in region_species:
+					if s == null:
+						continue
+					var sets_val = s.get("sets") if "sets" in s else null
+					if sets_val is Array and not sets_val.is_empty():
+						samples.append("%s=%s" % [str(s.get("id")), str(sets_val)])
+					if samples.size() >= 5:
+						break
+				_log_message("REGION DIAG | species sets samples: %s" % ", ".join(samples))
+		if "species_packs_db" in db:
+			var packs = db.get("species_packs_db")
+			if packs is Array and not packs.is_empty() and packs[0] != null:
+				var pack_vars: Array = []
+				for prop in packs[0].get_property_list():
+					if int(prop.get("usage", 0)) & PROPERTY_USAGE_SCRIPT_VARIABLE:
+						pack_vars.append(str(prop.get("name", "")))
+				_log_message("REGION DIAG | first species pack vars: %s" % ", ".join(pack_vars))
+		_log_asset_diagnostics(db)
+	_log_message("GAMEDB DIAG | === end ===")
+	_log_catalog_dir_diagnostics()
+
+
+func _log_catalog_dir_diagnostics() -> void:
+	for dir in ["res://game", "res://data", "res://resources", "res://assets",
+			"res://assets/ui/textures", "res://assets/ui/textures/dex", "res://assets/ui/textures/shop"]:
+		var access := DirAccess.open(dir)
+		if access == null:
+			_log_message("CATALOG DIAG | %s: (not found)" % dir)
+			continue
+		var dirs := access.get_directories()
+		var files := access.get_files()
+		_log_message("CATALOG DIAG | %s: dirs(%d)=%s files(%d)=%s" % [
+			dir, dirs.size(), _cap_list(dirs), files.size(), _cap_list(files)])
+
+
+func _cap_list(items: PackedStringArray, limit := 40) -> String:
+	var shown: Array = []
+	for i in range(mini(items.size(), limit)):
+		shown.append(items[i])
+	var suffix := "" if items.size() <= limit else " ...(+%d)" % (items.size() - limit)
+	return ", ".join(shown) + suffix
+
+
+## Asset discovery for watchlist icons: lists likely sprite directories and logs
+## any texture/resource paths exposed by a sample species and item.
+func _log_asset_diagnostics(db) -> void:
+	_log_message("ASSET DIAG | === begin ===")
+	for dir in ["res://assets/sprites", "res://assets/sprites/monsters", "res://assets/sprites/items",
+			"res://assets/ui/textures/monster_visual_hud", "res://assets/ui/textures/shop"]:
+		var access := DirAccess.open(dir)
+		if access == null:
+			_log_message("ASSET DIAG | %s: (not found)" % dir)
+			continue
+		var dirs := access.get_directories()
+		var files := access.get_files()
+		_log_message("ASSET DIAG | %s: dirs(%d)=%s files(%d)=%s" % [
+			dir, dirs.size(), _cap_list(dirs), files.size(), _cap_list(files)])
+	if db.has_method("get_all_species"):
+		var species_list = db.get_all_species()
+		if species_list is Array and not species_list.is_empty():
+			_log_asset_fields("species", species_list[0])
+	if "items_db" in db:
+		var items = db.get("items_db")
+		if items is Array and not items.is_empty():
+			_log_asset_fields("item", items[0])
+	_log_message("ASSET DIAG | === end ===")
+
+
+func _log_asset_fields(kind: String, obj) -> void:
+	if obj == null or not is_instance_valid(obj):
+		return
+	_log_message("ASSET DIAG | %s sample: %s" % [kind, _formatter.get_object_info(obj)])
+	if "id" in obj:
+		_log_message("ASSET DIAG |   %s.id = %s" % [kind, str(obj.get("id"))])
+	if "name_key" in obj:
+		_log_message("ASSET DIAG |   %s.name_key = %s" % [kind, str(obj.get("name_key"))])
+	for prop in obj.get_property_list():
+		if not (int(prop.get("usage", 0)) & PROPERTY_USAGE_SCRIPT_VARIABLE):
+			continue
+		var pname := str(prop.get("name", ""))
+		var value = obj.get(pname)
+		var desc := ""
+		if value is Texture2D:
+			desc = "Texture2D path=%s" % str(value.resource_path)
+		elif value is Resource:
+			desc = "Resource path=%s" % str(value.resource_path)
+		elif value is String and (value.contains("res://") or value.contains(".png") or value.contains(".tres")):
+			desc = "String path=%s" % value
+		if not desc.is_empty():
+			_log_message("ASSET DIAG |   %s.%s: %s" % [kind, pname, desc])
+
+
+func _log_shop_structure_diagnostic(state) -> void:
+	_log_message("SHOP DIAG | === begin ===")
+	var view = state.get("view") if _has_property(state, "view") else null
+	if view == null or not is_instance_valid(view):
+		_log_message("SHOP DIAG | state.view not found")
+		_log_message("SHOP DIAG | === end ===")
+		return
+	var view_script: Script = view.get_script()
+	_log_message("SHOP DIAG | view=%s class=%s script=%s path=%s" % [
+		view.name, view.get_class(), str(view_script.resource_path) if view_script != null else "(none)", view.get_path()])
+	if _has_property(view, "shop_slots"):
+		var slots = view.get("shop_slots")
+		_log_message("SHOP DIAG | view.shop_slots type=%s size=%s" % [
+			type_string(typeof(slots)), str(slots.size() if slots is Array else "n/a")])
+	else:
+		_log_message("SHOP DIAG | view.shop_slots NOT found")
+	_log_message("SHOP DIAG | view direct children:")
+	for child in view.get_children():
+		_log_message("SHOP DIAG |   %s" % _describe_node(child))
+	var cards: Array = []
+	_collect_shop_cards(view, cards)
+	_log_message("SHOP DIAG | shop_slot_ui cards found: %d" % cards.size())
+	for card in cards:
+		_log_message("SHOP DIAG |   card %s" % _describe_shop_card(card))
+	_log_message("SHOP DIAG | === end ===")
+
+
+func _collect_shop_cards(node, out: Array) -> void:
+	if node == null or not is_instance_valid(node):
+		return
+	if node is Control:
+		var script: Script = node.get_script()
+		if script != null and str(script.resource_path.get_file().get_basename()) == "shop_slot_ui":
+			out.append(node)
+	for child in node.get_children():
+		_collect_shop_cards(child, out)
+
+
+func _describe_node(node) -> String:
+	if node == null or not is_instance_valid(node):
+		return "(invalid)"
+	var script: Script = node.get_script()
+	var script_name := str(script.resource_path.get_file().get_basename()) if script != null else ""
+	var visible := ""
+	if node is CanvasItem:
+		visible = " visible=%s" % node.is_visible_in_tree()
+	return "%s (%s) script=%s%s" % [node.name, node.get_class(), script_name, visible]
+
+
+func _describe_shop_card(card) -> String:
+	var content = card.get("current_content") if _has_property(card, "current_content") else null
+	var content_desc := "none"
+	if content != null and is_instance_valid(content):
+		var kind := "other"
+		var key := ""
+		# Raw shop entries expose get_gold_cost()+data (monster) or id (item),
+		# matching ShopSnapshot.is_monster_offer()/classify_shop_entry().
+		if content.has_method("get_gold_cost") and _has_property(content, "data"):
+			kind = "monster"
+			var data = content.get("data")
+			if data != null and _has_property(data, "name_key"):
+				key = str(data.get("name_key"))
+		elif _has_property(content, "id"):
+			kind = "item"
+			key = str(content.get("id"))
+		var content_script: Script = content.get_script() if content is Object else null
+		content_desc = "%s id=%s key=%s script=%s" % [
+			kind, str(content.get_instance_id()), key,
+			str(content_script.resource_path) if content_script != null else "(none)"]
+	var rect := ""
+	if card is Control:
+		rect = " rect=%s" % card.get_global_rect()
+	return "%s (%s)%s content=[%s]" % [card.name, card.get_class(), rect, content_desc]
 
 
 func _setup_advisor() -> void:
@@ -263,6 +529,26 @@ func _setup_reminder_panel() -> void:
 	_rank_odds_panel.name = "RankOddsPanel"
 	_rank_odds_panel.log_line.connect(_log_event)
 	_reminder_layer.add_child(_rank_odds_panel)
+
+	# Watchlist button + popup; shop-gated with the rest of the reminder layer.
+	var WatchlistPanel = load("res://mods/CreatureComforts/hud/watchlist_panel.gd")
+	_watchlist_panel = WatchlistPanel.new()
+	_watchlist_panel.name = "WatchlistPanel"
+	_watchlist_panel.setup(_formatter)
+	_reminder_layer.add_child(_watchlist_panel)
+
+
+## Node-attached shop highlighting. Shares the watchlist panel's selection
+## dictionary by reference, so selection changes apply on the next frame.
+func _setup_shop_highlight() -> void:
+	var ShopHighlight = load("res://mods/CreatureComforts/hud/shop_highlight.gd")
+	_shop_highlight = ShopHighlight.new()
+	_shop_highlight.name = "ShopHighlight"
+	add_child(_shop_highlight)
+	_shop_highlight.setup(_watchlist_panel.selection)
+	var enabled := _feature_enabled(ModConfig.KEY_SHOP_HIGHLIGHTS)
+	_shop_highlight.set_enabled(enabled)
+	_watchlist_panel.visible = enabled
 
 
 func _setup_shop_overlay_gate() -> void:
@@ -358,6 +644,13 @@ func _play_poke_item() -> void:
 ## drops any queued sound; enabling lets the next poll re-show it. Panels are
 ## created once at startup, so toggling never duplicates UI or subscriptions.
 func _on_feature_toggled(key: String, value: bool) -> void:
+	# Shop highlighting has no poll-driven re-show, so handle both states here.
+	if key == ModConfig.KEY_SHOP_HIGHLIGHTS:
+		if _shop_highlight != null:
+			_shop_highlight.set_enabled(value)
+		if _watchlist_panel != null:
+			_watchlist_panel.visible = value
+		return
 	if value:
 		return
 	if key == ModConfig.KEY_DAY_REMINDERS:
@@ -588,6 +881,10 @@ func _handle_shop_phase(state) -> void:
 		if _shop_overlay_gate != null:
 			_shop_overlay_gate.reset_for_shop()
 		_log_phase_entry("SHOP", run, manager)
+		if _debug_logging:
+			if not _catalog_diagnostics_logged:
+				_log_catalog_diagnostics()
+			_log_shop_structure_diagnostic(state)
 		if _deep_inspection:
 			_log_lines(_formatter.format_deep_inspect_shop(manager, run))
 		# Trinket gains are battle-scoped now (tracked during the battle state only), so no

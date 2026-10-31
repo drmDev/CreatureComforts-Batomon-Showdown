@@ -24,17 +24,10 @@ const BODY_FONT_SIZE := 8
 const COLUMN_FRACTIONS := [0.12, 0.16, 0.18, 0.14, 0.20, 0.20]
 const HEADER_LABELS := ["Rank", "Common", "Uncommon", "Rare", "Super Rare", "Legendary"]
 
-const RARITY_COLORS := [
-	Color("#c8ccd4"),  # Common - light gray
-	Color("#7ec850"),  # Uncommon - green
-	Color("#4a9ff5"),  # Rare - blue
-	Color("#b06ef0"),  # Super Rare - purple
-	Color("#f39c12"),  # Legendary - gold
-]
-
-const HEADER_BG := Color("#2b3a52")  # Matches collapsible_panel header bar
-const HIGHLIGHT_COLOR := Color(0.95, 0.61, 0.07, 0.18)  # Current-rank row tint
-const DIM_COLOR := Color(0.0, 0.0, 0.0, 0.35)  # Modal backdrop
+const RARITY_COLORS := Style.RARITY_COLORS
+const HEADER_BG := Style.HEADER_BG
+const HIGHLIGHT_COLOR := Style.HIGHLIGHT_COLOR
+const DIM_COLOR := Style.DIM_COLOR
 
 # Rank 14 represents "14+" (the final row). 0 renders as an em dash.
 const RANK_ODDS := [

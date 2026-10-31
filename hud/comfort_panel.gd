@@ -1,11 +1,13 @@
 extends Control
 
-# Shared palette (matches reminder_label / player_hud / shop_income_panel / trinket_panel)
-const BG_COLOR := Color("#1a2332")       # Dark navy
-const BORDER_COLOR := Color("#f39c12")   # Gold
-const LABEL_COLOR := Color("#d4d8e0")    # Dimmer label text
-const VALUE_COLOR := Color("#ecf0f1")    # Bright value text
-const SHADOW_COLOR := Color("#2c3e50")   # Dark shadow
+const Style = preload("../core/style.gd")
+
+# Shared palette (single source: core/style.gd)
+const BG_COLOR := Style.BG_COLOR
+const BORDER_COLOR := Style.BORDER_COLOR
+const LABEL_COLOR := Style.LABEL_COLOR
+const VALUE_COLOR := Style.VALUE_COLOR
+const SHADOW_COLOR := Style.SHADOW_COLOR
 
 const FALLBACK_FONTS := [
 	"res://assets/ui/fonts/NotoSansJP-ExtraBold.ttf",

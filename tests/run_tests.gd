@@ -10,6 +10,7 @@ var _test_scripts := {
 	"trinket_gains": preload("test_trinket_gains.gd"),
 	"mod_config": preload("test_mod_config.gd"),
 	"reminder_label": preload("test_reminder_label.gd"),
+	"watchlist": preload("test_watchlist.gd"),
 }
 
 

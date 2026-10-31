@@ -1,7 +1,7 @@
 {
 	"id": "creature_comforts",
 	"name": "Creature Comforts",
-	"version": "1.1",
+	"version": "1.117",
 	"author": "NescapePlan",
 	"description": "Creature Comforts - QoL improvements.",
 	"settings": [
@@ -18,6 +18,8 @@
 		{"key": "shop_income", "label": "Shop Income", "type": "bool", "default": true,
 		 "description": "Display income during the shop phase."},
 		{"key": "rank_odds_preview", "label": "Rank Odds Preview", "type": "bool", "default": true,
-		 "description": "Show the shop rank probability table."}
+		 "description": "Show the shop rank probability table."},
+		{"key": "shop_highlights", "label": "Shop Highlights", "type": "bool", "default": true,
+		 "description": "Highlight shop cards that match your watchlist."}
 	]
 }

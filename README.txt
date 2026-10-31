@@ -41,6 +41,14 @@ Click the chart icon near the shop rank display to open a table showing
 the rarity probabilities for every shop rank (1 through 14+).
 
 
+WATCHLIST / SHOP HIGHLIGHTS
+Click the WL button in the shop to open a filterable list of every Batomon
+and item. Use the letter buttons to narrow the list, then tick entries you
+want to watch; matching shop cards are outlined automatically. Selections
+are saved and persist between sessions. Use the "Selected only" filter to
+review your list.
+
+
 SETTINGS
 --------
 Every feature can be toggled independently under Settings > Mods > Creature
@@ -53,6 +61,7 @@ Comforts. All settings default to On, so existing behavior is unchanged.
 - Trinkets Gained Panel: Show trinkets acquired during battle.
 - Shop Income: Display income during the shop phase.
 - Rank Odds Preview: Show the shop rank probability table.
+- Shop Highlights: Highlight shop cards that match your watchlist.
 
 Settings are saved by the Mod Loader and persist between game sessions.
 

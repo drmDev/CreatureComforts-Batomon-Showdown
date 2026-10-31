@@ -7,8 +7,8 @@ const ANIM_SEC := 0.14
 const DRAG_THRESHOLD := 3.0
 const TITLE_FONT_SIZE := 11
 
-const HEADER_BG := Color("#2b3a52")      # Slightly lighter navy for the header bar
-const INK_COLOR := Color("#ecf0f1")      # "-" / "+" glyph colour
+const HEADER_BG := Style.HEADER_BG      # Slightly lighter navy for the header bar
+const INK_COLOR := Style.VALUE_COLOR    # "-" / "+" glyph colour
 
 var _entries: Array = []  # Array of subclass-defined row Dictionaries
 var _content_key := ""    # Cheap change detection for subclass show_*() callers

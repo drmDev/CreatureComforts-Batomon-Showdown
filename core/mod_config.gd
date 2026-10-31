@@ -18,6 +18,7 @@ const KEY_BATTLE_STATUS_PANEL := "battle_status_panel"
 const KEY_TRINKETS_GAINED_PANEL := "trinkets_gained_panel"
 const KEY_SHOP_INCOME := "shop_income"
 const KEY_RANK_ODDS_PREVIEW := "rank_odds_preview"
+const KEY_SHOP_HIGHLIGHTS := "shop_highlights"
 
 ## All features default to enabled to preserve existing behavior.
 const DEFAULTS := {
@@ -28,6 +29,7 @@ const DEFAULTS := {
 	KEY_TRINKETS_GAINED_PANEL: true,
 	KEY_SHOP_INCOME: true,
 	KEY_RANK_ODDS_PREVIEW: true,
+	KEY_SHOP_HIGHLIGHTS: true,
 }
 
 ## Emitted when a known setting changes. Only our own keys are re-emitted.
