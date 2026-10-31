@@ -1,12 +1,7 @@
 extends RefCounted
-## ShopHighlightController - isolated shop-card highlight integration.
-##
 ## NOT WIRED UP IN v1. Shop-card highlighting is deferred to a v2 release; this
 ## controller keeps the integration logic (target building + live rect resolution)
 ## out of mod_main so it can be re-enabled without re-tangling the main loop.
-##
-## Owns a ShopHighlight overlay and converts highlight-mode advice into targets
-## (slot index + offer instance id), resolving live card rects each frame.
 
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
 const TrainerRules = preload("../advice/trainer_rules.gd")
@@ -16,7 +11,6 @@ var _overlay = null
 var _tree: SceneTree = null
 
 
-## Create the overlay under `parent`. `tree` is used to resolve the live shop view.
 func setup(parent: Node, tree: SceneTree) -> void:
 	_tree = tree
 	_overlay = ShopHighlightScript.new()
@@ -25,7 +19,6 @@ func setup(parent: Node, tree: SceneTree) -> void:
 	parent.add_child(_overlay)
 
 
-## Convert active highlight-mode advice into highlight targets.
 func update(all_active: Array) -> void:
 	if _overlay == null:
 		return
@@ -51,8 +44,6 @@ func clear() -> void:
 		_overlay.clear_targets()
 
 
-## Called every frame by the overlay: current rects for cards still showing the recorded offer.
-## Reads state.view.shop_slots[slot_index].current_content and compares instance ids, retaining nothing.
 func _resolve_rects(targets: Array) -> Array:
 	var rects: Array = []
 	if targets.is_empty() or _tree == null:

@@ -1,15 +1,7 @@
 extends "comfort_panel.gd"
-## PlayerHud - Compact battle HUD showing the player's HP, Wins, and Day.
-##
-## Ported from NP_QoL's player_hud.gd, but restyled to match Creature Comforts'
-## other panels (dark navy background, gold border, Consolas font, light shadow).
-##
 ## Icons: the game's own heart and trophy textures are loaded from the packed UI
 ## textures; the calendar icon is loaded from the mod's assets. A missing icon falls
 ## back to its text label.
-##
-## Displays as a single line: "[heart] 3  [trophy] 2  [calendar] 4"
-## Shown only while a battle is active (mod_main controls visibility).
 
 const CONTENT_PADDING := 4.0
 const CONTENT_INSET := 2.0  # Extra left/right breathing room inside the padding
@@ -57,7 +49,6 @@ func _setup_styles() -> void:
 	_panel_style.set_content_margin_all(CONTENT_PADDING)
 
 
-## Update the displayed stats. Expected keys: hp, wins, day (values are pre-formatted strings).
 func update_stats(new_stats: Dictionary) -> void:
 	if new_stats == _player_stats:
 		return
@@ -69,7 +60,6 @@ func update_stats(new_stats: Dictionary) -> void:
 	queue_redraw()
 
 
-## Panel width that exactly fits the current stats line (no trailing empty space).
 func _measure_content_width(stats: Dictionary) -> float:
 	var hp := str(stats.get("hp", "?"))
 	var wins := str(stats.get("wins", "?"))
@@ -136,7 +126,6 @@ func _draw_stats_row() -> void:
 	_draw_stat(cursor_x, row_top, baseline, "Day", day, _calendar_texture)
 
 
-## Draw "[icon] Value" (or "Label Value" when the icon is unavailable) and return the x cursor.
 func _draw_stat(start_x: float, row_top: float, baseline: float, label: String, value: String, icon: Texture2D) -> float:
 	var cursor_x := start_x
 

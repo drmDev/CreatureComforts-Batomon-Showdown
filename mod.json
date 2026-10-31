@@ -1,7 +1,7 @@
 {
 	"id": "creature_comforts",
 	"name": "Creature Comforts",
-	"version": "0.9066",
+	"version": "1.0",
 	"author": "NescapePlan",
-	"description": "Quality of Life improvements for the mons"
+	"description": "Creature Comforts - QoL improvements."
 }

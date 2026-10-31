@@ -11,11 +11,10 @@ extends RefCounted
 ##       assert_eq(1 + 1, 2)
 
 var _current_test: String = ""
-var _failures: Array = []  # Array of {"test": String, "message": String}
+var _failures: Array = []
 var _assertions: int = 0
 
 
-## Run every `test_*` method on this instance. Returns the number of failures.
 func run_all() -> int:
 	var methods: Array = []
 	for method in get_method_list():
@@ -40,8 +39,6 @@ func assertion_count() -> int:
 func failures() -> Array:
 	return _failures
 
-
-# --- Assertions ---
 
 func assert_true(value: bool, message: String = "") -> void:
 	_assertions += 1

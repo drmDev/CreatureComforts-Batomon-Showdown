@@ -1,5 +1,4 @@
 extends "test_runner.gd"
-## Unit tests for advice/trainer_rules.gd.
 
 const TrainerRules = preload("../advice/trainer_rules.gd")
 const TestHelpers = preload("test_helpers.gd")
@@ -12,8 +11,6 @@ const BASIC_BAIT := "basic_bait"
 func _formatter():
 	return TestHelpers.FakeFormatter.new()
 
-
-# --- ShopTargetsRule ---
 
 func test_shop_targets_matches_monster_by_name() -> void:
 	var rule = TrainerRules.ShopTargetsRule.new(
@@ -89,8 +86,6 @@ func test_shop_targets_empty_trainer_applies_to_any() -> void:
 	assert_not_empty(rule.evaluate(ctx))
 
 
-# --- TeamCompositionRule: anchor mode ---
-
 func test_team_anchor_flags_offender() -> void:
 	var rule = TrainerRules.TeamCompositionRule.new(
 		"r7", "musician", "warn", _formatter(), BEETDOWN, 3, "fighter",
@@ -142,8 +137,6 @@ func test_team_anchor_no_offenders_returns_empty() -> void:
 	assert_empty(rule.evaluate(ctx))
 
 
-# --- TeamCompositionRule: count mode ---
-
 func test_team_count_mode_flags_excess() -> void:
 	var rule = TrainerRules.TeamCompositionRule.new(
 		"r11", "musician", "warn", _formatter(), "", 0, "electric",
@@ -168,8 +161,6 @@ func test_team_count_mode_within_limit_returns_empty() -> void:
 	])
 	assert_empty(rule.evaluate(ctx))
 
-
-# --- DayReminderRule ---
 
 func test_day_reminder_matches_day() -> void:
 	var rule = TrainerRules.DayReminderRule.new(

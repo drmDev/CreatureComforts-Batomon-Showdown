@@ -1,24 +1,14 @@
 extends "collapsible_panel.gd"
-## TrinketPanel - Collapsible panel showing non-junk trinkets earned during a battle.
-##
-## Appears bottom-right when the battle state ends and the panel is shown, and auto-hides
-## after a few seconds. It only shows when at least one non-junk trinket was earned; that
-## filtering is done by mod_main before calling show_gains().
-##
 ## Gift content from a consumed Locked Box / Mysterious Chest is excluded upstream (it is
 ## applied after the frozen battle_over snapshot), so this panel only receives legitimate gains.
-##
-## Collapsible header mechanics (header bar, -/+ toggle, drag, animated reveal, shared styling)
-## live in collapsible_panel.gd. This subclass supplies the bottom-right anchoring, the
-## single-line "Nx name" rows, and the results-screen auto-hide timer.
 
 const PANEL_WIDTH := 185.0
-const CONTENT_PADDING := 6.0
-const ROW_HEIGHT := 16.0
-const ROW_GAP := 2.0
-const FONT_SIZE := 10
+const CONTENT_PADDING := 5.0
+const ROW_HEIGHT := 14.0
+const ROW_GAP := 1.0
+const FONT_SIZE := 8
+const HEADER_FONT_SIZE := 9  # Smaller than the shared TITLE_FONT_SIZE (11) for a compact header
 
-# Display
 const DISPLAY_DURATION_MS := 8000  # Auto-hide after 8 seconds on the results screen
 const MARGIN_RIGHT := 10.0
 const MARGIN_BOTTOM := 130.0       # Leaves room for a bottom-right toast from a companion mod
@@ -26,20 +16,15 @@ const MARGIN_BOTTOM := 130.0       # Leaves room for a bottom-right toast from a
 var _hide_at_ms := 0
 
 
-## Height of the panel when fully expanded (depends on the number of entries).
 func full_height() -> float:
 	return HEAD_H + CONTENT_PADDING + ROW_HEIGHT * float(_entries.size()) \
 		+ ROW_GAP * float(_entries.size()) + CONTENT_PADDING
 
 
-## Header title (between the left edge and the -/+ button).
 func header_text() -> String:
-	return "Trinkets Gained"
+	return "Trinkets"
 
 
-## Show the panel with the given (already non-junk filtered) entries.
-## entries: Array of Dictionary {"name": String, "count": int}
-##
 ## Idempotent: only the FIRST call (hidden -> visible) anchors the panel. Later calls with the
 ## same content do nothing, which preserves any drag position and the minimize animation.
 func show_gains(entries: Array) -> void:
@@ -61,7 +46,6 @@ func show_gains(entries: Array) -> void:
 	queue_redraw()
 
 
-## Hide the panel immediately.
 func hide_panel() -> void:
 	if _tween != null:
 		_tween.kill()
@@ -75,7 +59,6 @@ func hide_panel() -> void:
 	queue_redraw()
 
 
-## Stable, ordered text key used to detect whether the displayed rows changed.
 func _make_content_key(entries: Array) -> String:
 	var parts: Array[String] = []
 	for entry in entries:
@@ -84,11 +67,23 @@ func _make_content_key(entries: Array) -> String:
 
 
 func _apply_size() -> void:
-	# Keep the width we were set to (or a default) and animate height between header-only and full.
-	var w := size.x
-	if w <= 0.0:
-		w = PANEL_WIDTH
-	size = Vector2(w, lerpf(HEAD_H + 1.0, full_height(), reveal))
+	size = Vector2(_content_width(), lerpf(HEAD_H + 1.0, full_height(), reveal))
+
+
+func _content_width() -> float:
+	if _text_font == null:
+		return PANEL_WIDTH
+	var row_w := 0.0
+	for entry in _entries:
+		var line := "%dx %s" % [int(entry.get("count", 0)), str(entry.get("name", ""))]
+		row_w = maxf(row_w, _text_font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x)
+	var body_min := row_w + CONTENT_PADDING * 2.0 + 2.0
+	var title_w := _text_font.get_string_size(header_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, HEADER_FONT_SIZE).x
+	# Tighter than the base header inset: the title starts 2 px inside the header and
+	# leaves a 2 px gap before the -/+ button (see _draw_title), so the panel can be
+	# narrower without ellipsizing the title.
+	var header_min := title_w + BTN + 22.0
+	return maxf(body_min, header_min)
 
 
 func _anchor_bottom_right() -> void:
@@ -96,7 +91,16 @@ func _anchor_bottom_right() -> void:
 	position = Vector2(viewport_size.x - size.x - MARGIN_RIGHT, viewport_size.y - size.y - MARGIN_BOTTOM)
 
 
-## Single-line rows: "Nx Name".
+## Tighter title rect than the base: 2 px inside the header and a 2 px gap before the
+## -/+ button, matching the header_min calculation in _content_width().
+func _draw_title(_r: Rect2) -> void:
+	var start_x := 9.0
+	var max_w := button_rect().position.x - start_x - 2.0
+	var t := _fit_text(_text_font, header_text(), HEADER_FONT_SIZE, max_w)
+	var baseline := HEAD_H * 0.5 + 2.5
+	_draw_text_shadow(Vector2(start_x, baseline), t, VALUE_COLOR, HEADER_FONT_SIZE)
+
+
 func _draw_body(_width: float) -> void:
 	var cursor_y := HEAD_H + CONTENT_PADDING
 	for entry in _entries:

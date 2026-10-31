@@ -1,10 +1,4 @@
 extends Control
-## ComfortPanel - shared foundation for Creature Comforts HUD panels.
-##
-## Provides the common dark-navy/gold palette, the Consolas-with-fallbacks font,
-## shadowed text drawing, and viewport-resize plumbing used by the drawing panels
-## (player HUD, shop income, trinket panel). Subclasses keep their own layout,
-## styles, and drawing; this only removes the duplicated boilerplate.
 
 # Shared palette (matches reminder_label / player_hud / shop_income_panel / trinket_panel)
 const BG_COLOR := Color("#1a2332")       # Dark navy
@@ -23,7 +17,6 @@ const SYSTEM_FALLBACKS := ["Leelawadee UI", "Tahoma", "Segoe UI", "Noto Sans Tha
 var _text_font: Font
 
 
-## Build the shared Consolas font with the game's font fallbacks.
 func _build_panel_font() -> Font:
 	var fallbacks: Array[Font] = []
 	for font_path in FALLBACK_FONTS:
@@ -52,20 +45,17 @@ func _load_texture(relative_path: String) -> Texture2D:
 	return ImageTexture.create_from_image(image)
 
 
-## Connect the viewport resize signal once (safe to call from _ready).
 func _connect_viewport_resize(handler: Callable) -> void:
 	var viewport := get_viewport()
 	if viewport != null and not viewport.size_changed.is_connected(handler):
 		viewport.size_changed.connect(handler)
 
 
-## Draw text with a light shadow for readability (shared panel look).
 func _draw_text_shadow(pos: Vector2, text: String, color: Color, font_size: int, align := HORIZONTAL_ALIGNMENT_LEFT, width := -1.0) -> void:
 	draw_string(_text_font, pos + Vector2(0.0, 1.0), text, align, width, font_size, SHADOW_COLOR)
 	draw_string(_text_font, pos, text, align, width, font_size, color)
 
 
-## Trim `text` with an ellipsis so it fits `max_w` at `font_size` (per character).
 func _fit_text(font: Font, text: String, font_size: int, max_w: float) -> String:
 	if max_w <= 0.0:
 		return ""

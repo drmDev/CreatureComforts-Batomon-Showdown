@@ -1,5 +1,4 @@
 extends RefCounted
-## TrainerRules - Reusable rule classes for trainer advice.
 ## Rules return structured advice without side effects (no printing, file writing, or retaining live objects).
 ## Every advice dictionary uses a shared contract so consumers can route by field instead of rule-id strings:
 ##   rule_id, trainer_id, severity, message, display, reminder, chime, plus rule-specific extras.
@@ -7,7 +6,6 @@ extends RefCounted
 const AdviceContext = preload("advice_context.gd")
 
 
-## Base class for all rules
 class BaseRule:
 	# Display modes tell the UI layer how this rule should be shown.
 	const DISPLAY_NONE := "none"
@@ -16,10 +14,10 @@ class BaseRule:
 	const DISPLAY_BOTH := "both"
 
 	var rule_id: String
-	var trainer_id: String  # Trainer this rule applies to; empty string means any trainer
+	var trainer_id: String  # Empty = any trainer
 	var display_mode: String
-	var reminder_text: String  # Compact text for the top-bar label; empty = no label entry
-	var chime: bool  # Whether a new match may play the notification sound (day reminders only)
+	var reminder_text: String  # Empty = no label entry
+	var chime: bool
 
 	func _init(p_rule_id: String, p_trainer_id: String, p_display_mode: String, p_reminder_text: String, p_chime: bool) -> void:
 		rule_id = p_rule_id
@@ -28,11 +26,9 @@ class BaseRule:
 		reminder_text = p_reminder_text
 		chime = p_chime
 
-	## Evaluate rule against context, return advice or empty dict
 	func evaluate(_context: AdviceContext) -> Dictionary:
 		return {}
 
-	## Assemble advice with the shared contract; extras are merged per rule
 	func _make_advice(severity: String, message: String, extra: Dictionary = {}) -> Dictionary:
 		var advice := {
 			"rule_id": rule_id,
@@ -47,19 +43,17 @@ class BaseRule:
 			advice[key] = extra[key]
 		return advice
 
-	## Does this rule apply to the given context's trainer? (empty trainer_id = any trainer)
 	func _matches_trainer(context: AdviceContext) -> bool:
 		return trainer_id.is_empty() or context.trainer_id == trainer_id
 
 
-## Rule that flags specific shop targets (monsters by name and/or type, and/or items)
 class ShopTargetsRule extends BaseRule:
-	var target_monsters: Array  # monster name_keys
-	var target_items: Array  # item IDs
-	var target_types: Array  # lowercase type names; monster offers of these types are highlighted
+	var target_monsters: Array
+	var target_items: Array
+	var target_types: Array
 	var severity: String
 	var message_template: String
-	var formatter  # Reference to log formatter for name formatting
+	var formatter
 
 	func _init(p_rule_id: String, p_trainer_id: String, p_target_monsters: Array, p_target_items: Array, p_severity: String, p_message_template: String, p_formatter, p_target_types: Array = []) -> void:
 		super._init(p_rule_id, p_trainer_id, DISPLAY_HIGHLIGHT, "", false)
@@ -75,10 +69,9 @@ class ShopTargetsRule extends BaseRule:
 			return {}
 
 		var matches: Array = []
-		var matched_indices: Array = []  # Shop slot indices, aligned with matched_ids
-		var matched_ids: Array = []  # Live offer instance ids, so overlays can validate identity
+		var matched_indices: Array = []
+		var matched_ids: Array = []
 
-		# Check for target monsters (by name and/or type) and items
 		for shop_item in context.shop_items:
 			if shop_item.is_monster and (shop_item.name_key in target_monsters or _matches_target_type(shop_item.types)):
 				var monster_name: String = formatter.format_species_name(shop_item.name_key)
@@ -99,7 +92,6 @@ class ShopTargetsRule extends BaseRule:
 			"matched_ids": matched_ids
 		})
 
-	## Does this monster offer carry any of the target types? (target_types empty = no type matching)
 	func _matches_target_type(types: Array) -> bool:
 		if target_types.is_empty():
 			return false
@@ -108,7 +100,6 @@ class ShopTargetsRule extends BaseRule:
 				return true
 		return false
 
-## Rule that flags a team-composition condition.
 ## Two modes:
 ##   Anchor mode (monster_key set): "the anchor monster must be the only monster of a given type"
 ##     (e.g., Beetdown must be the team's only fighter).
@@ -116,12 +107,12 @@ class ShopTargetsRule extends BaseRule:
 ##     of the required type, without naming specific units (e.g., Musician and Electric monsters).
 class TeamCompositionRule extends BaseRule:
 	var severity: String
-	var formatter  # Reference to log formatter for name formatting
-	var monster_key: String  # Anchor species name_key (e.g., "monster.name.beetdown"); empty = count mode
-	var min_level: int  # Anchor must be at least this level for the rule to apply (anchor mode)
-	var required_type: String  # Type other monsters must have to violate the composition
-	var message: String  # Console message template; %%s is replaced with the offender list (anchor) or count (count mode)
-	var max_count: int  # Count mode: maximum allowed number of required_type monsters on the team
+	var formatter
+	var monster_key: String
+	var min_level: int
+	var required_type: String
+	var message: String
+	var max_count: int
 
 	func _init(p_rule_id: String, p_trainer_id: String, p_severity: String, p_formatter, p_monster_key: String, p_min_level: int, p_required_type: String, p_message: String, p_reminder_text: String, p_max_count: int = 1) -> void:
 		super._init(p_rule_id, p_trainer_id, DISPLAY_LABEL, p_reminder_text, false)
@@ -137,7 +128,6 @@ class TeamCompositionRule extends BaseRule:
 		if not _matches_trainer(context):
 			return {}
 
-		# Count mode: warn only when the active team exceeds max_count required-type monsters.
 		if monster_key.is_empty():
 			var count := 0
 			for monster in context.team_monsters:
@@ -147,7 +137,6 @@ class TeamCompositionRule extends BaseRule:
 				return {}
 			return _make_advice(severity, message % str(count))
 
-		# Anchor mode: find the anchor monster at or above the minimum level
 		var anchor_slot := -1
 		for monster in context.team_monsters:
 			if monster.name_key == monster_key and monster.level >= min_level:
@@ -157,7 +146,6 @@ class TeamCompositionRule extends BaseRule:
 		if anchor_slot == -1:
 			return {}
 
-		# Collect other monsters whose type violates the composition
 		var offenders: Array = []
 		for monster in context.team_monsters:
 			if monster.slot == anchor_slot:
@@ -172,7 +160,6 @@ class TeamCompositionRule extends BaseRule:
 		return _make_advice(severity, message % ", ".join(offenders))
 
 
-## Rule that triggers on a specific day
 class DayReminderRule extends BaseRule:
 	var target_day: int
 	var severity: String
@@ -188,7 +175,6 @@ class DayReminderRule extends BaseRule:
 		if not _matches_trainer(context):
 			return {}
 
-		# Check day
 		if context.day != target_day:
 			return {}
 

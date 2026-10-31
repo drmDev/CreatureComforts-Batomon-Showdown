@@ -1,27 +1,11 @@
 extends "comfort_panel.gd"
-## RankOddsPanel - Shop-only button that opens a "SHOP RANK ODDS" popup.
-##
-## A small pixel-art-style button (assets/icons/rankChart.png) sits in the bottom-left
-## corner, 20% up from the bottom of the viewport. Clicking it opens a modal popup
-## showing the shop rarity probabilities for every rank (1-14+). The popup is drawn
-## directly (no child nodes), matching the other Creature Comforts panels.
-##
-## The popup is modal while open: the control expands to cover the viewport so clicks
-## cannot reach the shop underneath. It closes via the X button, clicking the icon
-## again, clicking outside the popup, or Escape.
-##
-## Visibility is controlled by the reminder layer's shop gate (mod_main), so the
-## button only appears during the shop phase. mod_main calls set_rank() each shop
-## poll and hide_panel() when leaving the shop.
 
 signal log_line(message: String)
 
-# Button geometry / anchoring
 const BTN_SIZE := 22.0
 const LEFT_MARGIN := 100.0
 const BOTTOM_OFFSET_RATIO := 0.20  # Button bottom sits 20% of the viewport height above the bottom
 
-# Popup geometry
 const POPUP_WIDTH := 320.0
 const POPUP_PADDING := 8.0
 const TITLE_H := 22.0
@@ -33,16 +17,13 @@ const VIEWPORT_MARGIN := 8.0
 const TEXT_BASELINE_OFFSET := 4.0
 const FALLBACK_VIEWPORT_SIZE := Vector2(1280, 720)
 
-# Fonts
 const TITLE_FONT_SIZE := 11
 const HEADER_FONT_SIZE := 8
 const BODY_FONT_SIZE := 8
 
-# Column layout: Rank + 5 rarity columns (fractions of the inner width, sum = 1.0)
 const COLUMN_FRACTIONS := [0.12, 0.16, 0.18, 0.14, 0.20, 0.20]
 const HEADER_LABELS := ["Rank", "Common", "Uncommon", "Rare", "Super Rare", "Legendary"]
 
-# Rarity header colours (Common, Uncommon, Rare, Super Rare, Legendary)
 const RARITY_COLORS := [
 	Color("#c8ccd4"),  # Common - light gray
 	Color("#7ec850"),  # Uncommon - green
@@ -55,7 +36,6 @@ const HEADER_BG := Color("#2b3a52")  # Matches collapsible_panel header bar
 const HIGHLIGHT_COLOR := Color(0.95, 0.61, 0.07, 0.18)  # Current-rank row tint
 const DIM_COLOR := Color(0.0, 0.0, 0.0, 0.35)  # Modal backdrop
 
-# Rank probability table: [rank, common, uncommon, rare, super_rare, legendary].
 # Rank 14 represents "14+" (the final row). 0 renders as an em dash.
 const RANK_ODDS := [
 	[1, 100, 0, 0, 0, 0],
@@ -124,9 +104,6 @@ func _setup_styles() -> void:
 	_close_style.set_corner_radius_all(2)
 
 
-# --- Public API -----------------------------------------------------------------
-
-## Update the current shop rank and show the button. Called each shop poll.
 func set_rank(rank: int) -> void:
 	_rank = clampi(rank, 1, 14)
 	if not visible:
@@ -136,7 +113,6 @@ func set_rank(rank: int) -> void:
 	queue_redraw()
 
 
-## Hide the button and close the popup. Called when leaving the shop.
 func hide_panel() -> void:
 	if _popup_open:
 		_close_popup()
@@ -153,11 +129,8 @@ func reset_for_shop() -> void:
 		_close_popup()
 
 
-# --- Anchoring ------------------------------------------------------------------
-
 func _anchor() -> void:
 	var viewport_size := _viewport_size()
-	# Bottom edge sits 20% of the viewport height above the bottom (size accounted for).
 	_button_screen_pos = Vector2(LEFT_MARGIN, roundf(viewport_size.y * (1.0 - BOTTOM_OFFSET_RATIO) - BTN_SIZE))
 	if _popup_open:
 		position = Vector2.ZERO
@@ -177,8 +150,6 @@ func _viewport_size() -> Vector2:
 	return viewport.get_visible_rect().size if viewport != null else FALLBACK_VIEWPORT_SIZE
 
 
-# --- Popup state ----------------------------------------------------------------
-
 func _open_popup() -> void:
 	if _popup_open:
 		return
@@ -197,8 +168,6 @@ func _close_popup() -> void:
 	log_line.emit("RANK ODDS | popup closed")
 	queue_redraw()
 
-
-# --- Geometry -------------------------------------------------------------------
 
 ## Button rect in local coordinates (the control is button-sized when closed and
 ## viewport-sized when the popup is open).
@@ -229,8 +198,6 @@ func _close_rect() -> Rect2:
 	)
 
 
-# --- Drawing --------------------------------------------------------------------
-
 func _draw() -> void:
 	if _text_font == null:
 		return
@@ -256,12 +223,10 @@ func _draw_popup() -> void:
 	var r := _popup_rect()
 	_popup_style.draw(get_canvas_item(), r)
 
-	# Title header
 	var title_rect := Rect2(r.position, Vector2(r.size.x, TITLE_H))
 	_header_style.draw(get_canvas_item(), title_rect)
 	_draw_text_shadow(r.position + Vector2(POPUP_PADDING, TITLE_H - 6.0), "SHOP RANK ODDS", VALUE_COLOR, TITLE_FONT_SIZE)
 
-	# Close button (X)
 	var close := _close_rect()
 	_close_style.draw(get_canvas_item(), close)
 	var c := close.get_center()
@@ -277,7 +242,6 @@ func _draw_table(r: Rect2) -> void:
 	var header_y := r.position.y + TITLE_H + POPUP_PADDING
 	var columns := COLUMN_FRACTIONS.size()
 
-	# Header row
 	var x := inner_left
 	for i in range(columns):
 		var cw: float = inner_w * COLUMN_FRACTIONS[i]
@@ -285,10 +249,8 @@ func _draw_table(r: Rect2) -> void:
 		_draw_text_shadow(Vector2(x, header_y + HEADER_ROW_H - TEXT_BASELINE_OFFSET), HEADER_LABELS[i], color, HEADER_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER, cw)
 		x += cw
 
-	# Separator under the header
 	draw_line(Vector2(inner_left, header_y + HEADER_ROW_H), Vector2(inner_left + inner_w, header_y + HEADER_ROW_H), BORDER_COLOR, 1.0)
 
-	# Rows
 	var row_y := header_y + HEADER_ROW_H + HEADER_GAP
 	for row in RANK_ODDS:
 		var is_current := int(row[0]) == _rank
@@ -311,8 +273,6 @@ func _cell_text(row: Array, column: int) -> String:
 	var pct := int(row[column])
 	return "—" if pct == 0 else "%d%%" % pct
 
-
-# --- Input ----------------------------------------------------------------------
 
 func _gui_input(event) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:

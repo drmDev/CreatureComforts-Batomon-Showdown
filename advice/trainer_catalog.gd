@@ -1,10 +1,8 @@
 extends RefCounted
-## TrainerCatalog - declarative trainer definitions.
 ## Data only: trainer id, display name, and rule definitions consumed by rule_factory.gd.
 ## Adding a trainer = adding one entry here (plus a trainers/<id>.gd only if it needs
 ## custom evaluate() logic, referenced via the "script" key in a rule definition).
 
-# Shared shop-target defaults for trainers that start with the same shopping goal.
 # Items stay empty: basic_bait changed in-game and is no longer reminder worthy.
 const DEFAULT_SHOP_MONSTERS := ["monster.name.lamplet", "monster.name.swoonet"]
 const DEFAULT_SHOP_ITEMS := []

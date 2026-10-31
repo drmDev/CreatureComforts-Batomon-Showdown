@@ -1,5 +1,4 @@
 extends RefCounted
-## RuleFactory - builds rule instances from TrainerCatalog definitions.
 ## Keeps trainer data out of both the rule classes and mod_main; per-trainer custom
 ## evaluate() logic can be supplied via a "script" key pointing to a GDScript whose
 ## .new(rule_def, formatter) returns a BaseRule-compatible instance.
@@ -13,7 +12,6 @@ func _init(p_formatter) -> void:
 	_formatter = p_formatter
 
 
-## Build all registered trainers' rules
 func build_all(trainer_definitions: Array) -> Array:
 	var rules: Array = []
 	for trainer_def in trainer_definitions:
@@ -21,7 +19,6 @@ func build_all(trainer_definitions: Array) -> Array:
 	return rules
 
 
-## Build one trainer's rules from its catalog entry
 func build_trainer(trainer_def: Dictionary) -> Array:
 	var rules: Array = []
 	var trainer_id: String = str(trainer_def.get("id", ""))
@@ -87,7 +84,6 @@ func _build_rule(trainer_id: String, rule_def: Dictionary):
 	return null
 
 
-## Apply optional display/reminder/chime overrides from the catalog entry.
 ## An unknown display mode fails loudly instead of silently rendering nowhere.
 func _apply_overrides(rule, rule_def: Dictionary) -> void:
 	if rule_def.has("display"):

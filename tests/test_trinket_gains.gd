@@ -1,10 +1,7 @@
 extends "test_runner.gd"
-## Unit tests for core/trinket_gains.gd (battle-scoped trinket diff logic).
 
 const TrinketGains = preload("../core/trinket_gains.gd")
 
-
-# --- diff_id_lists ---
 
 func test_diff_id_lists_returns_new_ids() -> void:
 	assert_eq(TrinketGains.diff_id_lists(["a", "b"], ["a", "b", "c"]), ["c"])
@@ -22,8 +19,6 @@ func test_diff_id_lists_empty_inputs() -> void:
 	assert_eq(TrinketGains.diff_id_lists([], []), [])
 	assert_eq(TrinketGains.diff_id_lists([], ["a"]), ["a"])
 
-
-# --- diff_states ---
 
 func test_diff_states_reports_gains_and_counter() -> void:
 	var before := {"trinket_ids": ["a"], "trinkets_gained_total": 1, "used_trinket_ids": []}
@@ -49,8 +44,6 @@ func test_diff_states_tolerates_missing_keys() -> void:
 	assert_empty(gains["newly_used"])
 
 
-# --- has_gift_trinket ---
-
 func test_has_gift_trinket_detects_locked_box() -> void:
 	assert_true(TrinketGains.has_gift_trinket(["locked_box"]))
 
@@ -66,8 +59,6 @@ func test_has_gift_trinket_ignores_other_one_shots() -> void:
 func test_has_gift_trinket_empty() -> void:
 	assert_false(TrinketGains.has_gift_trinket([]))
 
-
-# --- withheld_count ---
 
 func test_withheld_count_reports_counter_gap() -> void:
 	# Real Day 7 defeat: Locked Box consumed, 11 battle gains in inventory, counter +12.
@@ -89,8 +80,6 @@ func test_withheld_count_tolerates_missing_keys() -> void:
 	assert_eq(TrinketGains.withheld_count({}), 0)
 
 
-# --- displayable_ids ---
-
 func test_displayable_ids_removes_junk_keeps_order() -> void:
 	assert_eq(TrinketGains.displayable_ids(["junk", "metronome", "junk", "barbell"], "junk"), ["metronome", "barbell"])
 
@@ -106,8 +95,6 @@ func test_displayable_ids_empty_input() -> void:
 func test_displayable_ids_keeps_duplicates() -> void:
 	assert_eq(TrinketGains.displayable_ids(["quick_bell", "quick_bell"], "junk"), ["quick_bell", "quick_bell"])
 
-
-# --- Battle scenarios ---
 
 func test_defeat_gift_scenario_reports_gift_and_gain() -> void:
 	# Day 13-style defeat: a Locked Box was consumed and its gift (zenith_stone) appeared.

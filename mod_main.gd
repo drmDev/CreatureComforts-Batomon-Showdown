@@ -1,15 +1,12 @@
 extends Node
-## Creature Comforts - Trainer Advice System
-## Inspects game state objects during Shop and Battle phases with configurable detail levels.
-
-const VERSION := "0.9066"
+## Creature Comforts - QOL
+const VERSION := "1.0"
 const MOD_ID := "creature_comforts"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
 const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 
-# Polling and state tracking
 const POLL_INTERVAL_MS := 500
 
 # Battle result labels (from simulation.data.player_health)
@@ -23,9 +20,7 @@ const TrainerRules = preload("advice/trainer_rules.gd")
 # Junk trinket id lives in the formatter (single source for the panel filter + log)
 const LogFormatterScript = preload("core/log_formatter.gd")
 const JUNK_TRINKET_ID := LogFormatterScript.JUNK_TRINKET_ID
-# Pure battle-scoped trinket diff logic (unit-tested)
 const TrinketGains = preload("core/trinket_gains.gd")
-# Dev-only toggle defaults (not user-facing settings)
 const DevConfig = preload("dev/dev_config.gd")
 
 # Overlay gate: hides reminders while the shop is not on screen or not interactive
@@ -48,15 +43,15 @@ const SHOP_SETTLE_MS := 1200  # Overlay stays hidden this long after the shop st
 const OVERLAY_NODE_NAMES := ["DexUI", "SettingsMenu"]
 
 var _overlay_gate_reason := ""
-var _shop_since_ms := 0  # When the current shop state first appeared (0 = not in shop)
+var _shop_since_ms := 0
 var _gate_hold_until_ms := 0  # Transition signal hold: keep the overlay hidden until this tick
 var _search_end_hold_until_ms := 0  # Brief hold after search ends, before the battle transition fires
-var _view_member_cache: Dictionary = {}  # "view_id:name" -> resolved node (or null)
-var _transition_nodes: Dictionary = {}  # instance ids of nodes already connected to transition_requested
+var _view_member_cache: Dictionary = {}
+var _transition_nodes: Dictionary = {}
 
 var _next_poll := 0
 var _last_phase := ""
-var _last_snapshot = null  # ShopSnapshot from previous poll
+var _last_snapshot = null
 var _battle_logged := false
 
 # Battle-scoped trinket gains.
@@ -69,12 +64,12 @@ var _battle_logged := false
 # Mysterious Chest is applied after the frozen battle_over snapshot, so it never appears in the
 # ids diff and cannot be spoiled; legitimate gains are still shown.
 # The snapshot stays frozen at battle_over so later event rewards never leak into the diff.
-var _pre_battle_trinket_state = null  # Dictionary: last trinket inventory seen outside battle
-var _battle_trinket_start = null      # Dictionary: baseline used for the current battle
-var _battle_trinket_end = null        # Dictionary: trinket inventory frozen at battle_over
+var _pre_battle_trinket_state = null
+var _battle_trinket_start = null
+var _battle_trinket_end = null
 var _battle_trinket_tracking := false
 var _battle_over_seen := false     # battle_over observed; end snapshot is frozen at this point
-var _battle_gains_logged := false  # Battle gains already logged this battle
+var _battle_gains_logged := false
 var _initialization_started := false
 var _initialized := false
 
@@ -82,24 +77,20 @@ var _initialized := false
 # dev/dev_config.gd; flip them live with the key combos in _handle_dev_toggles().
 var _debug_logging := DevConfig.DEBUG_LOGGING
 var _deep_inspection := DevConfig.DEEP_INSPECTION
-# Rising-edge state for the Ctrl+Shift dev toggle keys (Input has no key "just pressed" query).
+# Ctrl+Shift dev toggle keys
 var _dev_toggle_debug_was_down := false
 var _dev_toggle_inspect_was_down := false
 
-# Logging
 var _log_path := ""
 var _log_file: FileAccess = null  # Kept open for the session; avoids open/close per line
 var _formatter = null
 
-# Trainer advice system
 var _advisor = null
 var _advice_context_builder = null
 
-# Snapshot system
 var _snapshot_builder = null
 var _changes_comparer = null
 
-# Reminder label system (compact top-bar)
 var _reminder_label = null
 var _reminder_layer: CanvasLayer = null
 var _pika_player: AudioStreamPlayer = null
@@ -110,31 +101,23 @@ var _pending_chime_rule_ids: Dictionary = {}
 # Trinket-reminder sound queued until the overlay gate opens
 var _pending_trinket_reminder_sound := false
 
-# Trainer display names (built from the trainer catalog)
 var _trainer_display_names: Dictionary = {}
 
-# Trinket gain panel (bottom-right of the results screen, auto-hides after 8s)
 var _trinket_panel = null
 
-# Shop income panel (near bottom-center, shop-only, shows daily income)
 var _shop_income_panel = null
 
-# Shop-only trinket reminders panel (top-left; shows unused one-shot trinkets)
 var _trinket_reminders_panel = null
-var _trinket_reminders_alerted := false  # True while the current non-empty list has been announced
+var _trinket_reminders_alerted := false
 var _last_trinket_reminder_entries: Dictionary = {}  # name -> count, for change-only logging
 
-# Shop-only rank odds button + popup (bottom-left; shows rarity odds for all ranks)
 var _rank_odds_panel = null
-# Label reminders currently shown (rule_id -> text), for change-only logging
 var _last_reminder_rule_ids: Dictionary = {}
 
-# Daily income schedule (user-verified: Day 1 base income is 35, +5 per day).
-# Trinket/passive gold_gain bonuses are added on top.
+# Trinket/passive gold_gain bonuses are added on top of the base schedule.
 const BASE_INCOME := 35
 const INCOME_PER_DAY := 5
 
-# One-shot trinkets worth reminding about while still held (id -> short description).
 # IDs follow the game's snake_case convention (e.g. "treasure_map").
 const TRACKED_TRINKET_DESCRIPTIONS := {
 	"mini_duplicator": "Next non-unique trinket gift: +1 copy",
@@ -143,7 +126,6 @@ const TRACKED_TRINKET_DESCRIPTIONS := {
 	"upgrade_disc": "Next monster purchase: +1 level",
 }
 
-# Player HUD (battle-only HP / Wins / Day line, ported from NP_QoL)
 var _player_hud = null
 
 # Results layer: hosts the trinket-gain panel so it can show over the battle results screen.
@@ -177,36 +159,22 @@ func _initialize_mod() -> void:
 		return
 	_initialization_started = true
 	
-	# Create formatter
 	_formatter = LogFormatterScript.new(_has_property)
 	
-	# Create snapshot builder
 	var ShopSnapshot = load("res://mods/CreatureComforts/core/shop_snapshot.gd")
 	_snapshot_builder = ShopSnapshot.new()
 	
-	# Create changes comparer
 	var ShopChanges = load("res://mods/CreatureComforts/core/shop_changes.gd")
 	_changes_comparer = ShopChanges.new()
 	
-	# Create advisor and register rules
 	_setup_advisor()
-	
-	# Create reminder label system
 	_setup_reminder_panel()
-	
 	# Listen for the game's transition signal so battle start hides the overlay immediately
 	_setup_transition_listener()
-	
-	# Create battle player HUD
 	_setup_player_hud()
-	
-	# Create the results layer for the trinket-gain panel
 	_setup_results_panel()
-	
-	# Setup notification sounds
 	_setup_notification_sounds()
 	
-	# Create output directory
 	var dir_path := ProjectSettings.globalize_path(OUTPUT_DIR)
 	var dir_result := DirAccess.make_dir_recursive_absolute(dir_path)
 	if dir_result != OK and dir_result != ERR_ALREADY_EXISTS:
@@ -216,7 +184,6 @@ func _initialize_mod() -> void:
 	_log_path = OUTPUT_DIR.path_join(LOG_FILE)
 	var abs_log_path := ProjectSettings.globalize_path(_log_path)
 	
-	# Create log file if it doesn't exist
 	if not FileAccess.file_exists(_log_path):
 		var file := FileAccess.open(_log_path, FileAccess.WRITE)
 		if file == null:
@@ -244,7 +211,6 @@ func _initialize_mod() -> void:
 
 
 func _setup_advisor() -> void:
-	"""Initialize advisor and register all rules from the trainer catalog."""
 	var TrainerAdvisor = load("res://mods/CreatureComforts/advice/trainer_advisor.gd")
 	var TrainerCatalog = load("res://mods/CreatureComforts/advice/trainer_catalog.gd")
 	var RuleFactory = load("res://mods/CreatureComforts/advice/rule_factory.gd")
@@ -254,7 +220,6 @@ func _setup_advisor() -> void:
 	# Cache AdviceContext builder (rules consume snapshot data as plain records)
 	_advice_context_builder = load("res://mods/CreatureComforts/advice/advice_context.gd").new()
 	
-	# Build trainer display-name map and register rules from the catalog
 	var definitions: Array = TrainerCatalog.TRAINER_DEFINITIONS
 	for trainer_def in definitions:
 		_trainer_display_names[str(trainer_def.get("id", ""))] = str(trainer_def.get("display_name", ""))
@@ -265,7 +230,6 @@ func _setup_advisor() -> void:
 
 
 func _setup_reminder_panel() -> void:
-	"""Initialize reminder label UI layer."""
 	var ReminderLabel = load("res://mods/CreatureComforts/hud/reminder_label.gd")
 	
 	_reminder_layer = CanvasLayer.new()
@@ -291,7 +255,6 @@ func _setup_reminder_panel() -> void:
 	_trinket_reminders_panel.layout_debug.connect(_on_trinket_panel_layout_debug)
 	_reminder_layer.add_child(_trinket_reminders_panel)
 
-	# Bottom-left rank odds button + popup; shop-gated like the other shop panels.
 	var RankOddsPanel = load("res://mods/CreatureComforts/hud/rank_odds_panel.gd")
 	_rank_odds_panel = RankOddsPanel.new()
 	_rank_odds_panel.name = "RankOddsPanel"
@@ -299,7 +262,6 @@ func _setup_reminder_panel() -> void:
 	_reminder_layer.add_child(_rank_odds_panel)
 
 
-## Debug Logging only: write the trinket panel's one-shot layout snapshot.
 func _on_trinket_panel_layout_debug(message: String) -> void:
 	if not _debug_logging:
 		return
@@ -308,7 +270,6 @@ func _on_trinket_panel_layout_debug(message: String) -> void:
 
 
 func _setup_player_hud() -> void:
-	"""Initialize the battle-only player HUD (HP / Wins / Day)."""
 	var PlayerHud = load("res://mods/CreatureComforts/hud/player_hud.gd")
 	
 	var layer := CanvasLayer.new()
@@ -322,7 +283,6 @@ func _setup_player_hud() -> void:
 
 
 func _setup_results_panel() -> void:
-	"""Initialize the results layer that hosts the trinket-gain panel."""
 	# Separate layer from _reminder_layer: the overlay gate hides reminders outside the
 	# shop, but the trinket panel must be visible after battles (over the results screen).
 	_results_layer = CanvasLayer.new()
@@ -384,6 +344,8 @@ func _process(_delta: float) -> void:
 	_inspect_current_phase()
 
 
+
+
 ## Dev-only runtime toggles (not user-facing). Hold Ctrl+Shift and tap the
 ## configured key to flip a toggle; the change is written to the log immediately.
 func _handle_dev_toggles() -> void:
@@ -426,7 +388,6 @@ func _inspect_current_phase() -> void:
 		# Reset battle-scoped tracking only when actually leaving the battle phase.
 		if _last_phase == "battle":
 			_reset_battle_completion()
-		# Leaving the battle state (event, shop, or other): stop battle trinket tracking.
 		_finalize_battle_trinket_tracking()
 		# Keep a rolling "last state outside battle" snapshot. The battle is simulated before the
 		# first poll sees the battle state, so this is the only reliable pre-battle baseline.
@@ -446,7 +407,6 @@ func _inspect_current_phase() -> void:
 
 
 func _update_player_hud(state, is_battle: bool) -> void:
-	"""Show the player HUD only during an active battle; hide it everywhere else."""
 	if _player_hud == null:
 		return
 	if not is_battle:
@@ -464,7 +424,6 @@ func _update_player_hud(state, is_battle: bool) -> void:
 
 
 func _build_player_stats(player_run) -> Dictionary:
-	"""Read HP / Wins / Day from the battle's player run data (same fields as NP_QoL)."""
 	var stats := {
 		"hp": "?",
 		"wins": "?",
@@ -484,19 +443,14 @@ func _build_player_stats(player_run) -> Dictionary:
 
 
 func _evaluate_trainer_advice(snapshot) -> void:
-	"""Evaluate trainer advice using the advisor system."""
 	if _advisor == null or _advice_context_builder == null:
 		return
 	
-	# Create context from snapshot using cached builder
 	var context = _advice_context_builder.from_snapshot(snapshot)
-	
-	# Evaluate all rules
 	var result: Dictionary = _advisor.evaluate(context)
 	var new_or_changed: Array = result.get("new_or_changed", [])
 	var all_active: Array = result.get("all_active", [])
 	
-	# Emit new or changed advice to console (suppression works here)
 	for advice in new_or_changed:
 		var severity: String = advice.get("severity", "NOTICE")
 		var message: String = advice.get("message", "")
@@ -518,7 +472,6 @@ func _evaluate_trainer_advice(snapshot) -> void:
 			_pending_chime_rule_ids[advice.get("rule_id", "")] = true
 			_log_event("DAY REMINDER | %s | %s" % [advice.get("rule_id", ""), message])
 	
-	# Update on-screen reminder label
 	if _reminder_label != null:
 		var reminders_to_show: Dictionary = {}
 		
@@ -536,7 +489,6 @@ func _evaluate_trainer_advice(snapshot) -> void:
 	_try_play_chime()
 
 
-## Log only label-reminder additions, updates, and removals (not repeated polls).
 func _log_reminder_changes(reminders: Dictionary) -> void:
 	for rule_id in reminders.keys():
 		var text := str(reminders[rule_id])
@@ -551,7 +503,6 @@ func _log_reminder_changes(reminders: Dictionary) -> void:
 
 
 func _try_play_chime() -> void:
-	"""Play queued notification sounds once the overlay is on screen."""
 	if _pending_chime_rule_ids.is_empty() and not _pending_trinket_reminder_sound:
 		return
 	if _overlay_gate_reason.is_empty():
@@ -570,13 +521,10 @@ func _handle_shop_phase(state) -> void:
 	if run == null or manager == null:
 		return
 	
-	# Capture current snapshot once per poll
 	var current_snapshot = _snapshot_builder.capture(run, manager, _has_property, _formatter.resolve_type_name)
 	
-	# Detect changes
 	var phase_changed := _last_phase != "shop"
 	
-	# Check for trainer identity changes (not just gold/shop offers)
 	var trainer_changed := false
 	if _last_snapshot != null:
 		trainer_changed = _last_snapshot.trainer_id != current_snapshot.trainer_id
@@ -598,7 +546,6 @@ func _handle_shop_phase(state) -> void:
 		if comparison.has_changes():
 			_log_lines(_formatter.format_snapshot_changes(comparison, run, manager, _debug_logging))
 	
-	# Reset suppression and battle trinket tracking on trainer identity changes (new run)
 	if trainer_changed:
 		if _advisor != null:
 			_advisor.reset_suppression()
@@ -610,7 +557,6 @@ func _handle_shop_phase(state) -> void:
 		_last_reminder_rule_ids.clear()
 		_pending_trinket_reminder_sound = false
 	
-	# Evaluate trainer advice (after logging, before updating snapshot)
 	_evaluate_trainer_advice(current_snapshot)
 	
 	_update_shop_income(run)
@@ -623,7 +569,6 @@ func _handle_shop_phase(state) -> void:
 	_last_snapshot = current_snapshot
 
 
-## Current day's income: base schedule plus passive gold_gain bonuses (e.g. Gold Nugget +3).
 func _compute_daily_income(run) -> int:
 	var day := int(run.get("current_round")) if _has_property(run, "current_round") else 1
 	var income := BASE_INCOME + INCOME_PER_DAY * maxi(day - 1, 0)
@@ -639,13 +584,11 @@ func _compute_daily_income(run) -> int:
 
 
 func _update_shop_income(run) -> void:
-	"""Refresh the bottom-center income panel while the shop is active."""
 	if _shop_income_panel == null:
 		return
 	_shop_income_panel.set_income(_compute_daily_income(run))
 
 
-## Refresh the bottom-left rank odds button with the current shop rank.
 func _update_rank_odds(run) -> void:
 	if _rank_odds_panel == null:
 		return
@@ -701,7 +644,6 @@ func _update_trinket_reminders(run) -> void:
 		_try_play_chime()
 
 
-## Log only trinket-reminder additions, updates, and removals (not repeated polls).
 func _log_trinket_reminder_changes(entries: Array) -> void:
 	var current := {}
 	for entry in entries:
@@ -721,7 +663,6 @@ func _handle_battle_phase(state) -> void:
 	# Battle completion detection (win/loss/draw) - independent of replay logging
 	_check_battle_completion(state)
 	
-	# Check if replay data is ready
 	var player = state.get("_replay_p1_data") if _has_property(state, "_replay_p1_data") else null
 	var opponent = state.get("_replay_p2_data") if _has_property(state, "_replay_p2_data") else null
 	
@@ -772,7 +713,6 @@ func _handle_battle_phase(state) -> void:
 
 
 func _check_battle_completion(state) -> void:
-	"""Detect battle completion once and log the result."""
 	if state == null or not is_instance_valid(state):
 		_reset_battle_completion()
 		return
@@ -794,13 +734,11 @@ func _check_battle_completion(state) -> void:
 	_log_battle_result(battle_data)
 
 
-## Clear battle-completion tracking so a later battle is reported again.
 func _reset_battle_completion() -> void:
 	_battle_completion_state_id = 0
 	_battle_completion_reported = false
 
 
-## Log how the battle ended.
 func _log_battle_result(battle_data) -> void:
 	if battle_data == null:
 		_log_event("BATTLE COMPLETE | %s" % BATTLE_RESULT_UNKNOWN)
@@ -822,7 +760,6 @@ func _log_battle_result(battle_data) -> void:
 	_log_event("BATTLE COMPLETE | %s | HP %d" % [result, player_hp])
 
 
-## Capture the trinket inventory (ids, gained counter, consumed one-shots) as a plain snapshot.
 func _capture_trinket_state(run) -> Dictionary:
 	var snapshot := {}
 	var ids = run.get("trinket_ids") if _has_property(run, "trinket_ids") else []
@@ -834,14 +771,10 @@ func _capture_trinket_state(run) -> Dictionary:
 	return snapshot
 
 
-## Diff trinkets gained between two captured states (inventory diff + counter delta + newly used).
 func _diff_trinket_states(before: Dictionary, after: Dictionary) -> Dictionary:
 	return TrinketGains.diff_states(before, after)
 
 
-## Update the trinket panel from a gains dict, showing only non-junk trinkets.
-## Hides the panel when nothing non-junk was earned (1 or 10 junk alone => no panel).
-## Returns true when the panel was shown.
 func _update_trinket_panel(gains: Dictionary) -> bool:
 	if _trinket_panel == null:
 		return false
@@ -854,13 +787,11 @@ func _update_trinket_panel(gains: Dictionary) -> bool:
 
 
 func _hide_trinket_panel() -> void:
-	"""Hide the trinket gain panel."""
 	if _trinket_panel != null:
 		_trinket_panel.hide_panel()
 
 
 func _summarize_trinket_gains(ids: Array) -> Array:
-	"""Group trinket ids by count and format names. Returns Array of {name, count}."""
 	var counts := {}
 	for tid in ids:
 		var key := str(tid)
@@ -874,7 +805,6 @@ func _summarize_trinket_gains(ids: Array) -> Array:
 	return entries
 
 
-## Is the battle currently marked over (battle_over flag on simulation.data)?
 func _battle_is_over(state) -> bool:
 	if state == null or not is_instance_valid(state):
 		return false
@@ -936,7 +866,6 @@ func _finalize_battle_trinket_tracking(show_panel := true) -> void:
 
 
 func _update_overlay_gate() -> void:
-	"""Every frame: hide the whole reminder layer unless the shop is on screen and interactive."""
 	if _reminder_layer == null:
 		return
 	
@@ -1015,7 +944,6 @@ func _compute_overlay_gate_reason() -> String:
 	return ""
 
 
-## Is the shop's own fade/transition animation currently active?
 ## `transition_anim` is the view's AnimationPlayer; the `Transition` node is the
 ## visual overlay fallback.
 func _is_shop_transition_active(view) -> bool:
@@ -1058,7 +986,7 @@ func _find_visible_overlay(view, main) -> String:
 				if not has_visible_child:
 					continue
 			var lower := str(child.name).to_lower()
-			if lower.begins_with("dex") or lower.contains("batopedia") or lower.contains("settings") or lower.contains("pause"):
+			if lower.begins_with("dex") or lower.contains("batopedia") or lower.contains("settings") or lower.contains("pause") or lower.contains("stats"):
 				return str(child.name)
 	return ""
 
@@ -1081,7 +1009,6 @@ func _node_is_visible(node) -> bool:
 	return false
 
 
-## Resolve a shop-view member by property name, then direct child, then recursive search.
 ## Results (including misses) are cached per view instance and cleared on shop entry.
 func _get_view_member(view, property_names: Array, node_name: String):
 	if view == null or not is_instance_valid(view) or not view is Node:
@@ -1156,7 +1083,6 @@ func _on_transition_requested(target: String, data) -> void:
 
 
 func _reset_transient_state(clear_suppression: bool, clear_reminders: bool, clear_chimes: bool) -> void:
-	"""Reset overlay/suppression state shared across phase transitions."""
 	if clear_reminders:
 		if _reminder_label != null:
 			_reminder_label.hide_all_reminders()
@@ -1177,24 +1103,19 @@ func _log_phase_entry(phase: String, run, manager = null) -> void:
 		_log_lines(_formatter.format_phase_snapshot(phase, run, manager))
 
 
-## Log a concise, timestamped event line (regular debug log).
 func _log_event(message: String) -> void:
 	_log_message("[%s] %s" % [_formatter.get_time_short(), message])
 
 
 func _print_notice(message: String) -> void:
-	"""Print notice to console and log file."""
 	print(message)
 	_log_message(message)
 
 
 func _log_lines(lines: Array) -> void:
-	"""Log multiple lines from formatter."""
 	for line in lines:
 		_log_message(line)
 
-
-# Utility functions
 
 func _has_property(obj, property: String) -> bool:
 	if not is_instance_valid(obj):
@@ -1217,7 +1138,6 @@ func _script_is(obj, script_path: String) -> bool:
 
 
 func _get_run_data():
-	"""Return RunManager.data (the run) or null."""
 	var run_manager = get_node_or_null("/root/RunManager")
 	if run_manager == null or not _has_property(run_manager, "data"):
 		return null

@@ -1,12 +1,4 @@
 extends "comfort_panel.gd"
-## ShopIncomePanel - Tiny square panel showing the player's current daily income.
-##
-## Displayed bottom-center while the shop is on screen. The value is the run's
-## per-day income: the base schedule (35 gold on Day 1, +5 per day) plus every
-## `gold_gain` passive bonus the player owns (e.g. Gold Nugget +3).
-##
-## Matches the shared Creature Comforts panel look (dark navy background, gold
-## border, Consolas font, light shadow). Draws directly; no child nodes.
 
 const PANEL_SIZE := 16.0
 const BOTTOM_MARGIN := 16.0
@@ -46,7 +38,6 @@ func _setup_styles() -> void:
 	_panel_style.set_corner_radius_all(3)
 
 
-## Update and show the panel. The shop's overlay layer controls when it is on screen.
 func set_income(value: int) -> void:
 	if _income == value and visible:
 		return

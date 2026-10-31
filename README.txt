@@ -1,0 +1,129 @@
+Creature Comforts v1.0 - Quality of Life Mod for Batomon Showdown
+=================================================================
+
+Creature Comforts adds helpful reminders and quality-of-life improvements to
+Batomon Showdown, making important information easier to access during your runs.
+
+The mod does not alter game balance, monster stats, abilities, shop probabilities,
+or combat mechanics. There is no combat calculations, DPS simulations, etc. 
+
+
+FEATURES
+--------
+
+TRINKET REMINDERS
+Displays reminders for certain trinkets whose effects are easy to forget,
+such as Mini Duplicator, Mega Duplicator, Treasure Map, and Upgrade Disc.
+
+- A small icon appears when relevant trinkets are held.
+- Plays a notification sound when reminders first become available.
+- Click the icon to expand a panel showing trinket names and effects.
+
+BATTLE TRINKET REWARDS
+Displays a collapsible panel showing trinkets acquired during battle, so you
+don't have to check your inventory to see what you gained.
+
+BATTLE STATUS DISPLAY
+Displays your current day, remaining lives, and wins during battle.
+
+SHOP INCOME
+Displays your current income directly in the shop.
+
+TRAINER REMINDERS
+Provides reminders before important trainer-specific events, such as the
+Mad Scientist's Day 7 transformation.
+
+SHOP RANK ODDS
+Click the chart icon near the shop rank display to open a table showing
+the rarity probabilities for every shop rank (1 through 14+).
+
+REQUIREMENTS
+------------
+- Batomon Showdown (Steam, PC)
+- Community Batomon Showdown Mod Loader
+
+The Mod Loader must be installed before installing Creature Comforts.
+
+
+INSTALL
+-------
+1. Install the community Mod Loader first (see its Nexus Mods page).
+2. Close Batomon Showdown.
+3. Open the game folder:
+   Steam > Right-click Batomon Showdown > Manage > Browse local files.
+4. Extract the Creature Comforts ZIP into the game folder.
+
+   The resulting folder structure should look like:
+
+      Batomon Showdown\Mods\CreatureComforts\
+         mod_main.gd
+         mod.json
+         ...additional mod files and assets...
+
+   IMPORTANT: Do not place the ZIP itself inside the Mods folder.
+   Extract its contents, preserving the folder structure.
+
+5. Start Batomon Showdown.
+
+The Mod Loader will automatically detect Creature Comforts.
+
+
+UNINSTALL
+---------
+1. Close Batomon Showdown.
+2. Delete the folder:
+
+      Batomon Showdown\Mods\CreatureComforts
+
+3. Start the game normally.
+
+Creature Comforts does not modify game saves or permanent gameplay data.
+Uninstalling the mod does not require starting a new run.
+
+
+COMPATIBILITY
+-------------
+Creature Comforts is designed to work alongside other mods using the
+community Mod Loader.
+
+The mod adds interface elements without changing gameplay.
+
+Compatibility with every other mod is not guaranteed, particularly mods
+that extensively modify the shop or battle interface.
+
+
+TROUBLESHOOTING
+---------------
+MOD DOES NOT APPEAR:
+- Confirm the community Mod Loader is installed and working.
+- Verify that mod_main.gd is located directly inside
+  Mods\CreatureComforts\, not inside an additional nested folder.
+- Restart the game after installing the mod.
+
+If you encounter a bug, please report it with:
+- A description of what happened.
+- What you expected to happen.
+- Screenshots, if possible.
+
+
+FEEDBACK / FEATURE REQUESTS
+---------------------------
+Creature Comforts is an evolving quality-of-life mod.
+
+Suggestions, bug reports, and feedback are welcome!
+
+If there's something you frequently forget during a run, or information
+you wish the game displayed more clearly, I'd love to hear about it.
+
+Please leave feedback on Nexus Mods or submit an issue on GitHub.
+
+
+LEGAL / CREDITS
+---------------
+Creature Comforts is a fan-made, unofficial mod for Batomon Showdown.
+
+Not affiliated with or endorsed by the developers of Batomon Showdown.
+
+Community Mod Loader by EmoUsedHM01 and madibye (separate download).
+
+Batomon Showdown and its game assets belong to their respective owners.

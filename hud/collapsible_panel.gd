@@ -1,16 +1,6 @@
 extends "comfort_panel.gd"
-## CollapsiblePanel - shared collapsible-header mechanics for Creature Comforts panels.
-##
-## Provides the header bar with a -/+ toggle button, header dragging, an animated reveal that
-## ignores Engine.time_scale, and the shared panel/header/button styling.
-##
-## Subclasses own their layout: implement header_text(), full_height(), _apply_size(), and
-## _draw_body() (rows only; the base draws the body background, header, and button). The shared
-## `_entries` / `_content_key` row-state vars are provided for the subclass show_*() methods.
-##
 ## Behaviour adapted from examples/MyBattleStats/disabled_collapsible_panel.gd.
 
-# Collapsible panel geometry
 const HEAD_H := 16.0
 const BTN := 12.0
 const ANIM_SEC := 0.14
@@ -23,7 +13,6 @@ const INK_COLOR := Color("#ecf0f1")      # "-" / "+" glyph colour
 var _entries: Array = []  # Array of subclass-defined row Dictionaries
 var _content_key := ""    # Cheap change detection for subclass show_*() callers
 
-# Collapsible state
 var minimized := false
 var reveal := 1.0  # 1 = expanded, 0 = minimized (animated)
 
@@ -66,19 +55,14 @@ func _setup_styles() -> void:
 	_button_style.set_content_margin_all(2)
 
 
-# --- Subclass hooks -------------------------------------------------------------
-
-## Header title (between the left edge and the -/+ button).
 func header_text() -> String:
 	return ""
 
 
-## Height of the panel when fully expanded.
 func full_height() -> float:
 	return HEAD_H
 
 
-## Set `size` from the current reveal and the subclass layout.
 func _apply_size() -> void:
 	pass
 
@@ -87,8 +71,6 @@ func _apply_size() -> void:
 func _draw_body(_width: float) -> void:
 	pass
 
-
-# --- Shared behaviour -----------------------------------------------------------
 
 func set_minimized(on: bool, animate := true) -> void:
 	if on == minimized and (_tween == null or not _tween.is_running()):
@@ -135,7 +117,6 @@ func _draw() -> void:
 	var ci := get_canvas_item()
 	var w := size.x
 
-	# Body background + rows (rows only when expanded)
 	if reveal > 0.01:
 		_panel_style.draw(ci, Rect2(Vector2(0, 4), Vector2(w, maxf(size.y - 4, 8))))
 		_draw_body(w)
@@ -145,7 +126,6 @@ func _draw() -> void:
 	_header_style.draw(ci, Rect2(Vector2(7, 0), Vector2(hw - 14, HEAD_H)))
 	_draw_title(Rect2(Vector2(12, 0), Vector2(button_rect().position.x - 16, HEAD_H)))
 
-	# -/+ button
 	var b := button_rect()
 	_button_style.draw(ci, b)
 	var c := b.get_center().floor()
@@ -154,7 +134,6 @@ func _draw() -> void:
 		draw_rect(Rect2(c.x, c.y - 3, 1, 7), INK_COLOR)
 
 
-## Header title, trimmed so it never runs under the button, centred vertically.
 func _draw_title(r: Rect2) -> void:
 	var t := _fit_text(_text_font, header_text(), TITLE_FONT_SIZE, r.size.x)
 	var baseline := r.position.y + HEAD_H * 0.5 + 3.0

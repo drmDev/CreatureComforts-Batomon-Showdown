@@ -1,14 +1,10 @@
 extends RefCounted
-## TestHelpers - fakes and builders shared by the Creature Comforts tests.
-##
 ## FakeObject exists because the rules guard with is_instance_valid(), which returns
 ## false for Dictionaries. Fakes must be Object instances (RefCounted).
 
 const AdviceContext = preload("../advice/advice_context.gd")
 
 
-## RefCounted whose properties are backed by a Dictionary. Works with the probe
-## callable below (which uses the `in` operator, consulting _has/_get).
 class FakeObject:
 	extends RefCounted
 	var _props: Dictionary
@@ -26,15 +22,12 @@ class FakeObject:
 		_props[property] = value
 
 
-## Property probe mirroring mod_main._has_property semantics for FakeObject and
-## real Objects alike. Pass as the `_has_prop` Callable to the evaluator.
 static func probe(obj, property: String) -> bool:
 	if obj == null:
 		return false
 	return property in obj
 
 
-## Minimal formatter for trainer rules: only the two methods rules call.
 class FakeFormatter:
 	extends RefCounted
 
@@ -50,7 +43,6 @@ class FakeFormatter:
 		return item_id.replace("_", " ").capitalize()
 
 
-## Build an AdviceContext for trainer-rule tests.
 static func context(trainer_id: String, day: int, shop_items: Array = [], team_monsters: Array = []):
 	var ctx := AdviceContext.new()
 	ctx.trainer_id = trainer_id

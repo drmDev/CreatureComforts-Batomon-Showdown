@@ -1,21 +1,8 @@
 extends "collapsible_panel.gd"
-## TrinketRemindersPanel - Compact shop-phase reminder for unused one-shot trinkets.
-##
-## Collapsed it is a small left-aligned tab ~10% down the screen showing the gem icon followed
-## by "(N)", where N is the total number of relevant trinkets held. Clicking the tab (or its
-## +/- button) expands a content-fitted panel (capped at 320 px); each trinket shows its name +
-## quantity on the first line and its wrapped description underneath. The expanded/collapsed
-## choice persists while reminders remain, and resets to collapsed when the list reaches zero or
-## on a new run. The whole tab disappears when no relevant trinkets are held. When a new alerting
-## trinket appears (first show, or after the list was cleared), the caller plays the notification
-## sound; the panel stays collapsed until the player expands it.
-##
-## Collapsible header mechanics live in collapsible_panel.gd. This subclass supplies the
-## left-aligned, 10%-down anchoring, the gem + "(N)" title, the wrapped rows, and the tab width.
 
 const CONTENT_PADDING := 6.0
-const NAME_LINE_H := 14.0     # First line: name + quantity
-const DESC_LINE_H := 13.0     # Second line: short description
+const NAME_LINE_H := 14.0
+const DESC_LINE_H := 13.0
 const ROW_GAP := 5.0
 const NAME_FONT_SIZE := 8
 const DESC_FONT_SIZE := 7
@@ -33,7 +20,7 @@ const FALLBACK_TOP_OFFSET := 100.0
 ## Emitted with a one-shot layout snapshot for Debug Logging (mod_main filters on _debug_logging).
 signal layout_debug(message: String)
 
-var _total_count := 0  # Sum of entry counts, shown in the tab title
+var _total_count := 0
 var _gem_texture: Texture2D = null
 
 
@@ -49,7 +36,6 @@ func _ready() -> void:
 	_gem_texture = _load_texture("../assets/icons/gem.png")
 
 
-## Height of the panel when fully expanded (name line + wrapped description lines per entry).
 func full_height() -> float:
 	if _entries.is_empty():
 		return HEAD_H + CONTENT_PADDING * 2.0
@@ -60,14 +46,10 @@ func full_height() -> float:
 	return total
 
 
-## Collapsed tab title (between the left edge and the +/- button).
 func header_text() -> String:
 	return "(%d)" % _total_count
 
 
-## Show the panel with the given entries.
-## entries: Array of Dictionary {"name": String, "count": int, "desc": String}
-##
 ## Does NOT reset the collapsed state: a player who collapses the panel keeps it collapsed
 ## across shop visits. Only the first show anchors/sizes it from the current state.
 func show_reminders(entries: Array) -> void:
@@ -86,7 +68,6 @@ func show_reminders(entries: Array) -> void:
 	_log_layout_after_settle("show")
 
 
-## Hide the panel immediately, keeping the collapsed state for the next appearance.
 func hide_panel() -> void:
 	# Already hidden with no rows: nothing to do (called every poll outside the shop).
 	if not visible and _entries.is_empty():
@@ -102,7 +83,6 @@ func hide_panel() -> void:
 	_emit_layout_debug("hide")
 
 
-## Hide and reset to the collapsed default (zero reminders or new run).
 func reset_collapsed() -> void:
 	# Already hidden and collapsed with no rows: nothing to do (called every poll at zero).
 	if not visible and minimized and _entries.is_empty():
@@ -121,12 +101,10 @@ func reset_collapsed() -> void:
 	_emit_layout_debug("reset")
 
 
-## Reset the collapsed state to the collapsed default (new run).
 func reset_for_run() -> void:
 	reset_collapsed()
 
 
-## First line: "<name>[ xN]".
 func _name_line(entry: Dictionary) -> String:
 	var label := str(entry.get("name", ""))
 	var count := int(entry.get("count", 1))
@@ -135,7 +113,6 @@ func _name_line(entry: Dictionary) -> String:
 	return label
 
 
-## Stable, ordered text key used to detect whether the displayed rows changed.
 func _make_content_key(entries: Array) -> String:
 	var parts: Array[String] = []
 	for entry in entries:
@@ -144,13 +121,10 @@ func _make_content_key(entries: Array) -> String:
 
 
 func _apply_size() -> void:
-	# Width animates between the small tab and the content-fitted width; height between
-	# header-only and the wrapped rows.
 	var w := lerpf(_tab_width(), _content_width(), reveal)
 	size = Vector2(w, lerpf(HEAD_H + 1.0, full_height(), reveal))
 
 
-## Expanded width fitted to the widest name/description, capped for very long text.
 func _content_width() -> float:
 	if _text_font == null:
 		return MAX_EXPANDED_WIDTH
@@ -161,17 +135,14 @@ func _content_width() -> float:
 	return clampf(inner + CONTENT_PADDING * 2.0 + 2.0, _tab_width(), MAX_EXPANDED_WIDTH)
 
 
-## Keep the header bar only as wide as the collapsed tab (gem + "(N)" + button).
 func header_width() -> float:
 	return _tab_width()
 
 
-## Number of wrapped description lines for an entry at the given row width.
 func _desc_line_count(entry: Dictionary, row_w: float) -> int:
 	return maxi(1, _wrap_text(_text_font, str(entry.get("desc", "")), DESC_FONT_SIZE, row_w).size())
 
 
-## Word-wrap `text` to `max_w` at `font_size`; long words are broken by character.
 func _wrap_text(font: Font, text: String, font_size: int, max_w: float) -> Array[String]:
 	var lines: Array[String] = []
 	if font == null or text.is_empty() or max_w <= 0.0:
@@ -222,14 +193,12 @@ func _emit_layout_debug(reason: String) -> void:
 	layout_debug.emit("\n".join(lines))
 
 
-## Log the settled layout after the reveal tween has had time to finish.
 func _log_layout_after_settle(reason: String) -> void:
 	await get_tree().create_timer(DEBUG_SETTLE_SEC).timeout
 	if is_inside_tree():
 		_emit_layout_debug(reason)
 
 
-## Collapsed tab width: fits the gem icon + "(N)" plus the +/- button.
 func _tab_width() -> float:
 	if _text_font == null:
 		return MAX_EXPANDED_WIDTH
@@ -238,7 +207,6 @@ func _tab_width() -> float:
 	return icon_w + title_w + BTN + TAB_EXTRA_WIDTH
 
 
-## Header title: gem icon followed by "(N)" (replaces the base text-only title).
 func _draw_title(r: Rect2) -> void:
 	var text := header_text()
 	var icon_w := GEM_SIZE if _gem_texture != null else 0.0
@@ -251,7 +219,6 @@ func _draw_title(r: Rect2) -> void:
 	_draw_text_shadow(Vector2(start_x + icon_w + gap, baseline), text, VALUE_COLOR, TITLE_FONT_SIZE)
 
 
-## Rows: "Name [xN]" then the wrapped description lines.
 func _draw_body(width: float) -> void:
 	var cursor_y := HEAD_H + CONTENT_PADDING
 	var row_w := width - CONTENT_PADDING * 2.0 - 2.0

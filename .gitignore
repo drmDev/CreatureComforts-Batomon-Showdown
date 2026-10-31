@@ -10,6 +10,5 @@ Desktop.ini
 
 # misc
 plans/
-# dev tooling is local-only, except the runtime preload
 dev/*
 !dev/dev_config.gd

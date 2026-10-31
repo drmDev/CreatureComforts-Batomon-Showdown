@@ -1,5 +1,4 @@
 extends Control
-## ShopHighlight - click-through overlay that outlines shop cards.
 ## Holds only plain values (slot index + offer instance id) and a resolver Callable.
 ## Every frame it asks the resolver for the current rectangles of cards whose live content
 ## still matches the recorded offer, so a stale highlight is never drawn on the wrong card.
@@ -12,7 +11,7 @@ const FILL_COLOR := Color(1.0, 0.85, 0.2, 0.12)
 const OUTLINE_WIDTH := 2.0
 const GROW_PX := 2.0
 
-var _targets: Array = []  # Dictionaries {"slot": int, "id": int}
+var _targets: Array = []
 var _resolver: Callable = Callable()
 var _rects: Array[Rect2] = []
 
@@ -25,7 +24,6 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 
-## resolver(targets: Array) -> Array of Rect2 for targets whose live card still matches
 func setup(resolver: Callable) -> void:
 	_resolver = resolver
 

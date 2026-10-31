@@ -1,19 +1,14 @@
 extends RefCounted
-## ShopSnapshot - Capture game state once per shop poll
-## Provides consistent value records for change detection, advice, and log formatting.
-## Uses plain values only; retains no live game objects.
 
-
-## Represents a shop offer with identity, species, level, and types
 class ShopOffer:
 	var slot: int = -1
-	var instance_id: int = 0  # Live offer object's instance id (0 when empty); lets UI overlays validate identity
-	var type: String = "empty"  # "empty", "monster", "item", "unknown"
-	var species_key: String = ""  # monster.name.lamplet
-	var item_id: String = ""  # basic_bait, etc.
+	var instance_id: int = 0  # Lets UI overlays validate identity; 0 when empty
+	var type: String = "empty"
+	var species_key: String = ""
+	var item_id: String = ""
 	var level: int = 1
 	var is_shiny: bool = false
-	var types: Array = []  # Array of lowercase type names: ["fire", "flying"]
+	var types: Array = []
 
 	func is_empty() -> bool:
 		return type == "empty"
@@ -25,17 +20,15 @@ class ShopOffer:
 		return type == "item"
 
 
-## Represents a team or bench monster with identity, species, level, and types
 class Monster:
 	var slot: int = -1
-	var instance_id: int = 0  # For tracking identity across polls
-	var species_key: String = ""  # monster.name.lamplet
+	var instance_id: int = 0
+	var species_key: String = ""
 	var level: int = 1
 	var is_shiny: bool = false
-	var types: Array = []  # Array of lowercase type names: ["fire", "flying"]
+	var types: Array = []
 
 
-## Run state values
 var trainer_id: String = ""
 var day: int = 0
 var shop_rank: int = 0
@@ -44,22 +37,19 @@ var player_hp: int = 0
 var gold: int = 0
 var wins: int = 0
 
-## Shop state
-var shop_offers: Array = []  # Array of ShopOffer
+var shop_offers: Array = []
 var shop_frozen: bool = false
 
 ## Team state (stored in game order, not visual order)
-var team_monsters: Array = []  # Array of Monster (may contain nulls for empty slots)
+var team_monsters: Array = []
 
 ## Bench state (stored in game order, not visual order)
-var bench_monsters: Array = []  # Array of Monster (may contain nulls for empty slots)
+var bench_monsters: Array = []
 
 
-## Create snapshot from game objects
 func capture(run, manager, has_property_func: Callable, type_resolver: Callable):
 	var snapshot = get_script().new()
 
-	# Capture run state
 	if has_property_func.call(run, "trainer_id"):
 		snapshot.trainer_id = str(run.get("trainer_id"))
 
@@ -81,7 +71,6 @@ func capture(run, manager, has_property_func: Callable, type_resolver: Callable)
 	if has_property_func.call(run, "current_wins"):
 		snapshot.wins = int(run.get("current_wins"))
 
-	# Capture shop state
 	if has_property_func.call(manager, "current_shop_items"):
 		var items: Array = manager.current_shop_items
 		for i in range(items.size()):
@@ -112,18 +101,15 @@ func capture(run, manager, has_property_func: Callable, type_resolver: Callable)
 	if has_property_func.call(manager, "is_shop_frozen"):
 		snapshot.shop_frozen = bool(manager.is_shop_frozen)
 
-	# Capture team state
 	if has_property_func.call(run, "team"):
 		snapshot.team_monsters = _capture_monster_list(run.team, has_property_func, type_resolver)
 
-	# Capture bench state
 	if has_property_func.call(run, "bench"):
 		snapshot.bench_monsters = _capture_monster_list(run.bench, has_property_func, type_resolver)
 
 	return snapshot
 
 
-## Classify a live shop entry: "monster", "item", "unknown", or "empty" (null)
 static func classify_shop_entry(item, has_property_fn: Callable) -> String:
 	if item == null:
 		return "empty"
@@ -134,14 +120,12 @@ static func classify_shop_entry(item, has_property_fn: Callable) -> String:
 	return "unknown"
 
 
-## Is this live shop entry a monster offer?
 static func is_monster_offer(item, has_property_fn: Callable) -> bool:
 	if item == null:
 		return false
 	return item.has_method("get_gold_cost") and has_property_fn.call(item, "data")
 
 
-## Capture a list of monsters (team/bench) into plain-value records
 func _capture_monster_list(monster_list: Array, has_property_func: Callable, type_resolver: Callable) -> Array:
 	var monsters: Array = []
 	for i in range(monster_list.size()):
@@ -153,7 +137,6 @@ func _capture_monster_list(monster_list: Array, has_property_func: Callable, typ
 	return monsters
 
 
-## Copy species identity (name_key + types) into a target record
 func _apply_species_data(target, data, has_property_func: Callable, type_resolver: Callable) -> void:
 	if data == null:
 		return
@@ -168,7 +151,6 @@ func _apply_species_data(target, data, has_property_func: Callable, type_resolve
 					target.types.append(type_name.to_lower())
 
 
-## Extract monster data into plain values
 func _extract_monster(monster_obj, slot: int, has_property_func: Callable, type_resolver: Callable) -> Monster:
 	var monster = Monster.new()
 	monster.slot = slot
