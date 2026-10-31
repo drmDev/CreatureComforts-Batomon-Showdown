@@ -13,7 +13,8 @@ FEATURES
 
 TRINKET REMINDERS
 Displays reminders for certain trinkets whose effects are easy to forget,
-such as Mini Duplicator, Mega Duplicator, Treasure Map, and Upgrade Disc.
+such as Mini Duplicator, Mega Duplicator, Treasure Map, Upgrade Disc, and
+Greedy Gloves.
 
 - A small icon appears when relevant trinkets are held.
 - Plays a notification sound when reminders first become available.
@@ -31,7 +32,9 @@ Displays your current income directly in the shop.
 
 TRAINER REMINDERS
 Provides reminders before important trainer-specific events, such as the
-Mad Scientist's Day 7 transformation.
+Mad Scientist's Day 7 transformation, plus global event reminders that apply
+to every trainer (Days 3, 6, and 9). Multiple reminders stack vertically in
+one panel.
 
 SHOP RANK ODDS
 Click the chart icon near the shop rank display to open a table showing

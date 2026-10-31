@@ -22,7 +22,7 @@ func full_height() -> float:
 
 
 func header_text() -> String:
-	return "Trinkets"
+	return "Trinkets Gained"
 
 
 ## Idempotent: only the FIRST call (hidden -> visible) anchors the panel. Later calls with the

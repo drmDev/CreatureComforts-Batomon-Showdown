@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "1.002"
+const VERSION := "1.003"
 const MOD_ID := "creature_comforts"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
@@ -103,6 +103,7 @@ const TRACKED_TRINKET_DESCRIPTIONS := {
 	"mega_duplicator": "Next non-unique trinket gift: +2 copies",
 	"treasure_map": "Next trinket gift: +1 rarity tier",
 	"upgrade_disc": "Next monster purchase: +1 level",
+	"greedy_gloves": "Next Trinket gift: take all choices",
 }
 
 var _player_hud = null
@@ -221,6 +222,10 @@ func _setup_advisor() -> void:
 	
 	var factory = RuleFactory.new(_formatter)
 	for rule in factory.build_all(definitions):
+		_advisor.register_rule(rule)
+	
+	# Trainer-independent reminders (empty trainer id applies to every trainer).
+	for rule in factory.build_trainer({"id": "", "rules": TrainerCatalog.GLOBAL_RULES}):
 		_advisor.register_rule(rule)
 
 

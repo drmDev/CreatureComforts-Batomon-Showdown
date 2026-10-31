@@ -1,6 +1,8 @@
 extends "test_runner.gd"
 
 const TrainerRules = preload("../advice/trainer_rules.gd")
+const TrainerCatalog = preload("../advice/trainer_catalog.gd")
+const RuleFactory = preload("../advice/rule_factory.gd")
 const TestHelpers = preload("test_helpers.gd")
 
 const BEETDOWN := "monster.name.beetdown"
@@ -188,3 +190,26 @@ func test_day_reminder_trainer_mismatch_returns_empty() -> void:
 	)
 	var ctx = TestHelpers.context("gentleman", 6)
 	assert_empty(rule.evaluate(ctx))
+
+
+func test_day_reminder_empty_trainer_applies_to_any() -> void:
+	var rule = TrainerRules.DayReminderRule.new(
+		"global_day3_event", "", 2, "NOTICE", "Day 3 event tomorrow!", "Tomorrow: Day 3 event!"
+	)
+	for trainer_id in ["gentleman", "gamer", "mad_scientist", ""]:
+		var advice: Dictionary = rule.evaluate(TestHelpers.context(trainer_id, 2))
+		assert_not_empty(advice, "trainer %s" % trainer_id)
+		assert_eq(advice["reminder"], "Tomorrow: Day 3 event!")
+		assert_true(advice["chime"])
+
+
+func test_global_rules_build_via_factory() -> void:
+	var factory = RuleFactory.new(_formatter())
+	var rules: Array = factory.build_trainer({"id": "", "rules": TrainerCatalog.GLOBAL_RULES})
+	assert_eq(rules.size(), 3)
+	var days: Array = []
+	for rule in rules:
+		assert_eq(rule.trainer_id, "", "global rule must apply to any trainer")
+		assert_true(rule.chime, "global reminders chime")
+		days.append(rule.target_day)
+	assert_eq(days, [2, 5, 8])

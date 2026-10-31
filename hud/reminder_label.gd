@@ -58,12 +58,18 @@ func hide_all_reminders() -> void:
 func _update_display() -> void:
 	var reminder_texts: Array = []
 	for reminder_text in _active_reminders.values():
-		if not reminder_text.is_empty():
-			reminder_texts.append(reminder_text)
+		if reminder_text.is_empty():
+			continue
+		# Deduplicate: the same reminder can come from more than one rule.
+		if reminder_text in reminder_texts:
+			continue
+		reminder_texts.append(reminder_text)
 	
 	if reminder_texts.is_empty():
 		visible = false
 		_label.text = ""
 	else:
-		_label.text = " | ".join(reminder_texts)
+		# Stack reminders vertically; the Label's autowrap and minimum size grow
+		# the PanelContainer to fit long or multiple lines.
+		_label.text = "\n".join(reminder_texts)
 		visible = true

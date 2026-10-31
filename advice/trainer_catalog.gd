@@ -196,3 +196,33 @@ const TRAINER_DEFINITIONS := [
 		]
 	}
 ]
+
+# Trainer-independent day reminders. Built with an empty trainer id, so they
+# apply to every trainer (see BaseRule._matches_trainer). Each fires once on
+# its trigger day, the day before the event.
+const GLOBAL_RULES := [
+	{
+		"type": "day_reminder",
+		"rule_id": "global_day3_event",
+		"day": 2,
+		"severity": "NOTICE",
+		"message": "GLOBAL: Day 3 event tomorrow!",
+		"reminder": "Tomorrow: Day 3 event!"
+	},
+	{
+		"type": "day_reminder",
+		"rule_id": "global_day6_event",
+		"day": 5,
+		"severity": "NOTICE",
+		"message": "GLOBAL: Day 6 event tomorrow!",
+		"reminder": "Tomorrow: Day 6 event!"
+	},
+	{
+		"type": "day_reminder",
+		"rule_id": "global_day9_event",
+		"day": 8,
+		"severity": "NOTICE",
+		"message": "GLOBAL: Day 9 event tomorrow!",
+		"reminder": "Tomorrow: Day 9 event!"
+	}
+]
