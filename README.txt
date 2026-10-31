@@ -43,10 +43,14 @@ the rarity probabilities for every shop rank (1 through 14+).
 
 WATCHLIST / SHOP HIGHLIGHTS
 Click the WL button in the shop to open a filterable list of every Batomon
-and item. Use the letter buttons to narrow the list, then tick entries you
-want to watch; matching shop cards are outlined automatically. Selections
-are saved and persist between sessions. Use the "Selected only" filter to
-review your list.
+and item. The Batomon tab filters by Rarity, Type, and Region; the Items tab
+lists every item. Click anywhere on an entry (or its checkbox) to watch it;
+matching shop cards are outlined automatically. Selections are saved and
+persist between sessions.
+
+The Region dropdown starts on the region your current run is being played in
+and only changes back to that default when you start a run in a different
+region, so a manual choice stays put for the rest of a run.
 
 
 SETTINGS

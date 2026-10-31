@@ -33,6 +33,7 @@ const EXCLUDED_TYPES := ["all", "null"]
 
 # Region filter options and the species fields that may carry the region.
 const REGION_NAMES := ["Jinto", "Pantra"]
+const RunRegion = preload("../core/run_region.gd")
 
 ## { "monster": { name_key: true }, "item": { id: true } }
 var selection := {"monster": {}, "item": {}}
@@ -55,6 +56,8 @@ var _rarity_buttons: Array = []
 var _type_buttons: Array = []
 var _region_filter := ""
 var _region_option: OptionButton
+var _player_region := ""   # region the current run was detected as playing
+var _applied_region := ""  # last auto-applied region, so we only override on change
 var _rows_box: GridContainer
 var _popup_open := false
 
@@ -139,6 +142,12 @@ func _build_ui() -> void:
 
 	_panel = PanelContainer.new()
 	_panel.custom_minimum_size = Vector2(POPUP_WIDTH, POPUP_HEIGHT)
+	# Fully opaque background so the shop/bench cannot show through.
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color("#18232D")
+	panel_style.set_corner_radius_all(3)
+	panel_style.set_content_margin_all(4)
+	_panel.add_theme_stylebox_override("panel", panel_style)
 	_popup.add_child(_panel)
 
 	var vbox := VBoxContainer.new()
@@ -234,6 +243,12 @@ func _build_ui() -> void:
 	_filters_box.add_child(_type_flow)
 	_add_filter_button(_type_flow, "All", "", _type_buttons, _on_type_pressed)
 
+	# Subtle boundary between the filters and the scrollable list.
+	var divider := ColorRect.new()
+	divider.color = Color(1, 1, 1, 0.12)
+	divider.custom_minimum_size.y = 1
+	vbox.add_child(divider)
+
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -243,7 +258,7 @@ func _build_ui() -> void:
 	_rows_box.columns = LIST_COLUMNS
 	_rows_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_rows_box.add_theme_constant_override("h_separation", 4)
-	_rows_box.add_theme_constant_override("v_separation", 0)
+	_rows_box.add_theme_constant_override("v_separation", 1)
 	scroll.add_child(_rows_box)
 
 	# Initial state: Batomon tab, "All" filters.
@@ -297,6 +312,7 @@ func _toggle_popup() -> void:
 	if _popup_open:
 		_ensure_catalog()
 		_position_panel()
+		_sync_player_region()
 		_rebuild_rows()
 
 
@@ -321,8 +337,43 @@ func _on_type_pressed(value: String) -> void:
 
 
 func _on_region_selected(index: int) -> void:
-	_region_filter = "" if index == 0 else REGION_NAMES[index - 1]
+	_region_filter = "" if index == 0 else str(_region_option.get_item_text(index))
 	_rebuild_rows()
+
+
+## Defaults the Region dropdown to whatever region the run is being played in.
+## Only applied when the detected region changes, so a manual pick sticks for the
+## rest of that run (and a new/changed run re-defaults).
+func _sync_player_region() -> void:
+	if _region_option == null:
+		return
+	var result = RunRegion.detect()
+	var detected := str(result.get("region", "")).strip_edges()
+	if detected.is_empty() or detected == _applied_region:
+		return
+	_applied_region = detected
+	_player_region = detected
+	_ensure_region_item(detected)
+	_select_region(detected)
+
+
+## Adds the detected region to the dropdown when the catalog knows a region the
+## hard-coded REGION_NAMES list does not.
+func _ensure_region_item(region_name: String) -> void:
+	for i in range(_region_option.item_count):
+		if str(_region_option.get_item_text(i)).to_lower() == region_name.to_lower():
+			return
+	_region_option.add_item(region_name)
+
+
+## Selects a dropdown entry without emitting item_selected (stays a default).
+func _select_region(region_name: String) -> void:
+	for i in range(_region_option.item_count):
+		if str(_region_option.get_item_text(i)).to_lower() != region_name.to_lower():
+			continue
+		_region_option.select(i)
+		_region_filter = "" if i == 0 else str(_region_option.get_item_text(i))
+		return
 
 
 ## The catalog is loaded lazily so the GameDatabase autoload is guaranteed to
@@ -482,36 +533,100 @@ func _rebuild_rows() -> void:
 	for child in _rows_box.get_children():
 		_rows_box.remove_child(child)
 		child.queue_free()
+	var added := 0
 	for entry in _catalog:
 		if str(entry["kind"]) != _tab:
 			continue
 		if _tab == TAB_MONSTER and not _passes_monster_filters(entry):
 			continue
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 2)
-		var icon_tex = entry.get("icon")
-		if icon_tex is Texture2D:
-			var icon := TextureRect.new()
-			icon.texture = icon_tex
-			icon.custom_minimum_size = Vector2(12, 12)
-			icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			row.add_child(icon)
-		var cb := CheckBox.new()
-		cb.text = str(entry["name"])
-		cb.button_pressed = is_watched(entry["kind"], entry["key"])
-		cb.custom_minimum_size.y = ROW_HEIGHT
-		_apply_font(cb, BODY_FONT_SIZE)
-		cb.add_theme_constant_override("h_separation", 2)
-		# Remove the default stylebox padding so rows stay dense.
-		var empty := StyleBoxEmpty.new()
-		for state in ["normal", "hover", "pressed", "focus", "disabled", "hover_pressed"]:
-			cb.add_theme_stylebox_override(state, empty)
-		# Keep the check icon a fixed width so toggling cannot resize the row/text.
-		cb.add_theme_constant_override("icon_max_width", 12)
-		cb.toggled.connect(_on_entry_toggled.bind(entry["kind"], entry["key"]))
-		row.add_child(cb)
-		_rows_box.add_child(row)
+		_add_entry_row(entry, added)
+		added += 1
+	if added == 0:
+		var empty_label := Label.new()
+		empty_label.text = "No Batomon match these filters." if _tab == TAB_MONSTER else "No items available."
+		empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		empty_label.custom_minimum_size.x = POPUP_WIDTH - 24
+		_apply_font(empty_label, BODY_FONT_SIZE)
+		_rows_box.add_child(empty_label)
+
+
+## One clickable entry: [icon] [name] [checkbox]. The whole row toggles tracking;
+## alternating shades separate rows and a selected row gets an orange tint.
+##
+## The row is a PanelContainer (a real container, so it reports the content's
+## minimum size to the GridContainer and lays its children out inside itself)
+## with a transparent Button filling it to catch clicks. A plain Button would
+## have zero width here and its unmanaged children would overlap their
+## neighbours in the grid.
+func _add_entry_row(entry: Dictionary, index: int) -> void:
+	var watched := is_watched(entry["kind"], entry["key"])
+	var shade := Color("#1e2a36") if (index / LIST_COLUMNS) % 2 == 0 else Color("#18232D")
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = shade
+	normal.set_corner_radius_all(2)
+	normal.set_content_margin_all(1)
+
+	var row := PanelContainer.new()
+	row.custom_minimum_size.y = ROW_HEIGHT
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_stylebox_override("panel", normal)
+
+	var hbox := HBoxContainer.new()
+	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hbox.add_theme_constant_override("separation", 2)
+	row.add_child(hbox)
+
+	var icon_tex = entry.get("icon")
+	if icon_tex is Texture2D:
+		var icon := TextureRect.new()
+		icon.texture = icon_tex
+		icon.custom_minimum_size = Vector2(12, 12)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hbox.add_child(icon)
+
+	var label := Label.new()
+	label.text = str(entry["name"])
+	label.clip_text = true
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_apply_font(label, BODY_FONT_SIZE)
+	hbox.add_child(label)
+
+	var check := CheckBox.new()
+	check.button_pressed = watched
+	check.focus_mode = Control.FOCUS_NONE
+	check.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	check.add_theme_constant_override("icon_max_width", 12)
+	_apply_font(check, BODY_FONT_SIZE)
+	hbox.add_child(check)
+
+	# Transparent hit area. PanelContainer stretches every Control child to fill
+	# its content rect, so this Button covers the whole row.
+	var hit := Button.new()
+	hit.toggle_mode = true
+	hit.button_pressed = watched
+	hit.focus_mode = Control.FOCUS_NONE
+	hit.mouse_filter = Control.MOUSE_FILTER_STOP
+	var blank := StyleBoxEmpty.new()
+	for state in ["normal", "focus", "disabled"]:
+		hit.add_theme_stylebox_override(state, blank)
+	var hover := StyleBoxFlat.new()
+	hover.bg_color = Color(1, 1, 1, 0.06)
+	hover.set_corner_radius_all(2)
+	hit.add_theme_stylebox_override("hover", hover)
+	var pressed := StyleBoxFlat.new()
+	pressed.bg_color = Color(0.95, 0.61, 0.07, 0.22)
+	pressed.set_corner_radius_all(2)
+	hit.add_theme_stylebox_override("pressed", pressed)
+	hit.add_theme_stylebox_override("hover_pressed", pressed)
+	hit.toggled.connect(_on_entry_toggled.bind(entry["kind"], entry["key"]))
+	hit.toggled.connect(func(on): check.button_pressed = on)
+	row.add_child(hit)
+
+	_rows_box.add_child(row)
 
 
 func _passes_monster_filters(entry: Dictionary) -> bool:

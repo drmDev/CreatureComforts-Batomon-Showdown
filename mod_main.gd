@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "1.117"
+const VERSION := "1.122"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
@@ -20,6 +20,7 @@ const TrainerRules = preload("advice/trainer_rules.gd")
 const LogFormatterScript = preload("core/log_formatter.gd")
 const JUNK_TRINKET_ID := LogFormatterScript.JUNK_TRINKET_ID
 const TrinketGains = preload("core/trinket_gains.gd")
+const RunRegion = preload("core/run_region.gd")
 const DevConfig = preload("dev/dev_config.gd")
 const ModConfig = preload("core/mod_config.gd")
 
@@ -51,8 +52,11 @@ var _initialized := false
 var _mod_config = null
 
 # Investigation diagnostics: catalog dump runs once, on the first shop entry
-# with Debug Logging on (so it works even if logging was toggled after startup).
+# with Debug Logging on (so it works if logging was toggled after startup).
 var _catalog_diagnostics_logged := false
+# The run-data variable dump is a session-once diagnostic; the short detected
+# region line is repeated per shop visit.
+var _region_diagnostics_logged := false
 
 # Dev-only toggles (not user-facing settings). Startup defaults come from
 # dev/dev_config.gd; flip them live with the key combos in _handle_dev_toggles().
@@ -475,6 +479,23 @@ func _describe_shop_card(card) -> String:
 	return "%s (%s)%s content=[%s]" % [card.name, card.get_class(), rect, content_desc]
 
 
+## Reports what core/run_region.gd found (and everything it inspected) so an
+## unexpected watchlist Region default can be traced to the field the game
+## actually stores the active region/set in.
+func _log_region_diagnostic() -> void:
+	# verbose (run-data variable dump) is a session-once diagnostic: it allocates
+	# the 100+ name list, so it is not repeated on every shop visit.
+	var verbose := not _region_diagnostics_logged
+	var result = RunRegion.detect(_has_property, verbose)
+	var detected := str(result.get("region", ""))
+	_log_message("REGION DIAG | === begin ===")
+	_log_message("REGION DIAG | detected region: %s" % (detected if not detected.is_empty() else "(none)"))
+	for line in result.get("report", []):
+		_log_message("REGION DIAG | %s" % str(line))
+	_log_message("REGION DIAG | === end ===")
+	_region_diagnostics_logged = true
+
+
 func _setup_advisor() -> void:
 	var TrainerAdvisor = load("res://mods/CreatureComforts/advice/trainer_advisor.gd")
 	var TrainerCatalog = load("res://mods/CreatureComforts/advice/trainer_catalog.gd")
@@ -885,6 +906,7 @@ func _handle_shop_phase(state) -> void:
 			if not _catalog_diagnostics_logged:
 				_log_catalog_diagnostics()
 			_log_shop_structure_diagnostic(state)
+			_log_region_diagnostic()
 		if _deep_inspection:
 			_log_lines(_formatter.format_deep_inspect_shop(manager, run))
 		# Trinket gains are battle-scoped now (tracked during the battle state only), so no
