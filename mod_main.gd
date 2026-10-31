@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "1.001"
+const VERSION := "1.002"
 const MOD_ID := "creature_comforts"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
@@ -22,6 +22,7 @@ const LogFormatterScript = preload("core/log_formatter.gd")
 const JUNK_TRINKET_ID := LogFormatterScript.JUNK_TRINKET_ID
 const TrinketGains = preload("core/trinket_gains.gd")
 const DevConfig = preload("dev/dev_config.gd")
+const ModConfig = preload("core/mod_config.gd")
 
 var _next_poll := 0
 var _last_phase := ""
@@ -46,6 +47,9 @@ var _battle_over_seen := false     # battle_over observed; end snapshot is froze
 var _battle_gains_logged := false
 var _initialization_started := false
 var _initialized := false
+
+# User-facing feature toggles (centralized in core/mod_config.gd).
+var _mod_config = null
 
 # Dev-only toggles (not user-facing settings). Startup defaults come from
 # dev/dev_config.gd; flip them live with the key combos in _handle_dev_toggles().
@@ -133,6 +137,7 @@ func _initialize_mod() -> void:
 	_initialization_started = true
 	
 	_formatter = LogFormatterScript.new(_has_property)
+	_setup_mod_config()
 	
 	var ShopSnapshot = load("res://mods/CreatureComforts/core/shop_snapshot.gd")
 	_snapshot_builder = ShopSnapshot.new()
@@ -181,6 +186,23 @@ func _initialize_mod() -> void:
 	_log_message("=".repeat(80))
 	
 	print("Creature Comforts %s loaded - logging to %s" % [VERSION, abs_log_path])
+
+
+## Bind the centralized feature-toggle configuration to the Mod Loader. The
+## loader persists values and emits config_changed; mod_config re-emits only
+## our own keys so feature logic never touches the loader directly.
+func _setup_mod_config() -> void:
+	_mod_config = ModConfig.new()
+	_mod_config.setup(get_node_or_null("/root/ModLoader"))
+	_mod_config.changed.connect(_on_feature_toggled)
+
+
+## True when a user-facing feature is enabled. Defaults to enabled when the
+## configuration module is unavailable (e.g. standalone run).
+func _feature_enabled(key: String) -> bool:
+	if _mod_config == null:
+		return true
+	return _mod_config.is_enabled(key)
 
 
 func _setup_advisor() -> void:
@@ -310,14 +332,49 @@ func _setup_notification_sounds() -> void:
 
 func _play_pika() -> void:
 	"""Play notification sound for new day reminders."""
+	if not _feature_enabled(ModConfig.KEY_NOTIFICATION_SOUNDS):
+		return
 	if _pika_player != null and _pika_player.stream != null:
 		_pika_player.play()
 
 
 func _play_poke_item() -> void:
 	"""Play notification sound for new trinket reminders."""
+	if not _feature_enabled(ModConfig.KEY_NOTIFICATION_SOUNDS):
+		return
 	if _poke_item_player != null and _poke_item_player.stream != null:
 		_poke_item_player.play()
+
+
+## Apply a live settings change. Disabling a feature hides its UI immediately and
+## drops any queued sound; enabling lets the next poll re-show it. Panels are
+## created once at startup, so toggling never duplicates UI or subscriptions.
+func _on_feature_toggled(key: String, value: bool) -> void:
+	if value:
+		return
+	if key == ModConfig.KEY_DAY_REMINDERS:
+		if _reminder_label != null:
+			_reminder_label.hide_all_reminders()
+		_last_reminder_rule_ids.clear()
+		_pending_chime_rule_ids.clear()
+	elif key == ModConfig.KEY_TRINKET_REMINDERS:
+		if _trinket_reminders_panel != null:
+			_trinket_reminders_panel.hide_panel()
+		_pending_trinket_reminder_sound = false
+	elif key == ModConfig.KEY_NOTIFICATION_SOUNDS:
+		_pending_chime_rule_ids.clear()
+		_pending_trinket_reminder_sound = false
+	elif key == ModConfig.KEY_BATTLE_STATUS_PANEL:
+		if _player_hud != null:
+			_player_hud.visible = false
+	elif key == ModConfig.KEY_TRINKETS_GAINED_PANEL:
+		_hide_trinket_panel()
+	elif key == ModConfig.KEY_SHOP_INCOME:
+		if _shop_income_panel != null:
+			_shop_income_panel.hide_panel()
+	elif key == ModConfig.KEY_RANK_ODDS_PREVIEW:
+		if _rank_odds_panel != null:
+			_rank_odds_panel.hide_panel()
 
 
 func _process(_delta: float) -> void:
@@ -395,6 +452,9 @@ func _inspect_current_phase() -> void:
 func _update_player_hud(state, is_battle: bool) -> void:
 	if _player_hud == null:
 		return
+	if not _feature_enabled(ModConfig.KEY_BATTLE_STATUS_PANEL):
+		_player_hud.visible = false
+		return
 	if not is_battle:
 		_player_hud.visible = false
 		return
@@ -454,11 +514,11 @@ func _evaluate_trainer_advice(snapshot) -> void:
 			_print_notice(full_message)
 		
 		# Queue the chime for chime-flagged rules (day reminders); played once the overlay is showing
-		if advice.get("chime", false):
+		if advice.get("chime", false) and _feature_enabled(ModConfig.KEY_DAY_REMINDERS):
 			_pending_chime_rule_ids[advice.get("rule_id", "")] = true
 			_log_event("DAY REMINDER | %s | %s" % [advice.get("rule_id", ""), message])
 	
-	if _reminder_label != null:
+	if _reminder_label != null and _feature_enabled(ModConfig.KEY_DAY_REMINDERS):
 		var reminders_to_show: Dictionary = {}
 		
 		for advice in all_active:
@@ -573,11 +633,17 @@ func _compute_daily_income(run) -> int:
 func _update_shop_income(run) -> void:
 	if _shop_income_panel == null:
 		return
+	if not _feature_enabled(ModConfig.KEY_SHOP_INCOME):
+		_shop_income_panel.hide_panel()
+		return
 	_shop_income_panel.set_income(_compute_daily_income(run))
 
 
 func _update_rank_odds(run) -> void:
 	if _rank_odds_panel == null:
+		return
+	if not _feature_enabled(ModConfig.KEY_RANK_ODDS_PREVIEW):
+		_rank_odds_panel.hide_panel()
 		return
 	var rank := int(run.get("shop_rank")) if _has_property(run, "shop_rank") else 1
 	_rank_odds_panel.set_rank(rank)
@@ -588,6 +654,10 @@ func _update_rank_odds(run) -> void:
 ## label stays visible at the top; the panel sits below it.
 func _update_trinket_reminders(run) -> void:
 	if _trinket_reminders_panel == null:
+		return
+	if not _feature_enabled(ModConfig.KEY_TRINKET_REMINDERS):
+		_trinket_reminders_panel.hide_panel()
+		_pending_trinket_reminder_sound = false
 		return
 
 	# Accept any iterable (Array or PackedStringArray), matching _capture_trinket_state.
@@ -764,6 +834,9 @@ func _diff_trinket_states(before: Dictionary, after: Dictionary) -> Dictionary:
 
 func _update_trinket_panel(gains: Dictionary) -> bool:
 	if _trinket_panel == null:
+		return false
+	if not _feature_enabled(ModConfig.KEY_TRINKETS_GAINED_PANEL):
+		_hide_trinket_panel()
 		return false
 	var shown_ids: Array = TrinketGains.displayable_ids(gains.get("ids", []), JUNK_TRINKET_ID)
 	if shown_ids.is_empty():

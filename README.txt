@@ -37,6 +37,23 @@ SHOP RANK ODDS
 Click the chart icon near the shop rank display to open a table showing
 the rarity probabilities for every shop rank (1 through 14+).
 
+
+SETTINGS
+--------
+Every feature can be toggled independently under Settings > Mods > Creature
+Comforts. All settings default to On, so existing behavior is unchanged.
+
+- Day Reminders: Show reminders before important trainer events.
+- Trinket Reminders: Show collapsible reminders for timing-sensitive trinkets.
+- Notification Sounds: Play reminder sound effects (visual reminders stay on).
+- Battle Status Panel: Show remaining lives, wins, and current day during battles.
+- Trinkets Gained Panel: Show trinkets acquired during battle.
+- Shop Income: Display income during the shop phase.
+- Rank Odds Preview: Show the shop rank probability table.
+
+Settings are saved by the Mod Loader and persist between game sessions.
+
+
 REQUIREMENTS
 ------------
 - Batomon Showdown (Steam, PC)

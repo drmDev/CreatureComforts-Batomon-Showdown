@@ -1,7 +1,23 @@
 {
 	"id": "creature_comforts",
 	"name": "Creature Comforts",
-	"version": "1.001",
+	"version": "1.002",
 	"author": "NescapePlan",
-	"description": "Creature Comforts - QoL improvements."
+	"description": "Creature Comforts - QoL improvements.",
+	"settings": [
+		{"key": "day_reminders", "label": "Day Reminders", "type": "bool", "default": true,
+		 "description": "Show reminders before important trainer events."},
+		{"key": "trinket_reminders", "label": "Trinket Reminders", "type": "bool", "default": true,
+		 "description": "Show collapsible reminders for timing-sensitive trinkets."},
+		{"key": "notification_sounds", "label": "Notification Sounds", "type": "bool", "default": true,
+		 "description": "Play reminder sound effects."},
+		{"key": "battle_status_panel", "label": "Battle Status Panel", "type": "bool", "default": true,
+		 "description": "Show remaining lives, wins, and current day during battles."},
+		{"key": "trinkets_gained_panel", "label": "Trinkets Gained Panel", "type": "bool", "default": true,
+		 "description": "Show trinkets acquired during battle."},
+		{"key": "shop_income", "label": "Shop Income", "type": "bool", "default": true,
+		 "description": "Display income during the shop phase."},
+		{"key": "rank_odds_preview", "label": "Rank Odds Preview", "type": "bool", "default": true,
+		 "description": "Show the shop rank probability table."}
+	]
 }
