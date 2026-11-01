@@ -36,6 +36,18 @@ func _build_panel_font() -> Font:
 	return font
 
 
+## Shared HUD box: navy fill, gold 1px border, rounded corners. Used by the
+## rank-odds button, the income widget and the watchlist button so small
+## clickable HUD elements look identical.
+func _build_hud_box(radius := 3, border_width := 1) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = BG_COLOR
+	box.border_color = BORDER_COLOR
+	box.set_border_width_all(border_width)
+	box.set_corner_radius_all(radius)
+	return box
+
+
 ## Load a mod-local PNG at runtime (loose mod assets are not imported by the game).
 ## The path is relative to the calling subclass script's directory.
 func _load_texture(relative_path: String) -> Texture2D:

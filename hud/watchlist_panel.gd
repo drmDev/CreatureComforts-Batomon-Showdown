@@ -1,6 +1,6 @@
 extends "comfort_panel.gd"
-## Watchlist panel: tabbed Batomon/Items catalog with mouse-driven Rarity and
-## Type filters, selection, and persistence.
+## Watchlist panel: tabbed Batomon/Items catalog with mouse-driven Rarity, Type
+## and Region filters, selection, and persistence.
 ##
 ## No text inputs: the game handles hotkeys globally (R = reroll), so a focused
 ## text field would let typed letters trigger shop actions. All filtering is
@@ -8,9 +8,9 @@ extends "comfort_panel.gd"
 ## changed by filtering.
 
 const CFG_PATH := "user://creature_comforts/watchlist.cfg"
-const BTN_SIZE := 14
-const LEFT_RATIO := 0.25
-const BOTTOM_OFFSET_RATIO := 0.35
+const BTN_SIZE := 20
+const LEFT_RATIO := 0.27
+const BOTTOM_OFFSET_RATIO := 0.60
 
 const POPUP_WIDTH := 352.0
 const POPUP_HEIGHT := 300.0
@@ -19,11 +19,12 @@ const TITLE_FONT_SIZE := 12
 const BODY_FONT_SIZE := 7
 const ROW_HEIGHT := 10.0
 const LIST_COLUMNS := 3
+const ICON_Y_OFFSET := 2.5  # sprites sit slightly high so they line up with names
 
 const TAB_MONSTER := "monster"
 const TAB_ITEM := "item"
 
-const RARITY_NAMES := ["Common", "Uncommon", "Rare", "Super Rare", "Legendary", "Mythical"]
+## Tier -> rarity display name; the keys double as the filter row's order.
 const RARITY_BY_TIER := {1: "Common", 2: "Uncommon", 3: "Rare", 4: "Super Rare", 5: "Legendary", 6: "Mythical"}
 const RARITY_COLORS := Style.RARITY_COLORS_BY_NAME
 
@@ -31,7 +32,8 @@ const RARITY_COLORS := Style.RARITY_COLORS_BY_NAME
 const EXCLUDED_NAME_PARTS := ["mysterious", "null", "egg", "missing"]
 const EXCLUDED_TYPES := ["all", "null"]
 
-# Region filter options and the species fields that may carry the region.
+# Known regions. The run's own region is appended at runtime when it is not
+# listed here.
 const REGION_NAMES := ["Jinto", "Pantra"]
 const RunRegion = preload("../core/run_region.gd")
 
@@ -39,7 +41,7 @@ const RunRegion = preload("../core/run_region.gd")
 var selection := {"monster": {}, "item": {}}
 
 var _formatter = null
-var _catalog: Array = []  # {kind, key, name, tier, types}
+var _catalog: Array = []  # {kind, key, name, tier, types, icon, region?}
 var _available_types: Array = []
 var _catalog_loaded := false
 
@@ -56,8 +58,11 @@ var _rarity_buttons: Array = []
 var _type_buttons: Array = []
 var _region_filter := ""
 var _region_option: OptionButton
-var _player_region := ""   # region the current run was detected as playing
+var _region_map := {}      # set/pack id -> region display name (from the catalog)
 var _applied_region := ""  # last auto-applied region, so we only override on change
+var _snapshot_button: Button
+var _tracked_count_label: Label
+var _tracked_only := false
 var _rows_box: GridContainer
 var _popup_open := false
 
@@ -77,9 +82,25 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_anchor_button()
 	_position_panel()
+	_apply_tooltip_theme()
 	var vp := get_viewport()
 	if vp != null and not vp.size_changed.is_connected(_on_viewport_resized):
 		vp.size_changed.connect(_on_viewport_resized)
+
+
+## Tooltips are drawn with the TooltipLabel theme type, which per-control theme
+## overrides cannot reach, and the game's default size is far too large at this
+## HUD scale. Half of the inherited size stays readable without covering the
+## panel. Assigned to the panel so every tooltip in its subtree picks it up.
+func _apply_tooltip_theme() -> void:
+	var inherited := get_theme_font_size("font_size", "TooltipLabel")
+	if inherited <= 0:
+		inherited = ThemeDB.fallback_font_size
+	var tooltip_theme := Theme.new()
+	tooltip_theme.set_font_size("font_size", "TooltipLabel", maxi(6, roundi(inherited * 0.5)))
+	if _text_font != null:
+		tooltip_theme.set_font("font", "TooltipLabel", _text_font)
+	theme = tooltip_theme
 
 
 func _on_viewport_resized() -> void:
@@ -124,6 +145,8 @@ func _build_ui() -> void:
 	_button = WatchlistButton.new()
 	_button.font = _text_font
 	_button.font_size = BODY_FONT_SIZE
+	_button.icon = _load_texture("../assets/icons/watchlist.png")
+	_button.style_box = _build_hud_box()
 	_button.on_press = _toggle_popup
 	_button.custom_minimum_size = Vector2(BTN_SIZE, BTN_SIZE)
 	_button.size = Vector2(BTN_SIZE, BTN_SIZE)
@@ -166,13 +189,10 @@ func _build_ui() -> void:
 	_apply_font(title, TITLE_FONT_SIZE)
 	header.add_child(title)
 
-	var close_x := Button.new()
-	close_x.text = "X"
-	close_x.tooltip_text = "Close"
-	close_x.custom_minimum_size = Vector2(14, 14)
-	_apply_font(close_x, BODY_FONT_SIZE)
-	_style_button(close_x)
-	close_x.pressed.connect(_toggle_popup)
+	var close_x := CloseButton.new()
+	close_x.on_press = _toggle_popup
+	# Keep it square inside the (taller) title row.
+	close_x.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	header.add_child(close_x)
 
 	# Tabs
@@ -198,10 +218,10 @@ func _build_ui() -> void:
 	region_label.text = "Region"
 	_apply_font(region_label, BODY_FONT_SIZE)
 	tab_row.add_child(region_label)
+	# Index 0 is "All"; every other entry filters by its own label.
 	_region_option = OptionButton.new()
-	_region_option.add_item("All", 0)
-	for i in range(REGION_NAMES.size()):
-		_region_option.add_item(REGION_NAMES[i], i + 1)
+	for region_name in ["All"] + REGION_NAMES:
+		_region_option.add_item(region_name)
 	_apply_font(_region_option, BODY_FONT_SIZE)
 	_style_button(_region_option)
 	_region_option.custom_minimum_size = Vector2(0, 8)
@@ -230,7 +250,10 @@ func _build_ui() -> void:
 	rarity_flow.add_theme_constant_override("v_separation", 1)
 	_filters_box.add_child(rarity_flow)
 	_add_filter_button(rarity_flow, "All", "", _rarity_buttons, _on_rarity_pressed)
-	for rarity in RARITY_NAMES:
+	var tiers: Array = RARITY_BY_TIER.keys()
+	tiers.sort()
+	for tier in tiers:
+		var rarity := str(RARITY_BY_TIER[tier])
 		_add_filter_button(rarity_flow, rarity, rarity, _rarity_buttons, _on_rarity_pressed, RARITY_COLORS.get(rarity, Color.TRANSPARENT))
 
 	var type_label := Label.new()
@@ -243,7 +266,10 @@ func _build_ui() -> void:
 	_filters_box.add_child(_type_flow)
 	_add_filter_button(_type_flow, "All", "", _type_buttons, _on_type_pressed)
 
-	# Subtle boundary between the filters and the scrollable list.
+	# Toolbar: one-time team snapshot, tracked count, and the Tracked Only view.
+	_toolbar_box(vbox)
+
+	# Subtle boundary between the toolbar and the scrollable list.
 	var divider := ColorRect.new()
 	divider.color = Color(1, 1, 1, 0.12)
 	divider.custom_minimum_size.y = 1
@@ -262,11 +288,42 @@ func _build_ui() -> void:
 	scroll.add_child(_rows_box)
 
 	# Initial state: Batomon tab, "All" filters.
-	for entry in _tab_buttons:
-		entry["button"].button_pressed = (entry["tab"] == _tab)
-	_filters_box.visible = (_tab == TAB_MONSTER)
+	_sync_tab_buttons()
+	_sync_tab_visibility()
 	_sync_filter_buttons(_rarity_buttons, _rarity_filter)
 	_sync_filter_buttons(_type_buttons, _type_filter)
+
+
+## Tools sitting directly above the list: Snapshot Team (Batomon tab only), the
+## tracked count for the active tab, and the Tracked Only view toggle.
+func _toolbar_box(parent: Control) -> void:
+	var toolbar := HBoxContainer.new()
+	toolbar.add_theme_constant_override("separation", 4)
+	parent.add_child(toolbar)
+
+	_snapshot_button = Button.new()
+	_snapshot_button.text = "Snapshot Team"
+	_snapshot_button.tooltip_text = "Replaces your tracked Batomon with the ones currently fielded. Tracked items are kept."
+	_snapshot_button.custom_minimum_size = Vector2(0, 8)
+	_apply_font(_snapshot_button, BODY_FONT_SIZE)
+	_style_action_button(_snapshot_button)
+	_snapshot_button.pressed.connect(_on_snapshot_pressed)
+	toolbar.add_child(_snapshot_button)
+
+	_tracked_count_label = Label.new()
+	_apply_font(_tracked_count_label, BODY_FONT_SIZE)
+	toolbar.add_child(_tracked_count_label)
+
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	toolbar.add_child(spacer)
+
+	var tracked_only_check := CheckBox.new()
+	tracked_only_check.text = "Tracked Only"
+	tracked_only_check.tooltip_text = "Show only entries you are tracking"
+	_style_checkbox(tracked_only_check)
+	tracked_only_check.toggled.connect(_on_tracked_only_toggled)
+	toolbar.add_child(tracked_only_check)
 
 
 func _add_filter_button(parent: Control, text: String, value: String, store: Array, handler: Callable, color: Color = Color.TRANSPARENT) -> void:
@@ -279,6 +336,28 @@ func _add_filter_button(parent: Control, text: String, value: String, store: Arr
 	b.pressed.connect(handler.bind(value))
 	parent.add_child(b)
 	store.append({"button": b, "value": value})
+
+
+## Action-button styling (Snapshot Team): muted red fill with a brighter red
+## border, so it reads as an action rather than as another filter toggle.
+func _style_action_button(b: Button) -> void:
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Style.ACTION_BG
+	normal.border_color = Style.ACTION_BORDER
+	normal.set_border_width_all(1)
+	normal.set_corner_radius_all(2)
+	normal.set_content_margin_all(1)
+	var hover: StyleBoxFlat = normal.duplicate()
+	hover.bg_color = Style.ACTION_BG_HOVER
+	var pressed: StyleBoxFlat = normal.duplicate()
+	pressed.bg_color = Style.ACTION_BORDER
+	for state in ["normal", "focus", "disabled"]:
+		b.add_theme_stylebox_override(state, normal)
+	b.add_theme_stylebox_override("hover", hover)
+	b.add_theme_stylebox_override("pressed", pressed)
+	b.add_theme_stylebox_override("hover_pressed", pressed)
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
+		b.add_theme_color_override(state, VALUE_COLOR)
 
 
 ## Compact button styling so the popup controls match the small HUD scale.
@@ -306,6 +385,30 @@ func _sync_filter_buttons(buttons: Array, selected: String) -> void:
 		entry["button"].button_pressed = (entry["value"] == selected)
 
 
+func _sync_tab_buttons() -> void:
+	for entry in _tab_buttons:
+		entry["button"].button_pressed = (entry["tab"] == _tab)
+
+
+## Controls that only apply to the Batomon tab.
+func _sync_tab_visibility() -> void:
+	var monster_tab := (_tab == TAB_MONSTER)
+	_filters_box.visible = monster_tab
+	_snapshot_button.visible = monster_tab
+
+
+## Compact checkbox with one empty stylebox in EVERY state. States must match:
+## different styleboxes carry different content margins, which shifts the tick and
+## the label on hover and whenever a toggled checkbox draws with `pressed`
+## instead of `normal`.
+func _style_checkbox(check: CheckBox) -> void:
+	check.add_theme_constant_override("icon_max_width", 12)
+	var blank := StyleBoxEmpty.new()
+	for state in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
+		check.add_theme_stylebox_override(state, blank)
+	_apply_font(check, BODY_FONT_SIZE)
+
+
 func _toggle_popup() -> void:
 	_popup_open = not _popup_open
 	_popup.visible = _popup_open
@@ -318,9 +421,8 @@ func _toggle_popup() -> void:
 
 func _on_tab_pressed(tab: String) -> void:
 	_tab = tab
-	for entry in _tab_buttons:
-		entry["button"].button_pressed = (entry["tab"] == tab)
-	_filters_box.visible = (tab == TAB_MONSTER)
+	_sync_tab_buttons()
+	_sync_tab_visibility()
 	_rebuild_rows()
 
 
@@ -336,44 +438,108 @@ func _on_type_pressed(value: String) -> void:
 	_rebuild_rows()
 
 
-func _on_region_selected(index: int) -> void:
-	_region_filter = "" if index == 0 else str(_region_option.get_item_text(index))
+## View filter only: hides untracked rows, never changes the selection itself.
+func _on_tracked_only_toggled(on: bool) -> void:
+	_tracked_only = on
 	_rebuild_rows()
 
 
-## Defaults the Region dropdown to whatever region the run is being played in.
-## Only applied when the detected region changes, so a manual pick sticks for the
-## rest of that run (and a new/changed run re-defaults).
+## One-time capture: replaces tracked Batomon with the currently fielded team.
+## Deliberately not a sync - later team changes leave the list alone. Active
+## filters are ignored and tracked items are untouched. An empty team is a no-op
+## so the list cannot be wiped by accident.
+func _on_snapshot_pressed() -> void:
+	var run = _get_run_data()
+	if run == null or not ("team" in run):
+		return
+	var team = run.get("team")
+	if not (team is Array):
+		return
+	var keys := team_species_keys(team)
+	if keys.is_empty():
+		return
+	var tracked := {}
+	for key in keys:
+		tracked[key] = true
+	selection["monster"] = tracked
+	_save_selection()
+	_rebuild_rows()
+
+
+## Unique species keys of a team array. Entries are MonsterInstance-like objects
+## (or dictionaries) exposing `data.name_key`; empty slots and duplicate species
+## are skipped.
+static func team_species_keys(team: Array) -> Array:
+	var keys: Array = []
+	for monster in team:
+		var data = _entry_field(monster, "data")
+		if data == null:
+			continue
+		var raw_key = _entry_field(data, "name_key")
+		if raw_key == null:
+			continue
+		var key := str(raw_key).strip_edges()
+		if key.is_empty() or keys.has(key):
+			continue
+		keys.append(key)
+	return keys
+
+
+## Field lookup for game objects or dictionaries; null when missing or freed.
+static func _entry_field(obj, field: String):
+	if obj == null or not (obj is Object or obj is Dictionary):
+		return null
+	if obj is Object and not is_instance_valid(obj):
+		return null
+	if not (field in obj):
+		return null
+	return obj.get(field)
+
+
+func _get_run_data():
+	var run_manager = get_node_or_null("/root/RunManager")
+	if run_manager == null or not ("data" in run_manager):
+		return null
+	return run_manager.get("data")
+
+
+func _update_tracked_count() -> void:
+	if _tracked_count_label == null:
+		return
+	_tracked_count_label.text = "%d tracked" % selection.get(_tab, {}).size()
+
+
+func _on_region_selected(index: int) -> void:
+	_apply_region_index(index)
+	_rebuild_rows()
+
+
+## Defaults the Region dropdown to whatever region the run is being played in,
+## appending it when REGION_NAMES does not list it. Only applied when the detected
+## region changes, so a manual pick sticks for the rest of that run (a new or
+## different run re-defaults). `OptionButton.select()` emits nothing.
 func _sync_player_region() -> void:
 	if _region_option == null:
 		return
-	var result = RunRegion.detect()
-	var detected := str(result.get("region", "")).strip_edges()
+	var detected := str(RunRegion.detect().get("region", "")).strip_edges()
 	if detected.is_empty() or detected == _applied_region:
 		return
 	_applied_region = detected
-	_player_region = detected
-	_ensure_region_item(detected)
-	_select_region(detected)
-
-
-## Adds the detected region to the dropdown when the catalog knows a region the
-## hard-coded REGION_NAMES list does not.
-func _ensure_region_item(region_name: String) -> void:
+	var index := -1
 	for i in range(_region_option.item_count):
-		if str(_region_option.get_item_text(i)).to_lower() == region_name.to_lower():
-			return
-	_region_option.add_item(region_name)
+		if str(_region_option.get_item_text(i)).to_lower() == detected.to_lower():
+			index = i
+			break
+	if index < 0:
+		_region_option.add_item(detected)
+		index = _region_option.item_count - 1
+	_region_option.select(index)
+	_apply_region_index(index)
 
 
-## Selects a dropdown entry without emitting item_selected (stays a default).
-func _select_region(region_name: String) -> void:
-	for i in range(_region_option.item_count):
-		if str(_region_option.get_item_text(i)).to_lower() != region_name.to_lower():
-			continue
-		_region_option.select(i)
-		_region_filter = "" if i == 0 else str(_region_option.get_item_text(i))
-		return
+## Index 0 is "All"; every other entry filters by its own label.
+func _apply_region_index(index: int) -> void:
+	_region_filter = "" if index == 0 else str(_region_option.get_item_text(index))
 
 
 ## The catalog is loaded lazily so the GameDatabase autoload is guaranteed to
@@ -394,20 +560,7 @@ func _load_catalog() -> void:
 		return
 	var seen := {}
 	var type_set := {}
-	# Map set id -> set display name so species can be filtered by region (set).
-	var set_region_map := {}
-	if "sets_db" in db:
-		var sets = db.get("sets_db")
-		if sets is Array:
-			for s in sets:
-				if s == null:
-					continue
-				var sid := str(s.get("id")) if "id" in s else ""
-				if sid.is_empty():
-					continue
-				var sname := str(s.get("name")) if "name" in s else ""
-				var skey := str(s.get("name_key")) if "name_key" in s else ""
-				set_region_map[sid] = sname if not sname.is_empty() else skey
+	_region_map = RunRegion.build_region_map(db)
 	if db.has_method("get_all_species"):
 		for species in db.get_all_species():
 			if species == null:
@@ -440,7 +593,7 @@ func _load_catalog() -> void:
 				"kind": "monster", "key": key, "name": display,
 				"tier": tier, "types": types,
 				"icon": icon if icon is Texture2D else null,
-				"region": _extract_region(species, set_region_map),
+				"region": _extract_region(species),
 			})
 	if "items_db" in db:
 		var items = db.get("items_db")
@@ -470,7 +623,7 @@ func _rebuild_type_buttons() -> void:
 		var entry = _type_buttons.pop_back()
 		entry["button"].queue_free()
 	for type_name in _available_types:
-		_add_filter_button(_type_flow, type_name, type_name, _type_buttons, _on_type_pressed)
+		_add_filter_button(_type_flow, type_name, type_name, _type_buttons, _on_type_pressed, Style.type_color(type_name))
 	_sync_filter_buttons(_type_buttons, _type_filter)
 
 
@@ -480,36 +633,24 @@ func _resolve_type(type_resource) -> String:
 	return ""
 
 
-func _extract_region(species, set_region_map: Dictionary) -> String:
-	# Direct region fields first (if the game ever adds one).
-	for field in ["region", "regions", "home_region", "area", "zone", "origin"]:
-		if not (field in species):
+## Species carry no region field: the region is the set they belong to, resolved
+## through `_region_map` (set id -> display name). Unmapped ids are used verbatim.
+func _extract_region(species) -> String:
+	if not ("sets" in species):
+		return ""
+	var sets = species.get("sets")
+	if not (sets is Array):
+		return ""
+	for set_entry in sets:
+		var sid := ""
+		if set_entry is String:
+			sid = set_entry
+		elif set_entry is Object and is_instance_valid(set_entry) and "id" in set_entry:
+			sid = str(set_entry.get("id"))
+		if sid.is_empty():
 			continue
-		var value = species.get(field)
-		if value is String and not value.is_empty():
-			return value
-		if value is Array and not value.is_empty():
-			return str(value[0])
-		if value is Object and is_instance_valid(value):
-			if "id" in value:
-				return str(value.get("id"))
-			if "name" in value:
-				return str(value.get("name"))
-	# Otherwise the region is the species' set (Jinto/Pantra).
-	if "sets" in species:
-		var sets = species.get("sets")
-		if sets is Array:
-			for set_entry in sets:
-				var sid := ""
-				if set_entry is String:
-					sid = set_entry
-				elif set_entry is Object and is_instance_valid(set_entry) and "id" in set_entry:
-					sid = str(set_entry.get("id"))
-				if sid.is_empty():
-					continue
-				if set_region_map.has(sid):
-					return str(set_region_map[sid])
-				return sid
+		var mapped := str(_region_map.get(sid.to_lower(), ""))
+		return mapped if not mapped.is_empty() else sid
 	return ""
 
 
@@ -533,17 +674,27 @@ func _rebuild_rows() -> void:
 	for child in _rows_box.get_children():
 		_rows_box.remove_child(child)
 		child.queue_free()
+	_update_tracked_count()
 	var added := 0
 	for entry in _catalog:
 		if str(entry["kind"]) != _tab:
 			continue
+		var watched := is_watched(entry["kind"], entry["key"])
+		# Tracked Only composes with the other filters; it never overrides them.
+		if _tracked_only and not watched:
+			continue
 		if _tab == TAB_MONSTER and not _passes_monster_filters(entry):
 			continue
-		_add_entry_row(entry, added)
+		_add_entry_row(entry, added, watched)
 		added += 1
 	if added == 0:
 		var empty_label := Label.new()
-		empty_label.text = "No Batomon match these filters." if _tab == TAB_MONSTER else "No items available."
+		if _tracked_only:
+			empty_label.text = "Nothing tracked yet."
+		elif _tab == TAB_MONSTER:
+			empty_label.text = "No Batomon match these filters."
+		else:
+			empty_label.text = "No items match these filters."
 		empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		empty_label.custom_minimum_size.x = POPUP_WIDTH - 24
 		_apply_font(empty_label, BODY_FONT_SIZE)
@@ -558,8 +709,7 @@ func _rebuild_rows() -> void:
 ## with a transparent Button filling it to catch clicks. A plain Button would
 ## have zero width here and its unmanaged children would overlap their
 ## neighbours in the grid.
-func _add_entry_row(entry: Dictionary, index: int) -> void:
-	var watched := is_watched(entry["kind"], entry["key"])
+func _add_entry_row(entry: Dictionary, index: int, watched: bool) -> void:
 	var shade := Color("#1e2a36") if (index / LIST_COLUMNS) % 2 == 0 else Color("#18232D")
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = shade
@@ -578,13 +728,23 @@ func _add_entry_row(entry: Dictionary, index: int) -> void:
 
 	var icon_tex = entry.get("icon")
 	if icon_tex is Texture2D:
+		# Fixed-size holder + anchored rect: a container would reset the offsets,
+		# but a plain Control keeps the nudge applied so the sprite lines up with
+		# the name text instead of the row's centre.
+		var icon_slot := Control.new()
+		icon_slot.custom_minimum_size = Vector2(12, 12)
+		icon_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		hbox.add_child(icon_slot)
+
 		var icon := TextureRect.new()
 		icon.texture = icon_tex
-		icon.custom_minimum_size = Vector2(12, 12)
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		hbox.add_child(icon)
+		icon_slot.add_child(icon)
+		icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		icon.offset_top = -ICON_Y_OFFSET
+		icon.offset_bottom = -ICON_Y_OFFSET
 
 	var label := Label.new()
 	label.text = str(entry["name"])
@@ -595,13 +755,21 @@ func _add_entry_row(entry: Dictionary, index: int) -> void:
 	_apply_font(label, BODY_FONT_SIZE)
 	hbox.add_child(label)
 
+	# Fixed-size holder: a plain Control positions its child by anchors, so the
+	# checkbox rect stays exactly 12x12 no matter which state icon it draws.
+	# (Inside the HBox, a state change could otherwise resize the row.)
+	var check_holder := Control.new()
+	check_holder.custom_minimum_size = Vector2(12, 12)
+	check_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hbox.add_child(check_holder)
+
 	var check := CheckBox.new()
 	check.button_pressed = watched
 	check.focus_mode = Control.FOCUS_NONE
 	check.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	check.add_theme_constant_override("icon_max_width", 12)
-	_apply_font(check, BODY_FONT_SIZE)
-	hbox.add_child(check)
+	_style_checkbox(check)
+	check_holder.add_child(check)
+	check.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	# Transparent hit area. PanelContainer stretches every Control child to fill
 	# its content rect, so this Button covers the whole row.
@@ -653,6 +821,12 @@ func _on_entry_toggled(on: bool, kind: String, key: String) -> void:
 		bucket.erase(key)
 	selection[kind] = bucket
 	_save_selection()
+	if _tracked_only:
+		# Visible rows and the count both follow the selection; deferred so the row
+		# that emitted this signal can be freed safely.
+		_rebuild_rows.call_deferred()
+	else:
+		_update_tracked_count()
 
 
 func is_watched(kind: String, key: String) -> bool:
@@ -689,12 +863,50 @@ static func _format_ids(ids: Dictionary) -> String:
 	return ",".join(keys)
 
 
+## Close (X) button mirroring the rank-odds popup: a gold rounded box with dark
+## arms drawn straight onto the canvas, so both popups read as the same widget.
+class CloseButton extends Control:
+	const Style = preload("../core/style.gd")
+	const SIZE := 14.0     # matches rank_odds_panel.CLOSE_BTN
+	const ARM := 3.0
+	const ARM_WIDTH := 1.5
+
+	var on_press: Callable
+	var _box: StyleBoxFlat
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_STOP
+		focus_mode = Control.FOCUS_NONE
+		tooltip_text = "Close"
+		custom_minimum_size = Vector2(SIZE, SIZE)
+		_box = StyleBoxFlat.new()
+		_box.bg_color = Style.BORDER_COLOR
+		_box.set_corner_radius_all(2)
+
+	func _draw() -> void:
+		_box.draw(get_canvas_item(), Rect2(Vector2.ZERO, size))
+		var c := size * 0.5
+		draw_line(c + Vector2(-ARM, -ARM), c + Vector2(ARM, ARM), Style.BG_COLOR, ARM_WIDTH)
+		draw_line(c + Vector2(-ARM, ARM), c + Vector2(ARM, -ARM), Style.BG_COLOR, ARM_WIDTH)
+
+	func _gui_input(event) -> void:
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			if on_press.is_valid():
+				on_press.call()
+			accept_event()
+
+
 ## Small self-drawn button. A plain Control has no content minimum, so its size
 ## is exactly BTN_SIZE (unlike a Button, which clamps to text + theme padding).
 class WatchlistButton extends Control:
 	const Style = preload("../core/style.gd")
+	const ICON_PADDING := 2.0
 	var font: Font
 	var font_size := 7
+	var icon: Texture2D
+	# Rounded HUD box supplied by the owning panel (comfort_panel._build_hud_box),
+	# so this button matches the rank-odds and income widgets.
+	var style_box: StyleBoxFlat
 	var on_press: Callable
 
 	func _ready() -> void:
@@ -703,9 +915,20 @@ class WatchlistButton extends Control:
 		tooltip_text = "Watchlist"
 
 	func _draw() -> void:
-		draw_rect(Rect2(Vector2.ZERO, size), Style.BG_COLOR, true)
-		draw_rect(Rect2(Vector2.ZERO, size), Style.BORDER_COLOR, false, 1.0)
+		if style_box != null:
+			style_box.draw(get_canvas_item(), Rect2(Vector2.ZERO, size))
+		if icon != null:
+			var tex_size := icon.get_size()
+			if tex_size.x > 0.0 and tex_size.y > 0.0:
+				# Same inset the rank-odds icon uses, so the rounded border shows.
+				var box := Vector2(
+					maxf(size.x - ICON_PADDING * 2.0, 1.0),
+					maxf(size.y - ICON_PADDING * 2.0, 1.0))
+				var draw_size := tex_size * minf(box.x / tex_size.x, box.y / tex_size.y)
+				draw_texture_rect(icon, Rect2((size - draw_size) * 0.5, draw_size), false)
+				return
 		if font != null:
+			# Fallback when the asset is missing (e.g. an incomplete install).
 			var text := "WL"
 			var tw := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 			var th := font.get_height(font_size)

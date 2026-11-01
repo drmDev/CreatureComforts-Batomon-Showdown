@@ -2,7 +2,7 @@ extends "comfort_panel.gd"
 
 signal log_line(message: String)
 
-const BTN_SIZE := 22.0
+const BTN_SIZE := 20.0
 const LEFT_MARGIN := 100.0
 const BOTTOM_OFFSET_RATIO := 0.20  # Button bottom sits 20% of the viewport height above the bottom
 
@@ -74,11 +74,7 @@ func _ready() -> void:
 
 
 func _setup_styles() -> void:
-	_button_style = StyleBoxFlat.new()
-	_button_style.bg_color = BG_COLOR
-	_button_style.border_color = BORDER_COLOR
-	_button_style.set_border_width_all(1)
-	_button_style.set_corner_radius_all(3)
+	_button_style = _build_hud_box()
 
 	_popup_style = StyleBoxFlat.new()
 	_popup_style.bg_color = BG_COLOR

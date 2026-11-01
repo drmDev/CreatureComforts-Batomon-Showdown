@@ -52,6 +52,16 @@ The Region dropdown starts on the region your current run is being played in
 and only changes back to that default when you start a run in a different
 region, so a manual choice stays put for the rest of a run.
 
+The toolbar above the list has two helpers:
+
+- Snapshot Team (Batomon tab): replaces your tracked Batomon with the species
+  currently fielded. It is a one-time capture - later team changes do not
+  alter the list - and tracked items are left untouched. If no Batomon are
+  fielded the list is left as it is.
+- Tracked Only (both tabs): shows only the entries you track. It combines with
+  the Region, Rarity, and Type filters instead of replacing them, and the
+  count beside it shows how many entries the active tab is tracking.
+
 
 SETTINGS
 --------

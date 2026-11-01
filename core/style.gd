@@ -34,3 +34,33 @@ const RARITY_COLORS_BY_NAME := {
 	"Legendary": RARITY_LEGENDARY,
 	"Mythical": RARITY_MYTHICAL,
 }
+
+# Type filter colors (watchlist), keyed by lowercased type name. Entries that
+# reuse a rarity color are deliberate, to avoid duplicating hex values.
+const TYPE_COLORS := {
+	"bug": Color("#A4BC46"),       # yellow-green
+	"curio": Color("#D9A5D9"),     # soft lavender-pink
+	"dragon": RARITY_SUPER_RARE,   # light purple (reused)
+	"electric": Color("#F1CF4B"),  # bright yellow
+	"fighting": Color("#DF9680"),  # muted coral
+	"fire": Color("#F28448"),      # warm orange
+	"flying": Color("#A9D6E9"),    # pale sky blue
+	"ghost": Color("#B59ADC"),     # lavender
+	"grass": RARITY_UNCOMMON,      # leaf green (reused)
+	"rock": Color("#C5AA87"),      # sandy beige
+	"steel": Color("#ABC1CC"),     # cool gray-blue
+	"toxic": Color("#CB91DC"),     # pink-purple
+	"water": RARITY_RARE,          # light blue (reused)
+}
+
+# Action buttons (Snapshot Team) - muted red, so they read as actions rather than
+# as filter toggles.
+const ACTION_BG := Color("#87383B")
+const ACTION_BG_HOVER := Color("#9A4044")
+const ACTION_BORDER := Color("#CC6468")
+
+
+## Text colour for a type filter. Unknown types return TRANSPARENT so callers fall
+## back to their neutral text colour.
+static func type_color(type_name: String) -> Color:
+	return TYPE_COLORS.get(type_name.to_lower(), Color.TRANSPARENT)

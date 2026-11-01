@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "1.122"
+const VERSION := "1.130"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
@@ -201,8 +201,8 @@ func _initialize_mod() -> void:
 	_log_message("=".repeat(80))
 	
 	if _debug_logging:
-		# Investigation diagnostics for the shop-highlighting feature. Deferred so
-		# autoloads such as GameDatabase exist. Safe to remove once confirmed.
+		# Catalog overview for troubleshooting; deferred so autoloads such as
+		# GameDatabase exist.
 		call_deferred("_log_catalog_diagnostics")
 	
 	print("Creature Comforts %s loaded - logging to %s" % [VERSION, abs_log_path])
@@ -225,9 +225,9 @@ func _feature_enabled(key: String) -> bool:
 	return _mod_config.is_enabled(key)
 
 
-## --- Investigation diagnostics (shop highlighting) -------------------------
-## Gated by Debug Logging. These dump the unknown catalog/card APIs so the
-## feature can be built against real data. Remove once the details are known.
+## --- Diagnostics -----------------------------------------------------------
+## Gated by Debug Logging. One-shot catalog overview plus the region dump (the
+## latter lives in core/run_region.gd).
 
 func _log_catalog_diagnostics() -> void:
 	_catalog_diagnostics_logged = true
@@ -285,123 +285,7 @@ func _log_catalog_diagnostics() -> void:
 					var tier := int(s.get("tier")) if "tier" in s else 0
 					histogram[tier] = histogram.get(tier, 0) + 1
 				_log_message("CATALOG DIAG | species count=%d tier histogram=%s" % [species_list.size(), str(histogram)])
-		# Region discovery: species have no direct region field; inspect sets/packs.
-		if db.has_method("get_all_species"):
-			var region_species = db.get_all_species()
-			if region_species is Array and not region_species.is_empty() and region_species[0] != null:
-				if "sets" in region_species[0]:
-					_log_message("REGION DIAG | sample species.sets = %s" % str(region_species[0].get("sets")))
-		if "sets_db" in db:
-			var sets = db.get("sets_db")
-			if sets is Array and not sets.is_empty() and sets[0] != null:
-				var set_vars: Array = []
-				for prop in sets[0].get_property_list():
-					if int(prop.get("usage", 0)) & PROPERTY_USAGE_SCRIPT_VARIABLE:
-						set_vars.append(str(prop.get("name", "")))
-				_log_message("REGION DIAG | first set vars: %s" % ", ".join(set_vars))
-			if sets is Array:
-				var set_info: Array = []
-				for s in sets:
-					if s == null:
-						continue
-					var sid := str(s.get("id")) if "id" in s else "?"
-					var sname := str(s.get("name")) if "name" in s else "?"
-					set_info.append("%s=%s" % [sid, sname])
-				_log_message("REGION DIAG | sets: %s" % ", ".join(set_info))
-		if db.has_method("get_all_species"):
-			var region_species = db.get_all_species()
-			if region_species is Array:
-				var samples: Array = []
-				for s in region_species:
-					if s == null:
-						continue
-					var sets_val = s.get("sets") if "sets" in s else null
-					if sets_val is Array and not sets_val.is_empty():
-						samples.append("%s=%s" % [str(s.get("id")), str(sets_val)])
-					if samples.size() >= 5:
-						break
-				_log_message("REGION DIAG | species sets samples: %s" % ", ".join(samples))
-		if "species_packs_db" in db:
-			var packs = db.get("species_packs_db")
-			if packs is Array and not packs.is_empty() and packs[0] != null:
-				var pack_vars: Array = []
-				for prop in packs[0].get_property_list():
-					if int(prop.get("usage", 0)) & PROPERTY_USAGE_SCRIPT_VARIABLE:
-						pack_vars.append(str(prop.get("name", "")))
-				_log_message("REGION DIAG | first species pack vars: %s" % ", ".join(pack_vars))
-		_log_asset_diagnostics(db)
 	_log_message("GAMEDB DIAG | === end ===")
-	_log_catalog_dir_diagnostics()
-
-
-func _log_catalog_dir_diagnostics() -> void:
-	for dir in ["res://game", "res://data", "res://resources", "res://assets",
-			"res://assets/ui/textures", "res://assets/ui/textures/dex", "res://assets/ui/textures/shop"]:
-		var access := DirAccess.open(dir)
-		if access == null:
-			_log_message("CATALOG DIAG | %s: (not found)" % dir)
-			continue
-		var dirs := access.get_directories()
-		var files := access.get_files()
-		_log_message("CATALOG DIAG | %s: dirs(%d)=%s files(%d)=%s" % [
-			dir, dirs.size(), _cap_list(dirs), files.size(), _cap_list(files)])
-
-
-func _cap_list(items: PackedStringArray, limit := 40) -> String:
-	var shown: Array = []
-	for i in range(mini(items.size(), limit)):
-		shown.append(items[i])
-	var suffix := "" if items.size() <= limit else " ...(+%d)" % (items.size() - limit)
-	return ", ".join(shown) + suffix
-
-
-## Asset discovery for watchlist icons: lists likely sprite directories and logs
-## any texture/resource paths exposed by a sample species and item.
-func _log_asset_diagnostics(db) -> void:
-	_log_message("ASSET DIAG | === begin ===")
-	for dir in ["res://assets/sprites", "res://assets/sprites/monsters", "res://assets/sprites/items",
-			"res://assets/ui/textures/monster_visual_hud", "res://assets/ui/textures/shop"]:
-		var access := DirAccess.open(dir)
-		if access == null:
-			_log_message("ASSET DIAG | %s: (not found)" % dir)
-			continue
-		var dirs := access.get_directories()
-		var files := access.get_files()
-		_log_message("ASSET DIAG | %s: dirs(%d)=%s files(%d)=%s" % [
-			dir, dirs.size(), _cap_list(dirs), files.size(), _cap_list(files)])
-	if db.has_method("get_all_species"):
-		var species_list = db.get_all_species()
-		if species_list is Array and not species_list.is_empty():
-			_log_asset_fields("species", species_list[0])
-	if "items_db" in db:
-		var items = db.get("items_db")
-		if items is Array and not items.is_empty():
-			_log_asset_fields("item", items[0])
-	_log_message("ASSET DIAG | === end ===")
-
-
-func _log_asset_fields(kind: String, obj) -> void:
-	if obj == null or not is_instance_valid(obj):
-		return
-	_log_message("ASSET DIAG | %s sample: %s" % [kind, _formatter.get_object_info(obj)])
-	if "id" in obj:
-		_log_message("ASSET DIAG |   %s.id = %s" % [kind, str(obj.get("id"))])
-	if "name_key" in obj:
-		_log_message("ASSET DIAG |   %s.name_key = %s" % [kind, str(obj.get("name_key"))])
-	for prop in obj.get_property_list():
-		if not (int(prop.get("usage", 0)) & PROPERTY_USAGE_SCRIPT_VARIABLE):
-			continue
-		var pname := str(prop.get("name", ""))
-		var value = obj.get(pname)
-		var desc := ""
-		if value is Texture2D:
-			desc = "Texture2D path=%s" % str(value.resource_path)
-		elif value is Resource:
-			desc = "Resource path=%s" % str(value.resource_path)
-		elif value is String and (value.contains("res://") or value.contains(".png") or value.contains(".tres")):
-			desc = "String path=%s" % value
-		if not desc.is_empty():
-			_log_message("ASSET DIAG |   %s.%s: %s" % [kind, pname, desc])
 
 
 func _log_shop_structure_diagnostic(state) -> void:
@@ -486,7 +370,7 @@ func _log_region_diagnostic() -> void:
 	# verbose (run-data variable dump) is a session-once diagnostic: it allocates
 	# the 100+ name list, so it is not repeated on every shop visit.
 	var verbose := not _region_diagnostics_logged
-	var result = RunRegion.detect(_has_property, verbose)
+	var result = RunRegion.detect(verbose)
 	var detected := str(result.get("region", ""))
 	_log_message("REGION DIAG | === begin ===")
 	_log_message("REGION DIAG | detected region: %s" % (detected if not detected.is_empty() else "(none)"))

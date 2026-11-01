@@ -1,90 +1,58 @@
 extends RefCounted
 ## Resolves the region the player is currently running in (e.g. "Jinto", "Pantra").
 ##
-## The game exposes no documented "current region" field, so this probes a list of
-## plausible property names on RunManager, its `data` object, and a few state
-## autoloads; any catalog id it finds is mapped through `sets_db` /
-## `species_packs_db` to a display name. Region display names must line up with the
-## watchlist's species `region` values (species.sets -> set name), which is why the
-## same id -> name mapping is used.
+## `RunManager.data.active_set_id` holds the region as a set id (e.g. "oshima"),
+## which `sets_db` maps to a display name. The watchlist labels species with the
+## same map (species.sets -> set name), so both sides agree on the string.
 ##
-## `detect()` returns `{ "region": String, "report": Array[String] }` so callers can
-## log exactly what was inspected while troubleshooting.
+## `detect()` returns `{ "region": String, "report": Array[String] }`; the report
+## exists so the diagnostic logger can show what was read.
 
-## Property names that could carry the active region/set/pack, most likely first.
-## `active_set_id` is the field RunManager.data actually exposes.
-const CANDIDATE_KEYS := [
-	"active_set_id",
-	"region", "regions", "current_region", "region_id", "region_name",
-	"set", "sets", "current_set", "active_set", "set_id", "home_set",
-	"species_pack", "species_packs", "pack", "current_pack", "pack_id",
-	"origin", "zone", "area", "map", "map_id",
-]
+## Fields that may carry the active set/region, most likely first.
+const CANDIDATE_KEYS := ["active_set_id", "region", "current_region", "set_id", "current_set", "active_set"]
 
-## Autoload singletons that may own the run/region state.
-const CANDIDATE_AUTOLOADS := [
-	"RunManager", "GameState", "RunState", "GameManager", "ProgressManager", "SaveManager",
-]
-
-## Fields to read off an object found in one of the candidate properties.
-const OBJECT_NAME_FIELDS := ["id", "name", "name_key"]
-
-## Catalog collections (on GameDatabase) that map ids to display names.
-const ALIAS_COLLECTIONS := ["sets_db", "species_packs_db"]
+## GameDatabase collections that describe a region, keyed by id.
+const REGION_COLLECTIONS := ["sets_db", "species_packs_db"]
 
 
-## Detects the current region. `has_property` is an optional
-## `func(obj, name) -> bool`; when omitted, `name in obj` is used.
+## Detects the current region.
 ##
-## Cost: one property read per candidate key on the first source that answers
-## (`RunManager.data`, normally the very first), plus a small alias-map walk.
-## `verbose` additionally dumps the run data's script variable names, which
-## allocates a 100+ element array - only the diagnostic logger asks for that.
-static func detect(has_property: Callable = Callable(), verbose := false) -> Dictionary:
+## Cost: a few property existence checks on the run data (the confirmed source,
+## normally answered on the first read), then one small id -> name walk over
+## `sets_db`. `verbose` also dumps the run data's script variable names for
+## troubleshooting; that allocates a 100+ element array, so only the diagnostic
+## logger asks for it.
+static func detect(verbose := false) -> Dictionary:
 	var report: Array = []
-	var aliases := build_alias_map(null)
-	for source in collect_sources():
-		var obj = source.get("object")
-		var label := str(source.get("label", "?"))
-		if obj == null or not (obj is Object or obj is Dictionary):
+	var regions := build_region_map(null)
+	var run_manager = _get_node("/root/RunManager")
+	var run_data = null
+	if run_manager != null and "data" in run_manager:
+		run_data = run_manager.get("data")
+	# Run data is the confirmed source; the manager node is a fallback.
+	var sources := [
+		{"label": "RunManager.data", "object": run_data},
+		{"label": "RunManager", "object": run_manager},
+	]
+	for source in sources:
+		var obj = source["object"]
+		if obj == null:
 			continue
 		if verbose and obj is Object and not (obj is Node):
-			# Property names of the run data object, so a field we did not guess
-			# can still be identified from the log.
-			report.append("%s: %s" % [label, describe_properties(obj)])
-		var hit := _scan_object(obj, aliases, has_property, report, label)
+			report.append("%s: %s" % [source["label"], describe_properties(obj)])
+		var hit := _scan_object(obj, regions, report, source["label"])
 		if not hit.is_empty():
 			return {"region": hit, "report": report}
 	return {"region": "", "report": report}
 
 
-## Live candidate sources, in priority order: the run data first, then its owner.
-static func collect_sources() -> Array:
-	var out: Array = []
-	var root = _get_root()
-	if root == null:
-		return out
-	for node_name in CANDIDATE_AUTOLOADS:
-		var node = root.get_node_or_null("/root/" + node_name)
-		if node == null:
-			continue
-		if node_name == "RunManager" and "data" in node:
-			var data = node.get("data")
-			if data != null:
-				out.append({"label": node_name + ".data", "object": data})
-		out.append({"label": node_name, "object": node})
-	return out
-
-
-## Maps catalog ids (lowercased) to display names. Pass a Dictionary/object with a
-## `sets_db` / `species_packs_db` field to override the GameDatabase lookup (tests).
-static func build_alias_map(db = null) -> Dictionary:
-	var aliases := {}
+## Region id -> display name (e.g. "oshima" -> "Jinto"), lowercased keys. Shared
+## with the watchlist, which labels each species with its set's display name.
+static func build_region_map(db = null) -> Dictionary:
 	if db == null:
 		db = _get_database()
-	if db == null:
-		return aliases
-	for collection in ALIAS_COLLECTIONS:
+	var regions := {}
+	for collection in REGION_COLLECTIONS:
 		for entry in _collection_entries(db, collection):
 			var id := _string_field(entry, "id")
 			var display := _string_field(entry, "name")
@@ -92,12 +60,11 @@ static func build_alias_map(db = null) -> Dictionary:
 				display = _string_field(entry, "name_key")
 			if id.is_empty() or display.is_empty():
 				continue
-			aliases[id.to_lower()] = display
-	return aliases
+			regions[id.to_lower()] = display
+	return regions
 
 
-## Normalizes a raw property value (String, Array, set/pack resource) to a region
-## display name. Catalog ids are translated through `aliases`.
+## Normalizes a raw property value (a String or an Array of ids) to a region name.
 static func normalize_value(value, aliases: Dictionary) -> String:
 	if value is String or value is StringName:
 		return _match_name(str(value).strip_edges(), aliases)
@@ -106,36 +73,29 @@ static func normalize_value(value, aliases: Dictionary) -> String:
 			var found := normalize_value(item, aliases)
 			if not found.is_empty():
 				return found
-		return ""
-	if value is Object and is_instance_valid(value):
-		for field in OBJECT_NAME_FIELDS:
-			if not (field in value):
-				continue
-			var found := normalize_value(value.get(field), aliases)
-			if not found.is_empty():
-				return found
 	return ""
 
 
-## Resolves a raw string to a region display name. Tries an exact catalog id
-## (lowercased) first, then an exact display name, then a display name contained
-## in the raw value, so ids such as "set_jinto"/"jinto" still resolve to "Jinto".
+## Resolves a raw string to a display name: exact set id, then exact display name,
+## then a display name contained in the value ("jinto_base" -> "Jinto"). Unmapped
+## values pass through unchanged.
 static func _match_name(text: String, aliases: Dictionary) -> String:
 	if text.is_empty():
 		return ""
-	var mapped := str(aliases.get(text.to_lower(), ""))
+	var lower := text.to_lower()
+	var mapped := str(aliases.get(lower, ""))
 	if not mapped.is_empty():
 		return mapped
-	var lower := text.to_lower()
+	var partial := ""
 	for display in aliases.values():
 		var name := str(display)
-		if not name.is_empty() and lower == name.to_lower():
+		if name.is_empty():
+			continue
+		if lower == name.to_lower():
 			return name
-	for display in aliases.values():
-		var name := str(display)
-		if not name.is_empty() and lower.contains(name.to_lower()):
-			return name
-	return text
+		if partial.is_empty() and lower.contains(name.to_lower()):
+			partial = name
+	return partial if not partial.is_empty() else text
 
 
 static func describe_value(value) -> String:
@@ -164,26 +124,24 @@ static func describe_properties(obj) -> String:
 	return "vars(%d): %s" % [names.size(), ", ".join(names)]
 
 
-static func _scan_object(obj, aliases: Dictionary, has_property: Callable, report: Array, label: String) -> String:
+static func _scan_object(obj, aliases: Dictionary, report: Array, label: String) -> String:
 	for key in CANDIDATE_KEYS:
-		if not _has(obj, key, has_property):
+		if not _has(obj, key):
 			continue
 		var value = obj.get(key)
 		var normalized := normalize_value(value, aliases)
-		report.append("%s.%s = %s -> %s" % [label, key, describe_value(value), normalized if not normalized.is_empty() else "(no match)"])
+		report.append("%s.%s = %s -> %s" % [
+			label, key, describe_value(value),
+			normalized if not normalized.is_empty() else "(no match)"])
 		if not normalized.is_empty():
 			return normalized
 	return ""
 
 
-static func _has(obj, key: String, has_property: Callable) -> bool:
+static func _has(obj, key: String) -> bool:
 	if obj is Dictionary:
 		return obj.has(key)
-	if has_property.is_valid():
-		return bool(has_property.call(obj, key))
-	if obj is Object:
-		return key in obj
-	return false
+	return obj is Object and key in obj
 
 
 static func _string_field(obj, field: String) -> String:
@@ -209,20 +167,24 @@ static func _collection_entries(db, collection: String) -> Array:
 	return []
 
 
+static func _get_node(path: String):
+	var root = _get_root()
+	if root == null:
+		return null
+	return root.get_node_or_null(path)
+
+
+static func _get_database():
+	return _get_node("/root/GameDatabase")
+
+
 static func _get_root():
 	var tree := Engine.get_main_loop()
 	if tree == null or not (tree is SceneTree):
 		return null
 	var root: Window = (tree as SceneTree).root
-	# Absolute get_node paths only resolve inside the active scene tree (a
-	# headless --script run, e.g. the test suite, has a detached root).
+	# Absolute get_node paths only resolve inside the active scene tree (a headless
+	# --script run, e.g. the test suite, has a detached root).
 	if root == null or not root.is_inside_tree():
 		return null
 	return root
-
-
-static func _get_database():
-	var root = _get_root()
-	if root == null:
-		return null
-	return root.get_node_or_null("/root/GameDatabase")

@@ -31,11 +31,7 @@ func _ready() -> void:
 
 
 func _setup_styles() -> void:
-	_panel_style = StyleBoxFlat.new()
-	_panel_style.bg_color = BG_COLOR
-	_panel_style.border_color = BORDER_COLOR
-	_panel_style.set_border_width_all(1)
-	_panel_style.set_corner_radius_all(3)
+	_panel_style = _build_hud_box()
 
 
 func set_income(value: int) -> void:
