@@ -65,6 +65,14 @@ var _tracked_count_label: Label
 var _tracked_only := false
 var _rows_box: GridContainer
 var _popup_open := false
+var _rows_dirty := true
+
+# Shared row styleboxes, built once by _ensure_row_styles().
+var _blank_style: StyleBoxEmpty
+var _row_style_a: StyleBoxFlat
+var _row_style_b: StyleBoxFlat
+var _row_hover_style: StyleBoxFlat
+var _row_pressed_style: StyleBoxFlat
 
 
 func _init() -> void:
@@ -140,6 +148,7 @@ func _apply_font(control: Control, size: int) -> void:
 
 
 func _build_ui() -> void:
+	_ensure_row_styles()
 	# Custom-drawn control (not a Button) so BTN_SIZE fully controls the size;
 	# a Button clamps to its text + theme padding minimum.
 	_button = WatchlistButton.new()
@@ -203,6 +212,7 @@ func _build_ui() -> void:
 		var b := Button.new()
 		b.text = "Batomon" if tab == TAB_MONSTER else "Items"
 		b.toggle_mode = true
+		b.focus_mode = Control.FOCUS_NONE
 		b.custom_minimum_size = Vector2(35, 8)
 		_apply_font(b, BODY_FONT_SIZE)
 		_style_button(b)
@@ -220,6 +230,7 @@ func _build_ui() -> void:
 	tab_row.add_child(region_label)
 	# Index 0 is "All"; every other entry filters by its own label.
 	_region_option = OptionButton.new()
+	_region_option.focus_mode = Control.FOCUS_NONE
 	for region_name in ["All"] + REGION_NAMES:
 		_region_option.add_item(region_name)
 	_apply_font(_region_option, BODY_FONT_SIZE)
@@ -304,6 +315,7 @@ func _toolbar_box(parent: Control) -> void:
 	_snapshot_button = Button.new()
 	_snapshot_button.text = "Snapshot Team"
 	_snapshot_button.tooltip_text = "Replaces your tracked Batomon with the ones currently fielded. Tracked items are kept."
+	_snapshot_button.focus_mode = Control.FOCUS_NONE
 	_snapshot_button.custom_minimum_size = Vector2(0, 8)
 	_apply_font(_snapshot_button, BODY_FONT_SIZE)
 	_style_action_button(_snapshot_button)
@@ -321,6 +333,7 @@ func _toolbar_box(parent: Control) -> void:
 	var tracked_only_check := CheckBox.new()
 	tracked_only_check.text = "Tracked Only"
 	tracked_only_check.tooltip_text = "Show only entries you are tracking"
+	tracked_only_check.focus_mode = Control.FOCUS_NONE
 	_style_checkbox(tracked_only_check)
 	tracked_only_check.toggled.connect(_on_tracked_only_toggled)
 	toolbar.add_child(tracked_only_check)
@@ -330,6 +343,7 @@ func _add_filter_button(parent: Control, text: String, value: String, store: Arr
 	var b := Button.new()
 	b.text = text
 	b.toggle_mode = true
+	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(0, 7)
 	_apply_font(b, BODY_FONT_SIZE)
 	_style_button(b, color)
@@ -402,11 +416,32 @@ func _sync_tab_visibility() -> void:
 ## the label on hover and whenever a toggled checkbox draws with `pressed`
 ## instead of `normal`.
 func _style_checkbox(check: CheckBox) -> void:
+	_ensure_row_styles()
+	check.focus_mode = Control.FOCUS_NONE
 	check.add_theme_constant_override("icon_max_width", 12)
-	var blank := StyleBoxEmpty.new()
 	for state in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
-		check.add_theme_stylebox_override(state, blank)
+		check.add_theme_stylebox_override(state, _blank_style)
 	_apply_font(check, BODY_FONT_SIZE)
+
+
+## Build the shared row styleboxes once. A full catalog rebuild would otherwise
+## allocate one set per row (hundreds of resources per rebuild).
+func _ensure_row_styles() -> void:
+	if _blank_style != null:
+		return
+	_blank_style = StyleBoxEmpty.new()
+	_row_style_a = StyleBoxFlat.new()
+	_row_style_a.bg_color = Color("#1e2a36")
+	_row_style_a.set_corner_radius_all(2)
+	_row_style_a.set_content_margin_all(1)
+	_row_style_b = _row_style_a.duplicate()
+	_row_style_b.bg_color = Color("#18232D")
+	_row_hover_style = StyleBoxFlat.new()
+	_row_hover_style.bg_color = Color(1, 1, 1, 0.06)
+	_row_hover_style.set_corner_radius_all(2)
+	_row_pressed_style = StyleBoxFlat.new()
+	_row_pressed_style.bg_color = Color(0.95, 0.61, 0.07, 0.22)
+	_row_pressed_style.set_corner_radius_all(2)
 
 
 func _toggle_popup() -> void:
@@ -416,7 +451,31 @@ func _toggle_popup() -> void:
 		_ensure_catalog()
 		_position_panel()
 		_sync_player_region()
-		_rebuild_rows()
+		if _rows_dirty:
+			_rebuild_rows()
+
+
+## Close the popup without toggling. Called when the shop overlay gate hides the
+## reminder layer (shop exit, modal overlay, pause) so a stale modal cannot
+## reappear on the next shop visit.
+func close_popup() -> void:
+	if not _popup_open:
+		return
+	_popup_open = false
+	_popup.visible = false
+
+
+## While the popup is open it is modal: swallow keyboard input so the game's
+## global hotkeys (R = reroll, etc.) cannot act on the shop behind it. Esc closes
+## the popup instead of opening the game's Settings menu.
+func _input(event) -> void:
+	if not _popup_open:
+		return
+	if not (event is InputEventKey) or not event.pressed:
+		return
+	if event.keycode == KEY_ESCAPE:
+		close_popup()
+	get_viewport().set_input_as_handled()
 
 
 func _on_tab_pressed(tab: String) -> void:
@@ -516,8 +575,8 @@ func _on_region_selected(index: int) -> void:
 
 ## Defaults the Region dropdown to whatever region the run is being played in,
 ## appending it when REGION_NAMES does not list it. Only applied when the detected
-## region changes, so a manual pick sticks for the rest of that run (a new or
-## different run re-defaults). `OptionButton.select()` emits nothing.
+## region changes, so a manual pick sticks for the rest of the run (a different
+## detected region re-defaults). `OptionButton.select()` emits nothing.
 func _sync_player_region() -> void:
 	if _region_option == null:
 		return
@@ -539,7 +598,10 @@ func _sync_player_region() -> void:
 
 ## Index 0 is "All"; every other entry filters by its own label.
 func _apply_region_index(index: int) -> void:
-	_region_filter = "" if index == 0 else str(_region_option.get_item_text(index))
+	var next := "" if index == 0 else str(_region_option.get_item_text(index))
+	if next != _region_filter:
+		_region_filter = next
+		_rows_dirty = true
 
 
 ## The catalog is loaded lazily so the GameDatabase autoload is guaranteed to
@@ -547,9 +609,14 @@ func _apply_region_index(index: int) -> void:
 func _ensure_catalog() -> void:
 	if _catalog_loaded:
 		return
-	_catalog_loaded = true
 	_load_catalog()
+	# GameDatabase may not be ready on the first open; leave the flag unset so a
+	# later open retries instead of caching an empty catalog for the session.
+	if _catalog.is_empty():
+		return
+	_catalog_loaded = true
 	_rebuild_type_buttons()
+	_rows_dirty = true
 
 
 func _load_catalog() -> void:
@@ -573,7 +640,7 @@ func _load_catalog() -> void:
 			if key.is_empty() or seen.has("m:" + key):
 				continue
 			var display := _display_name("monster", key)
-			if display.strip_edges().is_empty() or _is_excluded_name(display):
+			if display.strip_edges().is_empty() or _is_excluded_key(key):
 				continue
 			seen["m:" + key] = true
 			var tier := int(species.get("tier")) if "tier" in species else 0
@@ -593,7 +660,7 @@ func _load_catalog() -> void:
 				"kind": "monster", "key": key, "name": display,
 				"tier": tier, "types": types,
 				"icon": icon if icon is Texture2D else null,
-				"region": _extract_region(species),
+				"regions": _extract_regions(species),
 			})
 	if "items_db" in db:
 		var items = db.get("items_db")
@@ -635,12 +702,14 @@ func _resolve_type(type_resource) -> String:
 
 ## Species carry no region field: the region is the set they belong to, resolved
 ## through `_region_map` (set id -> display name). Unmapped ids are used verbatim.
-func _extract_region(species) -> String:
+## A species can belong to several sets, so every mapped region is kept.
+func _extract_regions(species) -> Array:
+	var out: Array = []
 	if not ("sets" in species):
-		return ""
+		return out
 	var sets = species.get("sets")
 	if not (sets is Array):
-		return ""
+		return out
 	for set_entry in sets:
 		var sid := ""
 		if set_entry is String:
@@ -650,14 +719,18 @@ func _extract_region(species) -> String:
 		if sid.is_empty():
 			continue
 		var mapped := str(_region_map.get(sid.to_lower(), ""))
-		return mapped if not mapped.is_empty() else sid
-	return ""
+		var display := mapped if not mapped.is_empty() else sid
+		if not out.has(display):
+			out.append(display)
+	return out
 
 
-func _is_excluded_name(name: String) -> bool:
-	var lower := name.to_lower()
-	for part in EXCLUDED_NAME_PARTS:
-		if lower.contains(part):
+## Match the raw key against the exclusion list, not the translated display name.
+## Splitting on non-alphanumeric characters keeps "eggplant" from matching "egg".
+func _is_excluded_key(key: String) -> bool:
+	var parts := key.to_lower().replace("_", " ").replace("-", " ").replace(".", " ").split(" ", false)
+	for part in parts:
+		if part in EXCLUDED_NAME_PARTS:
 			return true
 	return false
 
@@ -675,6 +748,7 @@ func _rebuild_rows() -> void:
 		_rows_box.remove_child(child)
 		child.queue_free()
 	_update_tracked_count()
+	_rows_dirty = false
 	var added := 0
 	for entry in _catalog:
 		if str(entry["kind"]) != _tab:
@@ -710,16 +784,13 @@ func _rebuild_rows() -> void:
 ## have zero width here and its unmanaged children would overlap their
 ## neighbours in the grid.
 func _add_entry_row(entry: Dictionary, index: int, watched: bool) -> void:
-	var shade := Color("#1e2a36") if (index / LIST_COLUMNS) % 2 == 0 else Color("#18232D")
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = shade
-	normal.set_corner_radius_all(2)
-	normal.set_content_margin_all(1)
+	_ensure_row_styles()
+	var shade := _row_style_a if (index / LIST_COLUMNS) % 2 == 0 else _row_style_b
 
 	var row := PanelContainer.new()
 	row.custom_minimum_size.y = ROW_HEIGHT
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_theme_stylebox_override("panel", normal)
+	row.add_theme_stylebox_override("panel", shade)
 
 	var hbox := HBoxContainer.new()
 	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -778,18 +849,11 @@ func _add_entry_row(entry: Dictionary, index: int, watched: bool) -> void:
 	hit.button_pressed = watched
 	hit.focus_mode = Control.FOCUS_NONE
 	hit.mouse_filter = Control.MOUSE_FILTER_STOP
-	var blank := StyleBoxEmpty.new()
 	for state in ["normal", "focus", "disabled"]:
-		hit.add_theme_stylebox_override(state, blank)
-	var hover := StyleBoxFlat.new()
-	hover.bg_color = Color(1, 1, 1, 0.06)
-	hover.set_corner_radius_all(2)
-	hit.add_theme_stylebox_override("hover", hover)
-	var pressed := StyleBoxFlat.new()
-	pressed.bg_color = Color(0.95, 0.61, 0.07, 0.22)
-	pressed.set_corner_radius_all(2)
-	hit.add_theme_stylebox_override("pressed", pressed)
-	hit.add_theme_stylebox_override("hover_pressed", pressed)
+		hit.add_theme_stylebox_override(state, _blank_style)
+	hit.add_theme_stylebox_override("hover", _row_hover_style)
+	hit.add_theme_stylebox_override("pressed", _row_pressed_style)
+	hit.add_theme_stylebox_override("hover_pressed", _row_pressed_style)
 	hit.toggled.connect(_on_entry_toggled.bind(entry["kind"], entry["key"]))
 	hit.toggled.connect(func(on): check.button_pressed = on)
 	row.add_child(hit)
@@ -807,8 +871,13 @@ func _passes_monster_filters(entry: Dictionary) -> bool:
 		if not types.has(_type_filter):
 			return false
 	if not _region_filter.is_empty():
-		var region := str(entry.get("region", "")).to_lower()
-		if not region.contains(_region_filter.to_lower()):
+		var filter := _region_filter.to_lower()
+		var matched := false
+		for region in entry.get("regions", []):
+			if str(region).to_lower().contains(filter):
+				matched = true
+				break
+		if not matched:
 			return false
 	return true
 

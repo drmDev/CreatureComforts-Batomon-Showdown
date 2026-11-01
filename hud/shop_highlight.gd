@@ -9,13 +9,13 @@ extends Node
 
 const CARD_SCRIPT := "shop_slot_ui"
 const OVERLAY_NAME := "CreatureComfortsHighlight"
+const OVERLAY_GROUP := "cc_highlight_overlay"
 const BORDER_COLOR := Color(1.0, 0.85, 0.2, 0.95)
 const FILL_COLOR := Color(1.0, 0.85, 0.2, 0.10)
 const BORDER_WIDTH := 2.0
 
 var _watchlist = null
 var _enabled := true
-var _overlays: Array = []  # weakrefs to attached overlays
 
 
 ## `watchlist` is the panel's selection dictionary, shared by reference so
@@ -27,16 +27,12 @@ func setup(watchlist) -> void:
 	_scan.call_deferred(get_tree().root)
 
 
-## Enable/disable highlighting. Existing overlays clear immediately when off.
+## Enable/disable highlighting. Existing overlays are updated through the group,
+## so no per-overlay list has to be kept alive for the session.
 func set_enabled(on: bool) -> void:
 	_enabled = on
-	var live: Array = []
-	for ref in _overlays:
-		var overlay = ref.get_ref()
-		if overlay != null:
-			overlay.enabled = on
-			live.append(ref)
-	_overlays = live
+	if get_tree() != null:
+		get_tree().call_group(OVERLAY_GROUP, "set_enabled", on)
 
 
 func _exit_tree() -> void:
@@ -73,7 +69,7 @@ func _attach(reference) -> void:
 	overlay.enabled = _enabled
 	card.add_child(overlay)
 	overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_overlays.append(weakref(overlay))
+	overlay.add_to_group(OVERLAY_GROUP)
 
 
 class HighlightOverlay extends Control:
@@ -85,11 +81,20 @@ class HighlightOverlay extends Control:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		focus_mode = Control.FOCUS_NONE
 		z_index = 2
+		set_process(enabled)
+
+	## Called by ShopHighlight through the overlay group.
+	func set_enabled(on: bool) -> void:
+		enabled = on
+		set_process(on)
+		if not on and _active:
+			_active = false
+			queue_redraw()
 
 	func _process(_delta: float) -> void:
-		if not is_visible_in_tree():
+		if not enabled or not is_visible_in_tree():
 			return
-		var next := enabled and _matches()
+		var next := _matches()
 		if next != _active:
 			_active = next
 			queue_redraw()

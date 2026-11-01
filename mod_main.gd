@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "1.130"
+const VERSION := "1.133"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
@@ -471,6 +471,10 @@ func _on_shop_visibility_changed(allowed: bool, _reason: String) -> void:
 	_reminder_layer.visible = allowed
 	if allowed:
 		_try_play_chime()
+	elif _watchlist_panel != null:
+		# The layer is hidden, so a still-open popup would reappear on the next
+		# shop visit. Close it with the rest of the shop UI.
+		_watchlist_panel.close_popup()
 
 
 func _on_trinket_panel_layout_debug(message: String) -> void:
@@ -555,6 +559,8 @@ func _on_feature_toggled(key: String, value: bool) -> void:
 			_shop_highlight.set_enabled(value)
 		if _watchlist_panel != null:
 			_watchlist_panel.visible = value
+			if not value:
+				_watchlist_panel.close_popup()
 		return
 	if value:
 		return
@@ -633,6 +639,8 @@ func _inspect_current_phase() -> void:
 			_trinket_reminders_panel.hide_panel()
 		if _rank_odds_panel != null:
 			_rank_odds_panel.hide_panel()
+		if _watchlist_panel != null:
+			_watchlist_panel.close_popup()
 	if not is_battle:
 		# Reset battle-scoped tracking only when actually leaving the battle phase.
 		if _last_phase == "battle":
@@ -1170,10 +1178,9 @@ func _log_lines(lines: Array) -> void:
 func _has_property(obj, property: String) -> bool:
 	if not is_instance_valid(obj):
 		return false
-	for prop in obj.get_property_list():
-		if str(prop.name) == property:
-			return true
-	return false
+	# `in` is O(1) and avoids allocating the full property list on every call.
+	# This runs several times per frame from the shop overlay gate.
+	return property in obj
 
 
 func _script_is(obj, script_path: String) -> bool:
