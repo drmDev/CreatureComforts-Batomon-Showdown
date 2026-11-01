@@ -15,6 +15,13 @@ const HEADER_BG := Color("#2b3a52")      # Slightly lighter navy header bar
 const DIM_COLOR := Color(0, 0, 0, 0.35)  # Modal backdrop
 const HIGHLIGHT_COLOR := Color(0.95, 0.61, 0.07, 0.18)  # Current-row tint
 
+# Watchlist shop-card highlight (hud/shop_highlight.gd). Bright cyan reads
+# clearly against the navy panels and stays distinguishable for the common
+# forms of colour blindness, since it never relies on a red/green difference.
+# The fill is the same hue at ~10% alpha (#RRGGBBAA), so the card stays legible.
+const WATCHLIST_HIGHLIGHT_BORDER := Color("#00d9ff")
+const WATCHLIST_HIGHLIGHT_FILL := Color("#00d9ff1a")
+
 # Rarity colors (match the shop rank-odds table)
 const RARITY_COMMON := Color("#c8ccd4")
 const RARITY_UNCOMMON := Color("#7ec850")

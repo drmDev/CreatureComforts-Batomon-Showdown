@@ -10,9 +10,6 @@ extends Node
 const CARD_SCRIPT := "shop_slot_ui"
 const OVERLAY_NAME := "CreatureComfortsHighlight"
 const OVERLAY_GROUP := "cc_highlight_overlay"
-const BORDER_COLOR := Color(1.0, 0.85, 0.2, 0.95)
-const FILL_COLOR := Color(1.0, 0.85, 0.2, 0.10)
-const BORDER_WIDTH := 2.0
 
 var _watchlist = null
 var _enabled := true
@@ -76,6 +73,12 @@ func _attach(reference) -> void:
 
 
 class HighlightOverlay extends Control:
+	# Palette lives in core/style.gd so the highlight stays in sync with the HUD.
+	const Style = preload("../core/style.gd")
+	const BORDER_COLOR := Style.WATCHLIST_HIGHLIGHT_BORDER
+	const FILL_COLOR := Style.WATCHLIST_HIGHLIGHT_FILL
+	const BORDER_WIDTH := 2.0
+
 	var watchlist = null
 	var enabled := true
 	var _active := false

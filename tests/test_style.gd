@@ -40,6 +40,19 @@ func test_action_palette_differs_from_filter_palette() -> void:
 	assert_ne(Style.ACTION_BORDER, Style.BORDER_COLOR)
 
 
+func test_watchlist_highlight_is_cyan_and_distinct() -> void:
+	# Colour-blind friendly cyan, not the gold panel accent or a rarity colour.
+	assert_eq(Style.WATCHLIST_HIGHLIGHT_BORDER, Color("#00d9ff"))
+	assert_ne(Style.WATCHLIST_HIGHLIGHT_BORDER, Style.BORDER_COLOR)
+	assert_ne(Style.WATCHLIST_HIGHLIGHT_BORDER, Style.RARITY_RARE)
+	assert_ne(Style.WATCHLIST_HIGHLIGHT_BORDER, Style.RARITY_UNCOMMON)
+	# The fill is the same hue at low alpha, so the card stays readable.
+	assert_true(Style.WATCHLIST_HIGHLIGHT_FILL.a < Style.WATCHLIST_HIGHLIGHT_BORDER.a)
+	assert_eq(Style.WATCHLIST_HIGHLIGHT_FILL.r, Style.WATCHLIST_HIGHLIGHT_BORDER.r)
+	assert_eq(Style.WATCHLIST_HIGHLIGHT_FILL.g, Style.WATCHLIST_HIGHLIGHT_BORDER.g)
+	assert_eq(Style.WATCHLIST_HIGHLIGHT_FILL.b, Style.WATCHLIST_HIGHLIGHT_BORDER.b)
+
+
 func test_save_palette_is_muted_green_and_distinct() -> void:
 	# Save mirrors Snapshot Team's action treatment but must not be mistaken for it.
 	assert_eq(Style.SAVE_BG, Color("#376B4B"))
