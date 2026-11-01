@@ -59,6 +59,13 @@ const ACTION_BG := Color("#87383B")
 const ACTION_BG_HOVER := Color("#9A4044")
 const ACTION_BORDER := Color("#CC6468")
 
+# Save button (watchlist toolbar) - the same action treatment in muted green, so
+# it reads as a sibling of Snapshot Team without competing with it.
+const SAVE_BG := Color("#376B4B")
+const SAVE_BG_HOVER := Color("#427B58")
+const SAVE_BORDER := Color("#65A77A")
+const SAVE_BG_DISABLED := Color("#2A4A38")
+
 
 ## Text colour for a type filter. Unknown types return TRANSPARENT so callers fall
 ## back to their neutral text colour.

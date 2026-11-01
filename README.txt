@@ -52,15 +52,42 @@ The Region dropdown starts on the region your current run is being played in
 and only changes back to that default when you start a run in a different
 region, so a manual choice stays put for the rest of a run.
 
-The toolbar above the list has two helpers:
+The toolbar above the list has these helpers, in order:
 
 - Snapshot Team (Batomon tab): replaces your tracked Batomon with the species
   currently fielded. It is a one-time capture - later team changes do not
   alter the list - and tracked items are left untouched. If no Batomon are
   fielded the list is left as it is.
-- Tracked Only (both tabs): shows only the entries you track. It combines with
-  the Region, Rarity, and Type filters instead of replacing them, and the
-  count beside it shows how many entries the active tab is tracking.
+- The tracked count for the active tab.
+- Builds: opens your saved watchlist builds.
+- Save: stores the current watchlist as a new build. It is disabled while
+  nothing is tracked.
+- Tracked Only (both tabs, far right): shows only the entries you track. It
+  combines with the Region, Rarity, and Type filters instead of replacing
+  them, and the count beside it shows how many entries the active tab is
+  tracking.
+
+SAVED BUILDS
+Save keeps a copy of everything you are tracking - Batomon and items, on both
+tabs, regardless of the active filters - so you can switch between setups
+without rebuilding the list by hand. Saving never changes your active
+watchlist, and later edits to the watchlist do not change saved builds.
+
+Builds are named automatically ("Build 1 (2026-10-31)") and listed newest
+first. Numbers only ever increase, so a deleted build's number is never
+reused. Each entry previews up to 10 tracked icons (Batomon by rarity then
+name, items alphabetically) followed by a +N count for the rest.
+
+- Load replaces your tracked Batomon and items with the build's selections
+  and refreshes shop highlighting immediately. Your fielded team is not
+  changed.
+- Delete removes the saved build after a second confirming click. Your active
+  watchlist is not changed and the remaining builds keep their numbers.
+
+Saved builds are stored in one file:
+   user://creature_comforts/saved_builds.json
+If that file is missing or damaged, the mod starts with no saved builds and
+your active watchlist is unaffected.
 
 
 SETTINGS

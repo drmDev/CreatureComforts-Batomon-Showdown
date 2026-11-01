@@ -37,12 +37,16 @@ const EXCLUDED_TYPES := ["all", "null"]
 const REGION_NAMES := ["Jinto", "Pantra"]
 const RunRegion = preload("../core/run_region.gd")
 const RunData = preload("../core/run_data.gd")
+const SavedBuilds = preload("../core/saved_builds.gd")
+const SavedBuildsPanel = preload("saved_builds_panel.gd")
+const UiSound = preload("../core/ui_sound.gd")
 
 ## { "monster": { name_key: true }, "item": { id: true } }
 var selection := {"monster": {}, "item": {}}
 
 var _formatter = null
 var _catalog: Array = []  # {kind, key, name, tier, types, icon, region?}
+var _catalog_index := {}  # "kind:key" -> catalog entry, for saved-build previews
 var _available_types: Array = []
 var _catalog_loaded := false
 
@@ -63,6 +67,10 @@ var _region_map := {}      # set/pack id -> region display name (from the catalo
 var _applied_region := ""  # last auto-applied region, so we only override on change
 var _snapshot_button: Button
 var _tracked_count_label: Label
+var _builds_button: Button
+var _save_button: Button
+var _builds_panel: SavedBuildsPanel
+var _click_sound = null
 var _tracked_only := false
 var _tracked_only_check: CheckBox
 var _rows_box: GridContainer
@@ -143,6 +151,8 @@ func _position_panel() -> void:
 	_panel.position = Vector2(
 		roundf((vs.x - w) * 0.5),
 		roundf((vs.y - h) * 0.5))
+	if _builds_panel != null:
+		_builds_panel.layout(Rect2(_panel.position, _panel.size))
 
 
 func _apply_font(control: Control, size: int) -> void:
@@ -153,6 +163,8 @@ func _apply_font(control: Control, size: int) -> void:
 
 func _build_ui() -> void:
 	_ensure_row_styles()
+	_click_sound = UiSound.new()
+	_click_sound.setup(self, _sound_path("click.ogg"))
 	# Custom-drawn control (not a Button) so BTN_SIZE fully controls the size;
 	# a Button clamps to its text + theme padding minimum.
 	_button = WatchlistButton.new()
@@ -185,6 +197,12 @@ func _build_ui() -> void:
 	panel_style.set_content_margin_all(4)
 	_panel.add_theme_stylebox_override("panel", panel_style)
 	_popup.add_child(_panel)
+
+	# Saved Builds is a separate modal layer over the popup, not a third tab.
+	_builds_panel = SavedBuildsPanel.new()
+	_builds_panel.setup(_text_font, _catalog_lookup, _play_click)
+	_builds_panel.load_requested.connect(_on_build_load_requested)
+	_popup.add_child(_builds_panel)
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 2)
@@ -308,10 +326,12 @@ func _build_ui() -> void:
 	_sync_filter_buttons(_rarity_buttons, _rarity_filter)
 	_sync_filter_buttons(_type_buttons, _type_filter)
 	_sync_tracked_only_state()
+	_update_save_button_state()
 
 
 ## Tools sitting directly above the list: Snapshot Team (Batomon tab only), the
-## tracked count for the active tab, and the Tracked Only view toggle.
+## tracked count for the active tab, the saved-build actions, and the Tracked
+## Only view toggle (kept on the far right).
 func _toolbar_box(parent: Control) -> void:
 	var toolbar := HBoxContainer.new()
 	toolbar.add_theme_constant_override("separation", 4)
@@ -330,6 +350,26 @@ func _toolbar_box(parent: Control) -> void:
 	_tracked_count_label = Label.new()
 	_apply_font(_tracked_count_label, BODY_FONT_SIZE)
 	toolbar.add_child(_tracked_count_label)
+
+	_builds_button = Button.new()
+	_builds_button.text = "Builds"
+	_builds_button.tooltip_text = "Open your saved watchlist builds"
+	_builds_button.focus_mode = Control.FOCUS_NONE
+	_builds_button.custom_minimum_size = Vector2(0, 8)
+	_apply_font(_builds_button, BODY_FONT_SIZE)
+	_style_button(_builds_button)
+	_builds_button.pressed.connect(_on_builds_pressed)
+	toolbar.add_child(_builds_button)
+
+	_save_button = Button.new()
+	_save_button.text = "Save"
+	_save_button.tooltip_text = "Save the current watchlist as a new build"
+	_save_button.focus_mode = Control.FOCUS_NONE
+	_save_button.custom_minimum_size = Vector2(0, 8)
+	_apply_font(_save_button, BODY_FONT_SIZE)
+	_style_save_button(_save_button)
+	_save_button.pressed.connect(_on_save_pressed)
+	toolbar.add_child(_save_button)
 
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -377,6 +417,33 @@ func _style_action_button(b: Button) -> void:
 	b.add_theme_stylebox_override("hover_pressed", pressed)
 	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
 		b.add_theme_color_override(state, VALUE_COLOR)
+
+
+## Save-button styling: the Snapshot Team treatment in muted green, with white
+## text. The disabled state is dimmed so an empty watchlist reads as unavailable.
+func _style_save_button(b: Button) -> void:
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Style.SAVE_BG
+	normal.border_color = Style.SAVE_BORDER
+	normal.set_border_width_all(1)
+	normal.set_corner_radius_all(2)
+	normal.set_content_margin_all(1)
+	var hover: StyleBoxFlat = normal.duplicate()
+	hover.bg_color = Style.SAVE_BG_HOVER
+	var pressed: StyleBoxFlat = normal.duplicate()
+	pressed.bg_color = Style.SAVE_BORDER
+	var disabled: StyleBoxFlat = normal.duplicate()
+	disabled.bg_color = Style.SAVE_BG_DISABLED
+	disabled.border_color = Style.SAVE_BG_DISABLED
+	for state in ["normal", "focus"]:
+		b.add_theme_stylebox_override(state, normal)
+	b.add_theme_stylebox_override("disabled", disabled)
+	b.add_theme_stylebox_override("hover", hover)
+	b.add_theme_stylebox_override("pressed", pressed)
+	b.add_theme_stylebox_override("hover_pressed", pressed)
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
+		b.add_theme_color_override(state, Color.WHITE)
+	b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.45))
 
 
 ## Compact button styling so the popup controls match the small HUD scale.
@@ -458,6 +525,8 @@ func _toggle_popup() -> void:
 		_sync_player_region()
 		if _rows_dirty:
 			_rebuild_rows()
+	else:
+		_close_builds_panel()
 
 
 ## Close the popup without toggling. Called when the shop overlay gate hides the
@@ -468,18 +537,23 @@ func close_popup() -> void:
 		return
 	_popup_open = false
 	_popup.visible = false
+	_close_builds_panel()
 
 
 ## While the popup is open it is modal: swallow keyboard input so the game's
 ## global hotkeys (R = reroll, etc.) cannot act on the shop behind it. Esc closes
-## the popup instead of opening the game's Settings menu.
+## the Saved Builds layer first, then the popup, instead of opening the game's
+## Settings menu.
 func _input(event) -> void:
 	if not _popup_open:
 		return
 	if not (event is InputEventKey) or not event.pressed:
 		return
 	if event.keycode == KEY_ESCAPE:
-		close_popup()
+		if _builds_panel != null and _builds_panel.is_open():
+			_close_builds_panel()
+		else:
+			close_popup()
 	get_viewport().set_input_as_handled()
 
 
@@ -584,9 +658,92 @@ static func _entry_field(obj, field: String):
 
 
 func _update_tracked_count() -> void:
-	if _tracked_count_label == null:
+	if _tracked_count_label != null:
+		_tracked_count_label.text = "%d tracked" % selection.get(_tab, {}).size()
+	_update_save_button_state()
+
+
+## Save is only meaningful with something tracked. Counts both tabs, since a
+## build always captures Batomon and items together.
+func _update_save_button_state() -> void:
+	if _save_button == null:
 		return
-	_tracked_count_label.text = "%d tracked" % selection.get(_tab, {}).size()
+	_save_button.disabled = _total_tracked() == 0
+
+
+func _total_tracked() -> int:
+	return selection.get("monster", {}).size() + selection.get("item", {}).size()
+
+
+## Absolute path to a mod sound, resolved from this script's own directory so it
+## works regardless of where the mod is installed.
+func _sound_path(file_name: String) -> String:
+	return str(get_script().resource_path).get_base_dir().path_join("../assets/sounds/" + file_name)
+
+
+## Shared click feedback for the saved-build buttons. The Saved Builds panel gets
+## this as a Callable so it does not need its own player.
+func _play_click() -> void:
+	if _click_sound != null:
+		_click_sound.play()
+
+
+## Save the whole watchlist (both tabs, ignoring filters and Tracked Only) as a
+## new build. The active selection is never modified.
+func _on_save_pressed() -> void:
+	_play_click()
+	var monsters: Array = selection.get("monster", {}).keys()
+	var items: Array = selection.get("item", {}).keys()
+	if monsters.is_empty() and items.is_empty():
+		return
+	var store := SavedBuilds.load_store()
+	SavedBuilds.create_build(store, monsters, items, int(Time.get_unix_time_from_system()))
+	if not SavedBuilds.save_store(store):
+		return
+	if _builds_panel != null:
+		_builds_panel.refresh(store)
+
+
+func _on_builds_pressed() -> void:
+	_play_click()
+	if _builds_panel == null:
+		return
+	if _builds_panel.is_open():
+		_close_builds_panel()
+		return
+	# The preview needs catalog names/tiers/icons, so make sure it is loaded.
+	_ensure_catalog()
+	_builds_panel.open_panel(SavedBuilds.load_store())
+
+
+func _close_builds_panel() -> void:
+	if _builds_panel != null:
+		_builds_panel.close_panel()
+
+
+## Load replaces the tracked Batomon and items with the build's selections. The
+## dictionaries are assigned into the existing `selection` dictionary, which
+## shop_highlight shares by reference, so highlighting refreshes on the next
+## frame without any notification. The fielded team and the saved build are
+## untouched.
+func _on_build_load_requested(build: Dictionary) -> void:
+	var monsters := {}
+	for key in build.get("monsters", []):
+		monsters[str(key)] = true
+	var items := {}
+	for key in build.get("items", []):
+		items[str(key)] = true
+	selection["monster"] = monsters
+	selection["item"] = items
+	_save_selection()
+	_rebuild_rows()
+	_close_builds_panel()
+
+
+## Catalog entry for a saved-build preview, or null when the id is unknown (e.g.
+## a build saved before a catalog change). Unresolved ids still count as tracked.
+func _catalog_lookup(kind: String, key: String):
+	return _catalog_index.get("%s:%s" % [kind, key], null)
 
 
 func _on_region_selected(index: int) -> void:
@@ -643,6 +800,7 @@ func _ensure_catalog() -> void:
 
 func _load_catalog() -> void:
 	_catalog.clear()
+	_catalog_index.clear()
 	_available_types.clear()
 	var db = get_node_or_null("/root/GameDatabase")
 	if db == null:
@@ -678,12 +836,14 @@ func _load_catalog() -> void:
 							types.append(tname)
 							type_set[tname] = true
 			var icon = species.get("texture") if "texture" in species else null
-			_catalog.append({
+			var entry := {
 				"kind": "monster", "key": key, "name": display,
 				"tier": tier, "types": types,
 				"icon": icon if icon is Texture2D else null,
 				"regions": _extract_regions(species),
-			})
+			}
+			_catalog.append(entry)
+			_catalog_index["monster:" + key] = entry
 	if "items_db" in db:
 		var items = db.get("items_db")
 		if items is Array:
@@ -696,11 +856,13 @@ func _load_catalog() -> void:
 				seen["i:" + key] = true
 				var tier := int(item.get("tier")) if "tier" in item else 0
 				var icon = item.get("icon") if "icon" in item else null
-				_catalog.append({
+				var entry := {
 					"kind": "item", "key": key, "name": _display_name("item", key),
 					"tier": tier, "types": [],
 					"icon": icon if icon is Texture2D else null,
-				})
+				}
+				_catalog.append(entry)
+				_catalog_index["item:" + key] = entry
 	_available_types = type_set.keys()
 	_available_types.sort()
 	_catalog.sort_custom(func(a, b): return str(a["name"]).naturalnocasecmp_to(str(b["name"])) < 0)

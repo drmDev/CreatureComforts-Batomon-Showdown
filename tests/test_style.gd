@@ -38,3 +38,14 @@ func test_action_palette_differs_from_filter_palette() -> void:
 	# Snapshot Team must not look like an ordinary filter control.
 	assert_ne(Style.ACTION_BG, Style.BG_COLOR)
 	assert_ne(Style.ACTION_BORDER, Style.BORDER_COLOR)
+
+
+func test_save_palette_is_muted_green_and_distinct() -> void:
+	# Save mirrors Snapshot Team's action treatment but must not be mistaken for it.
+	assert_eq(Style.SAVE_BG, Color("#376B4B"))
+	assert_eq(Style.SAVE_BORDER, Color("#65A77A"))
+	assert_ne(Style.SAVE_BG, Style.ACTION_BG)
+	assert_ne(Style.SAVE_BORDER, Style.ACTION_BORDER)
+	assert_ne(Style.SAVE_BG, Style.BG_COLOR)
+	assert_ne(Style.SAVE_BG_HOVER, Style.SAVE_BG)
+	assert_ne(Style.SAVE_BG_DISABLED, Style.SAVE_BG)
