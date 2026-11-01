@@ -5,8 +5,6 @@ const AdviceContext = preload("advice_context.gd")
 
 var _rules: Array = []
 
-var _active_advice: Dictionary = {}
-
 var _last_emitted: Dictionary = {}
 
 
@@ -37,10 +35,8 @@ func evaluate(context: AdviceContext) -> Dictionary:
 		if not new_active.has(rule_id):
 			_last_emitted.erase(rule_id)
 	
-	_active_advice = new_active
-	
 	return {
-		"all_active": _active_advice.values(),
+		"all_active": new_active.values(),
 		"new_or_changed": new_or_changed
 	}
 

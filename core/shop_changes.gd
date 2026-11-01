@@ -43,8 +43,8 @@ func compare(previous, current) -> ComparisonResult:
 	
 	_detect_run_changes(previous, current, result)
 	_detect_shop_changes(previous, current, result)
-	_detect_team_changes(previous, current, result)
-	_detect_bench_changes(previous, current, result)
+	_detect_list_changes("team", "Team", previous.team_monsters, current.team_monsters, _monsters_equal, result)
+	_detect_list_changes("bench", "Bench", previous.bench_monsters, current.bench_monsters, _monsters_equal, result)
 	result.event_type = _classify_event(result)
 	
 	return result
@@ -81,14 +81,6 @@ func _detect_shop_changes(previous, current, result: ComparisonResult) -> void:
 		var label := "Shop Locked" if current.shop_frozen else "Shop Unlocked"
 		var change = Change.new("shop", "frozen", previous.shop_frozen, current.shop_frozen, label)
 		result.changes.append(change)
-
-
-func _detect_team_changes(previous, current, result: ComparisonResult) -> void:
-	_detect_list_changes("team", "Team", previous.team_monsters, current.team_monsters, _monsters_equal, result)
-
-
-func _detect_bench_changes(previous, current, result: ComparisonResult) -> void:
-	_detect_list_changes("bench", "Bench", previous.bench_monsters, current.bench_monsters, _monsters_equal, result)
 
 
 func _detect_list_changes(area: String, label_prefix: String, prev_list: Array, cur_list: Array, equal_fn: Callable, result: ComparisonResult) -> void:

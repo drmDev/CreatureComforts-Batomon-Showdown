@@ -105,7 +105,7 @@ func _draw_body(_width: float) -> void:
 	var cursor_y := HEAD_H + CONTENT_PADDING
 	for entry in _entries:
 		var baseline := cursor_y + ROW_HEIGHT - 2.0
-		var line := "%dx %s" % [entry.count, entry.name]
+		var line := "%dx %s" % [int(entry.get("count", 0)), str(entry.get("name", ""))]
 		_draw_text_shadow(Vector2(CONTENT_PADDING + 1.0, baseline), line, LABEL_COLOR, FONT_SIZE)
 		cursor_y += ROW_HEIGHT + ROW_GAP
 

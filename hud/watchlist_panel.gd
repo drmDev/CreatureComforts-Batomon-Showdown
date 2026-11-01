@@ -93,9 +93,7 @@ func _ready() -> void:
 	_anchor_button()
 	_position_panel()
 	_apply_tooltip_theme()
-	var vp := get_viewport()
-	if vp != null and not vp.size_changed.is_connected(_on_viewport_resized):
-		vp.size_changed.connect(_on_viewport_resized)
+	_connect_viewport_resize(_on_viewport_resized)
 
 
 ## Tooltips are drawn with the TooltipLabel theme type, which per-control theme
@@ -538,7 +536,7 @@ func _sync_tracked_only_state() -> void:
 ## filters are ignored and tracked items are untouched. An empty team is a no-op
 ## so the list cannot be wiped by accident.
 func _on_snapshot_pressed() -> void:
-	var run = _get_run_data()
+	var run = RunData.get_run_data()
 	if run == null or not ("team" in run):
 		return
 	var team = run.get("team")
@@ -583,10 +581,6 @@ static func _entry_field(obj, field: String):
 	if not (field in obj):
 		return null
 	return obj.get(field)
-
-
-func _get_run_data():
-	return RunData.get_run_data()
 
 
 func _update_tracked_count() -> void:

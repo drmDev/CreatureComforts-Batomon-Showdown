@@ -27,12 +27,12 @@ static func context(trainer_id: String, day: int, shop_items: Array = [], team_m
 	return ctx
 
 
-static func shop_monster(slot: int, name_key: String, types: Array = [], instance_id: int = 0):
-	return AdviceContext.ShopItem.new(slot, name_key, "", true, instance_id, types)
+static func shop_monster(slot: int, name_key: String, types: Array = []):
+	return AdviceContext.ShopItem.new(slot, name_key, "", true, types)
 
 
-static func shop_item(slot: int, item_id: String, instance_id: int = 0):
-	return AdviceContext.ShopItem.new(slot, "", item_id, false, instance_id, [])
+static func shop_item(slot: int, item_id: String):
+	return AdviceContext.ShopItem.new(slot, "", item_id, false, [])
 
 
 static func team_monster(slot: int, name_key: String, level: int, types: Array = []):

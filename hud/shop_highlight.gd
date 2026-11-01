@@ -22,9 +22,12 @@ var _enabled := true
 ## selection changes apply on the next frame without extra wiring.
 func setup(watchlist) -> void:
 	_watchlist = watchlist
-	if get_tree() != null and not get_tree().node_added.is_connected(_on_node_added):
-		get_tree().node_added.connect(_on_node_added)
-	_scan.call_deferred(get_tree().root)
+	var tree := get_tree()
+	if tree == null:
+		return
+	if not tree.node_added.is_connected(_on_node_added):
+		tree.node_added.connect(_on_node_added)
+	_scan.call_deferred(tree.root)
 
 
 ## Enable/disable highlighting. Existing overlays are updated through the group,

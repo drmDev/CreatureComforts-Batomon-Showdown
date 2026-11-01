@@ -256,7 +256,7 @@ func _format_slots(run, property_name: String, header: String) -> Array[String]:
 	return lines
 
 
-func format_deep_inspect_shop(manager, run) -> Array[String]:
+func format_deep_inspect_shop(manager) -> Array[String]:
 	var lines: Array[String] = []
 	lines.append("\n--- DEEP INSPECTION: SHOP ---")
 

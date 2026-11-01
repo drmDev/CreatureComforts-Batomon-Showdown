@@ -19,7 +19,7 @@ func test_shop_targets_matches_monster_by_name() -> void:
 		"r1", "musician", [LAMPLET], [], "info", "Buy %s", _formatter()
 	)
 	var ctx = TestHelpers.context("musician", 1, [
-		TestHelpers.shop_monster(0, LAMPLET, [], 111),
+		TestHelpers.shop_monster(0, LAMPLET),
 	])
 	var advice: Dictionary = rule.evaluate(ctx)
 	assert_not_empty(advice)
@@ -27,8 +27,6 @@ func test_shop_targets_matches_monster_by_name() -> void:
 	assert_eq(advice["trainer_id"], "musician")
 	assert_eq(advice["severity"], "info")
 	assert_eq(advice["display"], "highlight")
-	assert_eq(advice["matched_indices"], [0])
-	assert_eq(advice["matched_ids"], [111])
 	assert_true(str(advice["message"]).contains("Lamplet"))
 
 
@@ -37,12 +35,10 @@ func test_shop_targets_matches_item() -> void:
 		"r2", "musician", [], [BASIC_BAIT], "info", "Buy %s", _formatter()
 	)
 	var ctx = TestHelpers.context("musician", 1, [
-		TestHelpers.shop_item(2, BASIC_BAIT, 222),
+		TestHelpers.shop_item(2, BASIC_BAIT),
 	])
 	var advice: Dictionary = rule.evaluate(ctx)
 	assert_not_empty(advice)
-	assert_eq(advice["matched_indices"], [2])
-	assert_eq(advice["matched_ids"], [222])
 	assert_true(str(advice["message"]).contains("Basic Bait"))
 
 
@@ -51,11 +47,11 @@ func test_shop_targets_matches_monster_by_type() -> void:
 		"r3", "musician", [], [], "info", "Buy %s", _formatter(), ["fire"]
 	)
 	var ctx = TestHelpers.context("musician", 1, [
-		TestHelpers.shop_monster(1, LAMPLET, ["fire", "flying"], 333),
+		TestHelpers.shop_monster(1, LAMPLET, ["fire", "flying"]),
 	])
 	var advice: Dictionary = rule.evaluate(ctx)
 	assert_not_empty(advice)
-	assert_eq(advice["matched_indices"], [1])
+	assert_true(str(advice["message"]).contains("Lamplet"))
 
 
 func test_shop_targets_no_match_returns_empty() -> void:
@@ -63,7 +59,7 @@ func test_shop_targets_no_match_returns_empty() -> void:
 		"r4", "musician", [LAMPLET], [], "info", "Buy %s", _formatter()
 	)
 	var ctx = TestHelpers.context("musician", 1, [
-		TestHelpers.shop_monster(0, BEETDOWN, [], 1),
+		TestHelpers.shop_monster(0, BEETDOWN),
 	])
 	assert_empty(rule.evaluate(ctx))
 
@@ -73,7 +69,7 @@ func test_shop_targets_trainer_mismatch_returns_empty() -> void:
 		"r5", "musician", [LAMPLET], [], "info", "Buy %s", _formatter()
 	)
 	var ctx = TestHelpers.context("gentleman", 1, [
-		TestHelpers.shop_monster(0, LAMPLET, [], 1),
+		TestHelpers.shop_monster(0, LAMPLET),
 	])
 	assert_empty(rule.evaluate(ctx))
 
@@ -83,7 +79,7 @@ func test_shop_targets_empty_trainer_applies_to_any() -> void:
 		"r6", "", [LAMPLET], [], "info", "Buy %s", _formatter()
 	)
 	var ctx = TestHelpers.context("gentleman", 1, [
-		TestHelpers.shop_monster(0, LAMPLET, [], 1),
+		TestHelpers.shop_monster(0, LAMPLET),
 	])
 	assert_not_empty(rule.evaluate(ctx))
 

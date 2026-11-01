@@ -69,28 +69,21 @@ class ShopTargetsRule extends BaseRule:
 			return {}
 
 		var matches: Array = []
-		var matched_indices: Array = []
-		var matched_ids: Array = []
 
 		for shop_item in context.shop_items:
+			var display_name := ""
 			if shop_item.is_monster and (shop_item.name_key in target_monsters or _matches_target_type(shop_item.types)):
-				var monster_name: String = formatter.format_species_name(shop_item.name_key)
-				matches.append("[%d] %s" % [shop_item.slot, monster_name])
-				matched_indices.append(shop_item.slot)
-				matched_ids.append(shop_item.instance_id)
+				display_name = formatter.format_species_name(shop_item.name_key)
 			elif not shop_item.item_id.is_empty() and shop_item.item_id in target_items:
-				var item_name: String = formatter.format_item_name(shop_item.item_id)
-				matches.append("[%d] %s" % [shop_item.slot, item_name])
-				matched_indices.append(shop_item.slot)
-				matched_ids.append(shop_item.instance_id)
+				display_name = formatter.format_item_name(shop_item.item_id)
+			if display_name.is_empty():
+				continue
+			matches.append("[%d] %s" % [shop_item.slot, display_name])
 
 		if matches.is_empty():
 			return {}
 
-		return _make_advice(severity, message_template % ", ".join(matches), {
-			"matched_indices": matched_indices,
-			"matched_ids": matched_ids
-		})
+		return _make_advice(severity, message_template % ", ".join(matches))
 
 	func _matches_target_type(types: Array) -> bool:
 		if target_types.is_empty():

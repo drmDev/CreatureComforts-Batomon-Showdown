@@ -5,15 +5,13 @@ class ShopItem:
 	var name_key: String
 	var item_id: String
 	var is_monster: bool
-	var instance_id: int  # Lets overlays validate identity
 	var types: Array = []
 	
-	func _init(p_slot: int, p_name_key: String, p_item_id: String, p_is_monster: bool, p_instance_id: int = 0, p_types: Array = []) -> void:
+	func _init(p_slot: int, p_name_key: String, p_item_id: String, p_is_monster: bool, p_types: Array = []) -> void:
 		slot = p_slot
 		name_key = p_name_key
 		item_id = p_item_id
 		is_monster = p_is_monster
-		instance_id = p_instance_id
 		types = p_types
 
 
@@ -57,7 +55,7 @@ func from_snapshot(snapshot):
 			item_id = offer.item_id
 		
 		if not name_key.is_empty() or not item_id.is_empty():
-			context.shop_items.append(ShopItem.new(offer.slot, name_key, item_id, is_monster, offer.instance_id, offer.types))
+			context.shop_items.append(ShopItem.new(offer.slot, name_key, item_id, is_monster, offer.types))
 	
 	for i in range(snapshot.team_monsters.size()):
 		var monster_data = snapshot.team_monsters[i]

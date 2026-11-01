@@ -2,7 +2,6 @@ extends RefCounted
 
 class ShopOffer:
 	var slot: int = -1
-	var instance_id: int = 0  # Lets UI overlays validate identity; 0 when empty
 	var type: String = "empty"
 	var species_key: String = ""
 	var item_id: String = ""
@@ -77,19 +76,13 @@ func capture(run, manager, has_property_func: Callable, type_resolver: Callable)
 			var item = items[i]
 			var offer = ShopOffer.new()
 			offer.slot = i
-			if item != null:
-				offer.instance_id = item.get_instance_id()
 
 			match classify_shop_entry(item, has_property_func):
 				"empty":
 					offer.type = "empty"
 				"monster":
 					offer.type = "monster"
-					_apply_species_data(offer, item.data, has_property_func, type_resolver)
-					if has_property_func.call(item, "level"):
-						offer.level = int(item.get("level"))
-					if has_property_func.call(item, "is_shiny"):
-						offer.is_shiny = bool(item.get("is_shiny"))
+					_fill_monster_fields(offer, item, has_property_func, type_resolver)
 				"item":
 					offer.type = "item"
 					offer.item_id = str(item.id)
@@ -155,14 +148,17 @@ func _extract_monster(monster_obj, slot: int, has_property_func: Callable, type_
 	var monster = Monster.new()
 	monster.slot = slot
 	monster.instance_id = monster_obj.get_instance_id()
+	_fill_monster_fields(monster, monster_obj, has_property_func, type_resolver)
+	return monster
 
+
+## Shared species/level/shiny capture for shop offers and team/bench monsters.
+func _fill_monster_fields(target, monster_obj, has_property_func: Callable, type_resolver: Callable) -> void:
 	if has_property_func.call(monster_obj, "data"):
-		_apply_species_data(monster, monster_obj.data, has_property_func, type_resolver)
+		_apply_species_data(target, monster_obj.data, has_property_func, type_resolver)
 
 	if has_property_func.call(monster_obj, "level"):
-		monster.level = int(monster_obj.get("level"))
+		target.level = int(monster_obj.get("level"))
 
 	if has_property_func.call(monster_obj, "is_shiny"):
-		monster.is_shiny = bool(monster_obj.get("is_shiny"))
-
-	return monster
+		target.is_shiny = bool(monster_obj.get("is_shiny"))

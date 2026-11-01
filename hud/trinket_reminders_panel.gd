@@ -101,10 +101,6 @@ func reset_collapsed() -> void:
 	_emit_layout_debug("reset")
 
 
-func reset_for_run() -> void:
-	reset_collapsed()
-
-
 func _name_line(entry: Dictionary) -> String:
 	var label := str(entry.get("name", ""))
 	var count := int(entry.get("count", 1))

@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "1.137"
+const VERSION := "1.138"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
@@ -97,13 +97,13 @@ var _shop_income_panel = null
 
 var _trinket_reminders_panel = null
 var _trinket_reminders_alerted := false
-var _last_trinket_reminder_entries: Dictionary = {}  # name -> count, for change-only logging
+var _last_trinket_reminder_entries: Dictionary = {}  # name -> display line, for change-only logging
 
 var _rank_odds_panel = null
 var _rank_odds_popup_open := false
 var _watchlist_panel = null
 var _shop_highlight = null
-var _last_reminder_rule_ids: Dictionary = {}
+var _last_reminder_rule_ids: Dictionary = {}  # rule id -> display line, for change-only logging
 
 # Trinket/passive gold_gain bonuses are added on top of the base schedule.
 const BASE_INCOME := 35
@@ -618,8 +618,6 @@ func _process(_delta: float) -> void:
 	_inspect_current_phase()
 
 
-
-
 ## Dev-only runtime toggles (not user-facing). Hold Ctrl+Shift and tap the
 ## configured key to flip a toggle; the change is written to the log immediately.
 func _handle_dev_toggles() -> void:
@@ -732,14 +730,11 @@ func _evaluate_trainer_advice(snapshot) -> void:
 		if not message.is_empty():
 			# Trainers are namespaced by their own id, so no prefix inference is needed
 			var prefix: String = _trainer_display_names.get(advice.get("trainer_id", ""), "")
-			
-			var full_message := ""
+			var parts := ["*** COMFORTS %s" % severity]
 			if not prefix.is_empty():
-				full_message = "*** COMFORTS %s | %s | %s" % [severity, prefix, message]
-			else:
-				full_message = "*** COMFORTS %s | %s" % [severity, message]
-			
-			_print_notice(full_message)
+				parts.append(prefix)
+			parts.append(message)
+			_print_notice(" | ".join(parts))
 		
 		# Queue the chime for chime-flagged rules (day reminders); played once the overlay is showing
 		if advice.get("chime", false) and _feature_enabled(ModConfig.KEY_DAY_REMINDERS):
@@ -764,16 +759,24 @@ func _evaluate_trainer_advice(snapshot) -> void:
 
 
 func _log_reminder_changes(reminders: Dictionary) -> void:
+	var current := {}
 	for rule_id in reminders.keys():
-		var text := str(reminders[rule_id])
-		if not _last_reminder_rule_ids.has(rule_id):
-			_log_event("REMINDER ADDED | %s | %s" % [rule_id, text])
-		elif str(_last_reminder_rule_ids[rule_id]) != text:
-			_log_event("REMINDER UPDATED | %s | %s" % [rule_id, text])
-	for rule_id in _last_reminder_rule_ids.keys():
-		if not reminders.has(rule_id):
-			_log_event("REMINDER REMOVED | %s" % rule_id)
-	_last_reminder_rule_ids = reminders.duplicate()
+		current[rule_id] = "%s | %s" % [rule_id, str(reminders[rule_id])]
+	_log_keyed_changes("REMINDER", _last_reminder_rule_ids, current)
+	_last_reminder_rule_ids = current
+
+
+## Log added/changed/removed entries between two keyed display maps (key -> log text).
+func _log_keyed_changes(prefix: String, previous: Dictionary, current: Dictionary) -> void:
+	for key in current.keys():
+		var text := str(current[key])
+		if not previous.has(key):
+			_log_event("%s ADDED | %s" % [prefix, text])
+		elif str(previous[key]) != text:
+			_log_event("%s UPDATED | %s" % [prefix, text])
+	for key in previous.keys():
+		if not current.has(key):
+			_log_event("%s REMOVED | %s" % [prefix, key])
 
 
 func _try_play_chime() -> void:
@@ -814,7 +817,7 @@ func _handle_shop_phase(state) -> void:
 			_log_shop_structure_diagnostic(state)
 			_log_region_diagnostic()
 		if _deep_inspection:
-			_log_lines(_formatter.format_deep_inspect_shop(manager, run))
+			_log_lines(_formatter.format_deep_inspect_shop(manager))
 		# Trinket gains are battle-scoped now (tracked during the battle state only), so no
 		# shop-to-shop inventory diff happens here; the trinket panel shows on the results screen.
 		_reset_transient_state(true, false, false)  # Reset suppression for new shop visit
@@ -831,7 +834,7 @@ func _handle_shop_phase(state) -> void:
 			_advisor.reset_suppression()
 		_finalize_battle_trinket_tracking(false)  # Prevent false gains/panel from a previous run
 		if _trinket_reminders_panel != null:
-			_trinket_reminders_panel.reset_for_run()
+			_trinket_reminders_panel.reset_collapsed()
 		_trinket_reminders_alerted = false
 		_last_trinket_reminder_entries.clear()
 		_last_reminder_rule_ids.clear()
@@ -937,15 +940,9 @@ func _update_trinket_reminders(run) -> void:
 func _log_trinket_reminder_changes(entries: Array) -> void:
 	var current := {}
 	for entry in entries:
-		current[str(entry.get("name", ""))] = int(entry.get("count", 1))
-	for name in current.keys():
-		if not _last_trinket_reminder_entries.has(name):
-			_log_event("TRINKET REMINDER ADDED | %s x%d" % [name, int(current[name])])
-		elif int(_last_trinket_reminder_entries[name]) != int(current[name]):
-			_log_event("TRINKET REMINDER UPDATED | %s x%d" % [name, int(current[name])])
-	for name in _last_trinket_reminder_entries.keys():
-		if not current.has(name):
-			_log_event("TRINKET REMINDER REMOVED | %s" % name)
+		var name := str(entry.get("name", ""))
+		current[name] = "%s x%d" % [name, int(entry.get("count", 1))]
+	_log_keyed_changes("TRINKET REMINDER", _last_trinket_reminder_entries, current)
 	_last_trinket_reminder_entries = current
 
 
