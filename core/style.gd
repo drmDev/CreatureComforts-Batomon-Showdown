@@ -1,5 +1,6 @@
 extends RefCounted
-## Shared color palette for Creature Comforts HUD panels.
+## Shared color palette and small styling helpers for Creature Comforts HUD
+## panels.
 ##
 ## Single source of truth for the colors used across the HUD so panels stay
 ## visually consistent and values are not duplicated.
@@ -71,3 +72,24 @@ const SAVE_BG_DISABLED := Color("#2A4A38")
 ## back to their neutral text colour.
 static func type_color(type_name: String) -> Color:
 	return TYPE_COLORS.get(type_name.to_lower(), Color.TRANSPARENT)
+
+
+## Compact button styling for the small HUD scale: navy fill, gold 1px border,
+## rounded corners. `color` overrides the text colour (filters pass their own).
+static func compact_button(b: Button, color: Color = Color.TRANSPARENT) -> void:
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = BG_COLOR
+	normal.border_color = BORDER_COLOR
+	normal.set_border_width_all(1)
+	normal.set_corner_radius_all(2)
+	normal.set_content_margin_all(1)
+	var pressed: StyleBoxFlat = normal.duplicate()
+	pressed.bg_color = BORDER_COLOR
+	for state in ["normal", "hover", "focus", "disabled"]:
+		b.add_theme_stylebox_override(state, normal)
+	b.add_theme_stylebox_override("pressed", pressed)
+	var text_color := color if color != Color.TRANSPARENT else VALUE_COLOR
+	b.add_theme_color_override("font_color", text_color)
+	b.add_theme_color_override("font_hover_color", text_color)
+	b.add_theme_color_override("font_pressed_color", BG_COLOR)
+	b.add_theme_color_override("font_hover_pressed_color", BG_COLOR)

@@ -97,7 +97,7 @@ Comforts. All settings default to On, so existing behavior is unchanged.
 
 - Day Reminders: Show reminders before important trainer events.
 - Trinket Reminders: Show collapsible reminders for timing-sensitive trinkets.
-- Notification Sounds: Play reminder sound effects (visual reminders stay on).
+- Notification Sounds: Play reminder and UI sound effects (visual reminders stay on).
 - Battle Status Panel: Show remaining lives, wins, and current day during battles.
 - Trinkets Gained Panel: Show trinkets acquired during battle.
 - Shop Income: Display income during the shop phase.

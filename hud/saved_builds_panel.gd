@@ -10,6 +10,7 @@ extends Control
 
 const Style = preload("../core/style.gd")
 const SavedBuilds = preload("../core/saved_builds.gd")
+const CloseButton = preload("close_button.gd")
 
 signal load_requested(build: Dictionary)
 
@@ -26,7 +27,6 @@ var _store: Dictionary = SavedBuilds.empty_store()
 var _panel: PanelContainer
 var _rows_box: VBoxContainer
 var _confirm_id := ""
-var _open := false
 
 
 func setup(font: Font, catalog_lookup: Callable, play_click: Callable = Callable()) -> void:
@@ -40,7 +40,7 @@ func setup(font: Font, catalog_lookup: Callable, play_click: Callable = Callable
 
 
 func is_open() -> bool:
-	return _open
+	return visible
 
 
 ## Show the overlay for a store snapshot. The confirm state is always reset so a
@@ -48,13 +48,11 @@ func is_open() -> bool:
 func open_panel(store: Dictionary) -> void:
 	_store = store
 	_confirm_id = ""
-	_open = true
 	visible = true
 	_rebuild_rows()
 
 
 func close_panel() -> void:
-	_open = false
 	_confirm_id = ""
 	visible = false
 
@@ -62,7 +60,7 @@ func close_panel() -> void:
 ## Re-render after the watchlist saved a new build while this panel is open.
 func refresh(store: Dictionary) -> void:
 	_store = store
-	if _open:
+	if visible:
 		_rebuild_rows()
 
 
@@ -183,7 +181,7 @@ func _build_row(build: Dictionary) -> Control:
 	load_button.focus_mode = Control.FOCUS_NONE
 	load_button.custom_minimum_size = Vector2(0, 8)
 	_apply_font(load_button, BODY_FONT_SIZE)
-	_style_button(load_button)
+	Style.compact_button(load_button)
 	load_button.pressed.connect(_on_load_pressed.bind(build))
 	top.add_child(load_button)
 
@@ -194,7 +192,7 @@ func _build_row(build: Dictionary) -> Control:
 	delete_button.focus_mode = Control.FOCUS_NONE
 	delete_button.custom_minimum_size = Vector2(0, 8)
 	_apply_font(delete_button, BODY_FONT_SIZE)
-	_style_button(delete_button, Style.ACTION_BORDER if confirming else Color.TRANSPARENT)
+	Style.compact_button(delete_button, Style.ACTION_BORDER if confirming else Color.TRANSPARENT)
 	delete_button.pressed.connect(_on_delete_pressed.bind(build))
 	top.add_child(delete_button)
 
@@ -260,56 +258,3 @@ func _apply_font(control: Control, size: int) -> void:
 	if _font != null:
 		control.add_theme_font_override("font", _font)
 	control.add_theme_font_size_override("font_size", size)
-
-
-## Compact button styling matching the watchlist popup controls.
-func _style_button(b: Button, color: Color = Color.TRANSPARENT) -> void:
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = Style.BG_COLOR
-	normal.border_color = Style.BORDER_COLOR
-	normal.set_border_width_all(1)
-	normal.set_corner_radius_all(2)
-	normal.set_content_margin_all(1)
-	var pressed: StyleBoxFlat = normal.duplicate()
-	pressed.bg_color = Style.BORDER_COLOR
-	for state in ["normal", "hover", "focus", "disabled"]:
-		b.add_theme_stylebox_override(state, normal)
-	b.add_theme_stylebox_override("pressed", pressed)
-	var text_color := color if color != Color.TRANSPARENT else Style.VALUE_COLOR
-	b.add_theme_color_override("font_color", text_color)
-	b.add_theme_color_override("font_hover_color", text_color)
-	b.add_theme_color_override("font_pressed_color", Style.BG_COLOR)
-	b.add_theme_color_override("font_hover_pressed_color", Style.BG_COLOR)
-
-
-## Close (X) button mirroring the watchlist popup: a gold rounded box with dark
-## arms drawn straight onto the canvas.
-class CloseButton extends Control:
-	const Style = preload("../core/style.gd")
-	const SIZE := 14.0
-	const ARM := 3.0
-	const ARM_WIDTH := 1.5
-
-	var on_press: Callable
-	var _box: StyleBoxFlat
-
-	func _init() -> void:
-		mouse_filter = Control.MOUSE_FILTER_STOP
-		focus_mode = Control.FOCUS_NONE
-		tooltip_text = "Close"
-		custom_minimum_size = Vector2(SIZE, SIZE)
-		_box = StyleBoxFlat.new()
-		_box.bg_color = Style.BORDER_COLOR
-		_box.set_corner_radius_all(2)
-
-	func _draw() -> void:
-		_box.draw(get_canvas_item(), Rect2(Vector2.ZERO, size))
-		var c := size * 0.5
-		draw_line(c + Vector2(-ARM, -ARM), c + Vector2(ARM, ARM), Style.BG_COLOR, ARM_WIDTH)
-		draw_line(c + Vector2(-ARM, ARM), c + Vector2(ARM, -ARM), Style.BG_COLOR, ARM_WIDTH)
-
-	func _gui_input(event) -> void:
-		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-			if on_press.is_valid():
-				on_press.call()
-			accept_event()

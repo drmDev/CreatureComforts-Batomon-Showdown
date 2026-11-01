@@ -12,6 +12,7 @@ var _test_scripts := {
 	"reminder_label": preload("test_reminder_label.gd"),
 	"watchlist": preload("test_watchlist.gd"),
 	"saved_builds": preload("test_saved_builds.gd"),
+	"ui_sound": preload("test_ui_sound.gd"),
 	"run_region": preload("test_run_region.gd"),
 	"style": preload("test_style.gd"),
 }

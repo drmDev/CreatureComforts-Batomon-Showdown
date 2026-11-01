@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "1.140"
+const VERSION := "1.144"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
@@ -22,6 +22,7 @@ const JUNK_TRINKET_ID := LogFormatterScript.JUNK_TRINKET_ID
 const TrinketGains = preload("core/trinket_gains.gd")
 const RunRegion = preload("core/run_region.gd")
 const RunData = preload("core/run_data.gd")
+const UiSound = preload("core/ui_sound.gd")
 const ShopHighlight = preload("hud/shop_highlight.gd")
 const DevConfig = preload("dev/dev_config.gd")
 const ModConfig = preload("core/mod_config.gd")
@@ -81,8 +82,8 @@ var _changes_comparer = null
 var _reminder_label = null
 var _reminder_layer: CanvasLayer = null
 var _shop_overlay_gate = null
-var _pika_player: AudioStreamPlayer = null
-var _poke_item_player: AudioStreamPlayer = null
+var _pika_sound = null
+var _poke_sound = null
 
 # Chime queue: rule_ids whose day reminder fired since the last play
 var _pending_chime_rule_ids: Dictionary = {}
@@ -444,7 +445,7 @@ func _setup_reminder_panel() -> void:
 	var WatchlistPanel = load(_base_dir().path_join("hud/watchlist_panel.gd"))
 	_watchlist_panel = WatchlistPanel.new()
 	_watchlist_panel.name = "WatchlistPanel"
-	_watchlist_panel.setup(_formatter)
+	_watchlist_panel.setup(_formatter, _sounds_enabled)
 	_reminder_layer.add_child(_watchlist_panel)
 
 
@@ -525,42 +526,17 @@ func _setup_results_panel() -> void:
 	_results_layer.add_child(_trinket_panel)
 
 
+## Every sound the mod plays (reminders and UI feedback) is gated by the same
+## setting, so one toggle mutes all of them.
+func _sounds_enabled() -> bool:
+	return _feature_enabled(ModConfig.KEY_NOTIFICATION_SOUNDS)
+
+
 func _setup_notification_sounds() -> void:
-	"""Initialize notification sounds for day reminders and trinket reminders."""
-	var base_dir := str(get_script().resource_path).get_base_dir()
-	var path := base_dir.path_join("assets/sounds/pika.ogg")
-	
-	_pika_player = AudioStreamPlayer.new()
-	_pika_player.stream = AudioStreamOggVorbis.load_from_file(path)
-	_pika_player.volume_db = -6.0
-	add_child(_pika_player)
-	
-	if _pika_player.stream == null:
-		push_warning("Creature Comforts: Failed to load notification sound: " + path)
-
-	var poke_path := base_dir.path_join("assets/sounds/poke_item_found.ogg")
-	_poke_item_player = AudioStreamPlayer.new()
-	_poke_item_player.stream = AudioStreamOggVorbis.load_from_file(poke_path)
-	_poke_item_player.volume_db = -6.0
-	add_child(_poke_item_player)
-	if _poke_item_player.stream == null:
-		push_warning("Creature Comforts: Failed to load trinket notification sound: " + poke_path)
-
-
-func _play_pika() -> void:
-	"""Play notification sound for new day reminders."""
-	if not _feature_enabled(ModConfig.KEY_NOTIFICATION_SOUNDS):
-		return
-	if _pika_player != null and _pika_player.stream != null:
-		_pika_player.play()
-
-
-func _play_poke_item() -> void:
-	"""Play notification sound for new trinket reminders."""
-	if not _feature_enabled(ModConfig.KEY_NOTIFICATION_SOUNDS):
-		return
-	if _poke_item_player != null and _poke_item_player.stream != null:
-		_poke_item_player.play()
+	_pika_sound = UiSound.new()
+	_pika_sound.setup(self, "pika.ogg", _sounds_enabled)
+	_poke_sound = UiSound.new()
+	_poke_sound.setup(self, "poke_item_found.ogg", _sounds_enabled)
 
 
 ## Apply a live settings change. Disabling a feature hides its UI immediately and
@@ -784,10 +760,12 @@ func _try_play_chime() -> void:
 		return
 	if _shop_overlay_gate == null or _shop_overlay_gate.is_allowed():
 		if not _pending_chime_rule_ids.is_empty():
-			_play_pika()
+			if _pika_sound != null:
+				_pika_sound.play()
 			_pending_chime_rule_ids.clear()
 		if _pending_trinket_reminder_sound:
-			_play_poke_item()
+			if _poke_sound != null:
+				_poke_sound.play()
 			_pending_trinket_reminder_sound = false
 
 

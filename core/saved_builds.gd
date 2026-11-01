@@ -154,10 +154,6 @@ static func preview_entries(build: Dictionary, catalog_lookup: Callable, limit: 
 	}
 
 
-static func total_tracked(build: Dictionary) -> int:
-	return build.get("monsters", []).size() + build.get("items", []).size()
-
-
 static func load_store() -> Dictionary:
 	if not FileAccess.file_exists(PATH):
 		return empty_store()
@@ -218,11 +214,7 @@ static func _string_list(raw) -> Array:
 
 
 static func _sorted_unique(ids: Array) -> Array:
-	var out: Array = []
-	for value in ids:
-		var key := str(value).strip_edges()
-		if not key.is_empty() and not out.has(key):
-			out.append(key)
+	var out := _string_list(ids)
 	out.sort()
 	return out
 
@@ -255,13 +247,16 @@ static func _compare_monsters(a: Dictionary, b: Dictionary) -> bool:
 	var bt := int(b.get("tier", UNRESOLVED_TIER))
 	if at != bt:
 		return at < bt
-	var by_name := str(a.get("name", "")).naturalnocasecmp_to(str(b.get("name", "")))
-	if by_name != 0:
-		return by_name < 0
-	return str(a.get("key", "")) < str(b.get("key", ""))
+	return _compare_by_name(a, b)
 
 
 static func _compare_items(a: Dictionary, b: Dictionary) -> bool:
+	return _compare_by_name(a, b)
+
+
+## Name first (case-insensitive, natural order), then the raw key so the order is
+## stable when two entries share a display name.
+static func _compare_by_name(a: Dictionary, b: Dictionary) -> bool:
 	var by_name := str(a.get("name", "")).naturalnocasecmp_to(str(b.get("name", "")))
 	if by_name != 0:
 		return by_name < 0

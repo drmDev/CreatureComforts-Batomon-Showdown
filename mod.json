@@ -1,7 +1,7 @@
 {
 	"id": "creature_comforts",
 	"name": "Creature Comforts",
-	"version": "1.140",
+	"version": "1.144",
 	"author": "NescapePlan",
 	"description": "Creature Comforts - QoL improvements.",
 	"settings": [
@@ -10,7 +10,7 @@
 		{"key": "trinket_reminders", "label": "Trinket Reminders", "type": "bool", "default": true,
 		 "description": "Show collapsible reminders for timing-sensitive trinkets."},
 		{"key": "notification_sounds", "label": "Notification Sounds", "type": "bool", "default": true,
-		 "description": "Play reminder sound effects."},
+		 "description": "Play reminder and UI sound effects."},
 		{"key": "battle_status_panel", "label": "Battle Status Panel", "type": "bool", "default": true,
 		 "description": "Show remaining lives, wins, and current day during battles."},
 		{"key": "trinkets_gained_panel", "label": "Trinkets Gained Panel", "type": "bool", "default": true,

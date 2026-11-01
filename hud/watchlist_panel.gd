@@ -39,6 +39,7 @@ const RunRegion = preload("../core/run_region.gd")
 const RunData = preload("../core/run_data.gd")
 const SavedBuilds = preload("../core/saved_builds.gd")
 const SavedBuildsPanel = preload("saved_builds_panel.gd")
+const CloseButton = preload("close_button.gd")
 const UiSound = preload("../core/ui_sound.gd")
 
 ## { "monster": { name_key: true }, "item": { id: true } }
@@ -70,7 +71,9 @@ var _tracked_count_label: Label
 var _builds_button: Button
 var _save_button: Button
 var _builds_panel: SavedBuildsPanel
+var _sounds_enabled: Callable
 var _click_sound = null
+var _save_sound = null
 var _tracked_only := false
 var _tracked_only_check: CheckBox
 var _rows_box: GridContainer
@@ -89,8 +92,9 @@ func _init() -> void:
 	_text_font = _build_panel_font()
 
 
-func setup(formatter) -> void:
+func setup(formatter, sounds_enabled: Callable = Callable()) -> void:
 	_formatter = formatter
+	_sounds_enabled = sounds_enabled
 	_load_selection()
 	_build_ui()
 
@@ -164,7 +168,9 @@ func _apply_font(control: Control, size: int) -> void:
 func _build_ui() -> void:
 	_ensure_row_styles()
 	_click_sound = UiSound.new()
-	_click_sound.setup(self, _sound_path("click.ogg"))
+	_click_sound.setup(self, "click.ogg", _sounds_enabled)
+	_save_sound = UiSound.new()
+	_save_sound.setup(self, "save.ogg", _sounds_enabled)
 	# Custom-drawn control (not a Button) so BTN_SIZE fully controls the size;
 	# a Button clamps to its text + theme padding minimum.
 	_button = WatchlistButton.new()
@@ -200,7 +206,7 @@ func _build_ui() -> void:
 
 	# Saved Builds is a separate modal layer over the popup, not a third tab.
 	_builds_panel = SavedBuildsPanel.new()
-	_builds_panel.setup(_text_font, _catalog_lookup, _play_click)
+	_builds_panel.setup(_text_font, _catalog_lookup, _click_sound.play)
 	_builds_panel.load_requested.connect(_on_build_load_requested)
 	_popup.add_child(_builds_panel)
 
@@ -237,7 +243,7 @@ func _build_ui() -> void:
 		b.focus_mode = Control.FOCUS_NONE
 		b.custom_minimum_size = Vector2(35, 8)
 		_apply_font(b, BODY_FONT_SIZE)
-		_style_button(b)
+		Style.compact_button(b)
 		b.pressed.connect(_on_tab_pressed.bind(tab))
 		tab_row.add_child(b)
 		_tab_buttons.append({"button": b, "tab": tab})
@@ -256,7 +262,7 @@ func _build_ui() -> void:
 	for region_name in ["All"] + REGION_NAMES:
 		_region_option.add_item(region_name)
 	_apply_font(_region_option, BODY_FONT_SIZE)
-	_style_button(_region_option)
+	Style.compact_button(_region_option)
 	_region_option.custom_minimum_size = Vector2(0, 8)
 	# Shrink the dropdown popup to match the compact HUD scale.
 	var region_popup := _region_option.get_popup()
@@ -343,7 +349,7 @@ func _toolbar_box(parent: Control) -> void:
 	_snapshot_button.focus_mode = Control.FOCUS_NONE
 	_snapshot_button.custom_minimum_size = Vector2(0, 8)
 	_apply_font(_snapshot_button, BODY_FONT_SIZE)
-	_style_action_button(_snapshot_button)
+	_style_action_button(_snapshot_button, Style.ACTION_BG, Style.ACTION_BG_HOVER, Style.ACTION_BORDER, VALUE_COLOR)
 	_snapshot_button.pressed.connect(_on_snapshot_pressed)
 	toolbar.add_child(_snapshot_button)
 
@@ -357,7 +363,7 @@ func _toolbar_box(parent: Control) -> void:
 	_builds_button.focus_mode = Control.FOCUS_NONE
 	_builds_button.custom_minimum_size = Vector2(0, 8)
 	_apply_font(_builds_button, BODY_FONT_SIZE)
-	_style_button(_builds_button)
+	Style.compact_button(_builds_button)
 	_builds_button.pressed.connect(_on_builds_pressed)
 	toolbar.add_child(_builds_button)
 
@@ -367,7 +373,7 @@ func _toolbar_box(parent: Control) -> void:
 	_save_button.focus_mode = Control.FOCUS_NONE
 	_save_button.custom_minimum_size = Vector2(0, 8)
 	_apply_font(_save_button, BODY_FONT_SIZE)
-	_style_save_button(_save_button)
+	_style_action_button(_save_button, Style.SAVE_BG, Style.SAVE_BG_HOVER, Style.SAVE_BORDER, Color.WHITE, Style.SAVE_BG_DISABLED)
 	_save_button.pressed.connect(_on_save_pressed)
 	toolbar.add_child(_save_button)
 
@@ -391,79 +397,41 @@ func _add_filter_button(parent: Control, text: String, value: String, store: Arr
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(0, 7)
 	_apply_font(b, BODY_FONT_SIZE)
-	_style_button(b, color)
+	Style.compact_button(b, color)
 	b.pressed.connect(handler.bind(value))
 	parent.add_child(b)
 	store.append({"button": b, "value": value})
 
 
-## Action-button styling (Snapshot Team): muted red fill with a brighter red
-## border, so it reads as an action rather than as another filter toggle.
-func _style_action_button(b: Button) -> void:
+## Action-button styling: a filled box with a brighter border, so it reads as an
+## action rather than as another filter toggle. Snapshot Team uses the muted red
+## palette; Save uses the muted green one and dims its disabled state.
+func _style_action_button(b: Button, bg: Color, bg_hover: Color, border: Color, text_color: Color, disabled_bg: Color = Color.TRANSPARENT) -> void:
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Style.ACTION_BG
-	normal.border_color = Style.ACTION_BORDER
+	normal.bg_color = bg
+	normal.border_color = border
 	normal.set_border_width_all(1)
 	normal.set_corner_radius_all(2)
 	normal.set_content_margin_all(1)
 	var hover: StyleBoxFlat = normal.duplicate()
-	hover.bg_color = Style.ACTION_BG_HOVER
+	hover.bg_color = bg_hover
 	var pressed: StyleBoxFlat = normal.duplicate()
-	pressed.bg_color = Style.ACTION_BORDER
-	for state in ["normal", "focus", "disabled"]:
-		b.add_theme_stylebox_override(state, normal)
-	b.add_theme_stylebox_override("hover", hover)
-	b.add_theme_stylebox_override("pressed", pressed)
-	b.add_theme_stylebox_override("hover_pressed", pressed)
-	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
-		b.add_theme_color_override(state, VALUE_COLOR)
-
-
-## Save-button styling: the Snapshot Team treatment in muted green, with white
-## text. The disabled state is dimmed so an empty watchlist reads as unavailable.
-func _style_save_button(b: Button) -> void:
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = Style.SAVE_BG
-	normal.border_color = Style.SAVE_BORDER
-	normal.set_border_width_all(1)
-	normal.set_corner_radius_all(2)
-	normal.set_content_margin_all(1)
-	var hover: StyleBoxFlat = normal.duplicate()
-	hover.bg_color = Style.SAVE_BG_HOVER
-	var pressed: StyleBoxFlat = normal.duplicate()
-	pressed.bg_color = Style.SAVE_BORDER
-	var disabled: StyleBoxFlat = normal.duplicate()
-	disabled.bg_color = Style.SAVE_BG_DISABLED
-	disabled.border_color = Style.SAVE_BG_DISABLED
+	pressed.bg_color = border
 	for state in ["normal", "focus"]:
 		b.add_theme_stylebox_override(state, normal)
-	b.add_theme_stylebox_override("disabled", disabled)
 	b.add_theme_stylebox_override("hover", hover)
 	b.add_theme_stylebox_override("pressed", pressed)
 	b.add_theme_stylebox_override("hover_pressed", pressed)
+	if disabled_bg == Color.TRANSPARENT:
+		b.add_theme_stylebox_override("disabled", normal)
+	else:
+		var disabled: StyleBoxFlat = normal.duplicate()
+		disabled.bg_color = disabled_bg
+		disabled.border_color = disabled_bg
+		b.add_theme_stylebox_override("disabled", disabled)
+		b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.45))
 	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
-		b.add_theme_color_override(state, Color.WHITE)
-	b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.45))
-
-
-## Compact button styling so the popup controls match the small HUD scale.
-func _style_button(b: Button, color: Color = Color.TRANSPARENT) -> void:
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = BG_COLOR
-	normal.border_color = BORDER_COLOR
-	normal.set_border_width_all(1)
-	normal.set_corner_radius_all(2)
-	normal.set_content_margin_all(1)
-	var pressed: StyleBoxFlat = normal.duplicate()
-	pressed.bg_color = BORDER_COLOR
-	for state in ["normal", "hover", "focus", "disabled"]:
-		b.add_theme_stylebox_override(state, normal)
-	b.add_theme_stylebox_override("pressed", pressed)
-	var text_color := color if color != Color.TRANSPARENT else VALUE_COLOR
-	b.add_theme_color_override("font_color", text_color)
-	b.add_theme_color_override("font_hover_color", text_color)
-	b.add_theme_color_override("font_pressed_color", BG_COLOR)
-	b.add_theme_color_override("font_hover_pressed_color", BG_COLOR)
+		b.add_theme_color_override(state, text_color)
 
 
 func _sync_filter_buttons(buttons: Array, selected: String) -> void:
@@ -610,6 +578,7 @@ func _sync_tracked_only_state() -> void:
 ## filters are ignored and tracked items are untouched. An empty team is a no-op
 ## so the list cannot be wiped by accident.
 func _on_snapshot_pressed() -> void:
+	_save_sound.play()
 	var run = RunData.get_run_data()
 	if run == null or not ("team" in run):
 		return
@@ -668,30 +637,14 @@ func _update_tracked_count() -> void:
 func _update_save_button_state() -> void:
 	if _save_button == null:
 		return
-	_save_button.disabled = _total_tracked() == 0
-
-
-func _total_tracked() -> int:
-	return selection.get("monster", {}).size() + selection.get("item", {}).size()
-
-
-## Absolute path to a mod sound, resolved from this script's own directory so it
-## works regardless of where the mod is installed.
-func _sound_path(file_name: String) -> String:
-	return str(get_script().resource_path).get_base_dir().path_join("../assets/sounds/" + file_name)
-
-
-## Shared click feedback for the saved-build buttons. The Saved Builds panel gets
-## this as a Callable so it does not need its own player.
-func _play_click() -> void:
-	if _click_sound != null:
-		_click_sound.play()
+	var tracked: int = selection.get("monster", {}).size() + selection.get("item", {}).size()
+	_save_button.disabled = tracked == 0
 
 
 ## Save the whole watchlist (both tabs, ignoring filters and Tracked Only) as a
 ## new build. The active selection is never modified.
 func _on_save_pressed() -> void:
-	_play_click()
+	_save_sound.play()
 	var monsters: Array = selection.get("monster", {}).keys()
 	var items: Array = selection.get("item", {}).keys()
 	if monsters.is_empty() and items.is_empty():
@@ -705,7 +658,7 @@ func _on_save_pressed() -> void:
 
 
 func _on_builds_pressed() -> void:
-	_play_click()
+	_click_sound.play()
 	if _builds_panel == null:
 		return
 	if _builds_panel.is_open():
@@ -1125,39 +1078,6 @@ static func _format_ids(ids: Dictionary) -> String:
 	var keys: Array = ids.keys()
 	keys.sort()
 	return ",".join(keys)
-
-
-## Close (X) button mirroring the rank-odds popup: a gold rounded box with dark
-## arms drawn straight onto the canvas, so both popups read as the same widget.
-class CloseButton extends Control:
-	const Style = preload("../core/style.gd")
-	const SIZE := 14.0     # matches rank_odds_panel.CLOSE_BTN
-	const ARM := 3.0
-	const ARM_WIDTH := 1.5
-
-	var on_press: Callable
-	var _box: StyleBoxFlat
-
-	func _init() -> void:
-		mouse_filter = Control.MOUSE_FILTER_STOP
-		focus_mode = Control.FOCUS_NONE
-		tooltip_text = "Close"
-		custom_minimum_size = Vector2(SIZE, SIZE)
-		_box = StyleBoxFlat.new()
-		_box.bg_color = Style.BORDER_COLOR
-		_box.set_corner_radius_all(2)
-
-	func _draw() -> void:
-		_box.draw(get_canvas_item(), Rect2(Vector2.ZERO, size))
-		var c := size * 0.5
-		draw_line(c + Vector2(-ARM, -ARM), c + Vector2(ARM, ARM), Style.BG_COLOR, ARM_WIDTH)
-		draw_line(c + Vector2(-ARM, ARM), c + Vector2(ARM, -ARM), Style.BG_COLOR, ARM_WIDTH)
-
-	func _gui_input(event) -> void:
-		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-			if on_press.is_valid():
-				on_press.call()
-			accept_event()
 
 
 ## Small self-drawn button. A plain Control has no content minimum, so its size
