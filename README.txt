@@ -1,110 +1,50 @@
-Creature Comforts v1.1 - Quality of Life Mod for Batomon Showdown
+Creature Comforts v2.0 - Quality of Life Mod for Batomon Showdown
 =================================================================
 
-Creature Comforts adds helpful reminders and quality-of-life improvements to
-Batomon Showdown, making important information easier to access during your runs.
+Creature Comforts adds helpful reminders, shop planning tools, and quality-of-life improvements to Batomon Showdown.
 
-The mod does not alter game balance, monster stats, abilities, shop probabilities,
-or combat mechanics. There is no combat calculations, DPS simulations, etc. 
+The mod does not change game balance, monster stats, shop probabilities, or combat mechanics.
 
 
 FEATURES
 --------
 
-TRINKET REMINDERS
-Displays reminders for certain trinkets whose effects are easy to forget,
-such as Mini Duplicator, Mega Duplicator, Treasure Map, Upgrade Disc, and
-Greedy Gloves.
+WATCHLIST & SHOP HIGHLIGHTING
+Track Batomon and items you want to find in the shop. Matching shop entries are automatically highlighted.
 
-- A small icon appears when relevant trinkets are held.
-- Plays a notification sound when reminders first become available.
-- Click the icon to expand a panel showing trinket names and effects.
+- Browse and select Batomon and items.
+- Filter Batomon by rarity, type, and region.
+- Snapshot your active team into the Watchlist.
+- Use Tracked Only to quickly review and adjust selections.
+- Save, load, and delete builds to reuse your favorite setups.
+- Watchlist selections persist between sessions.
+
+TRINKET REMINDERS
+Get reminders for timing-sensitive trinkets such as Duplicators, Treasure Map, Upgrade Disc, and Greedy Gloves. Expand the reminder panel to view their effects.
 
 BATTLE TRINKET REWARDS
-Displays a collapsible panel showing trinkets acquired during battle, so you
-don't have to check your inventory to see what you gained.
+See which trinkets you gained during battle in a collapsible panel.
 
 BATTLE STATUS DISPLAY
-Displays your current day, remaining lives, and wins during battle.
+View your current day, remaining lives, and wins during combat.
 
 SHOP INCOME
 Displays your current income directly in the shop.
 
-TRAINER REMINDERS
-Provides reminders before important trainer-specific events, such as the
-Mad Scientist's Day 7 transformation, plus global event reminders that apply
-to every trainer (Days 3, 6, and 9). Multiple reminders stack vertically in
-one panel.
+DAY REMINDERS
+Receive reminders for important trainer-specific events and global events on Days 3, 6, and 9.
 
 SHOP RANK ODDS
-Click the chart icon near the shop rank display to open a table showing
-the rarity probabilities for every shop rank (1 through 14+).
-
-
-WATCHLIST / SHOP HIGHLIGHTS
-Click the WL button in the shop to open a filterable list of every Batomon
-and item. The Batomon tab filters by Rarity, Type, and Region; the Items tab
-lists every item. Click anywhere on an entry (or its checkbox) to watch it;
-matching shop cards are outlined automatically. Selections are saved and
-persist between sessions.
-
-The Region dropdown starts on the region your current run is being played in
-and only changes back to that default when you start a run in a different
-region, so a manual choice stays put for the rest of a run.
-
-The toolbar above the list has these helpers, in order:
-
-- Snapshot Team (Batomon tab): replaces your tracked Batomon with the species
-  currently fielded. It is a one-time capture - later team changes do not
-  alter the list - and tracked items are left untouched. If no Batomon are
-  fielded the list is left as it is.
-- The tracked count for the active tab.
-- Builds: opens your saved watchlist builds.
-- Save: stores the current watchlist as a new build. It is disabled while
-  nothing is tracked.
-- Tracked Only (both tabs, far right): shows only the entries you track. It
-  combines with the Region, Rarity, and Type filters instead of replacing
-  them, and the count beside it shows how many entries the active tab is
-  tracking.
-
-SAVED BUILDS
-Save keeps a copy of everything you are tracking - Batomon and items, on both
-tabs, regardless of the active filters - so you can switch between setups
-without rebuilding the list by hand. Saving never changes your active
-watchlist, and later edits to the watchlist do not change saved builds.
-
-Builds are named automatically ("Build 1 (2026-10-31)") and listed newest
-first. Numbers only ever increase, so a deleted build's number is never
-reused. Each entry previews up to 10 tracked icons (Batomon by rarity then
-name, items alphabetically) followed by a +N count for the rest.
-
-- Load replaces your tracked Batomon and items with the build's selections
-  and refreshes shop highlighting immediately. Your fielded team is not
-  changed.
-- Delete removes the saved build after a second confirming click. Your active
-  watchlist is not changed and the remaining builds keep their numbers.
-
-Saved builds are stored in one file:
-   user://creature_comforts/saved_builds.json
-If that file is missing or damaged, the mod starts with no saved builds and
-your active watchlist is unaffected.
+View shop rarity probabilities for ranks 1 through 14+ using the chart icon near the shop rank display.
 
 
 SETTINGS
 --------
-Every feature can be toggled independently under Settings > Mods > Creature
-Comforts. All settings default to On, so existing behavior is unchanged.
+Features can be enabled or disabled individually under:
 
-- Day Reminders: Show reminders before important trainer events.
-- Trinket Reminders: Show collapsible reminders for timing-sensitive trinkets.
-- Notification Sounds: Play reminder and UI sound effects (visual reminders stay on).
-- Battle Status Panel: Show remaining lives, wins, and current day during battles.
-- Trinkets Gained Panel: Show trinkets acquired during battle.
-- Shop Income: Display income during the shop phase.
-- Rank Odds Preview: Show the shop rank probability table.
-- Shop Highlights: Highlight shop cards that match your watchlist.
+Settings > Mods > Creature Comforts
 
-Settings are saved by the Mod Loader and persist between game sessions.
+Settings are saved automatically and persist between sessions.
 
 
 REQUIREMENTS
@@ -112,88 +52,77 @@ REQUIREMENTS
 - Batomon Showdown (Steam, PC)
 - Community Batomon Showdown Mod Loader
 
-The Mod Loader must be installed before installing Creature Comforts.
+IMPORTANT: The community Mod Loader is REQUIRED and must be installed before Creature Comforts.
+
+Mod Loader by EmoUsedHM01 and madibye (separate download).
 
 
-INSTALL
--------
-1. Install the community Mod Loader first (see its Nexus Mods page).
+INSTALLATION
+------------
+1. Install the community Batomon Showdown Mod Loader first.
+   Follow the installation instructions on its Nexus Mods page.
+
 2. Close Batomon Showdown.
-3. Open the game folder:
-   Steam > Right-click Batomon Showdown > Manage > Browse local files.
-4. Extract the Creature Comforts ZIP into the game folder.
 
-   The resulting folder structure should look like:
+3. Locate your game installation folder:
+   Steam > Right-click Batomon Showdown > Manage > Browse local files
 
-      Batomon Showdown\Mods\CreatureComforts\
-         mod_main.gd
-         mod.json
-         ...additional mod files and assets...
+4. Extract the Creature Comforts ZIP into the game folder, preserving the folder structure.
 
-   IMPORTANT: Do not place the ZIP itself inside the Mods folder.
-   Extract its contents, preserving the folder structure.
+   The resulting structure should look like:
 
-5. Start Batomon Showdown.
+   Batomon Showdown\Mods\CreatureComforts\
+      mod_main.gd
+      mod.json
+      ...additional mod files and assets...
 
-The Mod Loader will automatically detect Creature Comforts.
+   IMPORTANT:
+   - Do not place the ZIP file itself in the Mods folder.
+   - Do not create an extra nested CreatureComforts folder.
+   - mod_main.gd and mod.json must be directly inside Mods\CreatureComforts\.
+
+5. Launch Batomon Showdown.
+
+The Mod Loader should automatically detect Creature Comforts.
 
 
-UNINSTALL
----------
+UNINSTALLATION
+--------------
 1. Close Batomon Showdown.
 2. Delete the folder:
 
-      Batomon Showdown\Mods\CreatureComforts
+   Batomon Showdown\Mods\CreatureComforts
 
-3. Start the game normally.
+3. Launch the game normally.
 
-Creature Comforts does not modify game saves or permanent gameplay data.
-Uninstalling the mod does not require starting a new run.
-
-
-COMPATIBILITY
--------------
-Creature Comforts is designed to work alongside other mods using the
-community Mod Loader.
-
-The mod adds interface elements without changing gameplay.
-
-Compatibility with every other mod is not guaranteed, particularly mods
-that extensively modify the shop or battle interface.
+Creature Comforts does not modify game saves or permanent gameplay data. Uninstalling does not require starting a new run.
 
 
-TROUBLESHOOTING
----------------
-MOD DOES NOT APPEAR:
-- Confirm the community Mod Loader is installed and working.
-- Verify that mod_main.gd is located directly inside
-  Mods\CreatureComforts\, not inside an additional nested folder.
-- Restart the game after installing the mod.
+COMPATIBILITY & TROUBLESHOOTING
+-------------------------------
+Creature Comforts is designed to work alongside other mods using the community Mod Loader, but compatibility with every mod is not guaranteed.
 
-If you encounter a bug, please report it with:
-- A description of what happened.
-- What you expected to happen.
-- Screenshots, if possible.
+If the mod does not appear:
+- Confirm the Mod Loader is installed and working.
+- Verify the folder structure shown above.
+- Restart the game.
+
+If you encounter a bug, please include a description, reproduction steps, and screenshots if possible.
 
 
-FEEDBACK / FEATURE REQUESTS
----------------------------
-Creature Comforts is an evolving quality-of-life mod.
+FEEDBACK
+--------
+Suggestions, bug reports, and feature requests are welcome!
 
-Suggestions, bug reports, and feedback are welcome!
-
-If there's something you frequently forget during a run, or information
-you wish the game displayed more clearly, I'd love to hear about it.
-
-Please leave feedback on Nexus Mods or submit an issue on GitHub.
+Leave feedback on Nexus Mods or submit an issue on GitHub.
 
 
-LEGAL / CREDITS
----------------
-Creature Comforts is a fan-made, unofficial mod for Batomon Showdown.
+CREDITS
+-------
+Creature Comforts is an unofficial fan-made mod.
 
 Not affiliated with or endorsed by the developers of Batomon Showdown.
 
-Community Mod Loader by EmoUsedHM01 and madibye (separate download).
+Community Mod Loader by EmoUsedHM01 and madibye.
 
-Batomon Showdown and its game assets belong to their respective owners.
+Batomon Showdown and its assets belong to their respective owners.

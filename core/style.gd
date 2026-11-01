@@ -93,3 +93,34 @@ static func compact_button(b: Button, color: Color = Color.TRANSPARENT) -> void:
 	b.add_theme_color_override("font_hover_color", text_color)
 	b.add_theme_color_override("font_pressed_color", BG_COLOR)
 	b.add_theme_color_override("font_hover_pressed_color", BG_COLOR)
+
+
+## Action-button styling: a filled box with a brighter border, so it reads as an
+## action rather than as another filter toggle. `disabled_bg` is optional; when
+## set, the disabled state is dimmed instead of reusing the normal box.
+static func action_button(b: Button, bg: Color, bg_hover: Color, border: Color, text_color: Color, disabled_bg: Color = Color.TRANSPARENT) -> void:
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = bg
+	normal.border_color = border
+	normal.set_border_width_all(1)
+	normal.set_corner_radius_all(2)
+	normal.set_content_margin_all(1)
+	var hover: StyleBoxFlat = normal.duplicate()
+	hover.bg_color = bg_hover
+	var pressed: StyleBoxFlat = normal.duplicate()
+	pressed.bg_color = border
+	for state in ["normal", "focus"]:
+		b.add_theme_stylebox_override(state, normal)
+	b.add_theme_stylebox_override("hover", hover)
+	b.add_theme_stylebox_override("pressed", pressed)
+	b.add_theme_stylebox_override("hover_pressed", pressed)
+	if disabled_bg == Color.TRANSPARENT:
+		b.add_theme_stylebox_override("disabled", normal)
+	else:
+		var disabled: StyleBoxFlat = normal.duplicate()
+		disabled.bg_color = disabled_bg
+		disabled.border_color = disabled_bg
+		b.add_theme_stylebox_override("disabled", disabled)
+		b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.45))
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
+		b.add_theme_color_override(state, text_color)

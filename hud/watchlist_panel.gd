@@ -349,7 +349,7 @@ func _toolbar_box(parent: Control) -> void:
 	_snapshot_button.focus_mode = Control.FOCUS_NONE
 	_snapshot_button.custom_minimum_size = Vector2(0, 8)
 	_apply_font(_snapshot_button, BODY_FONT_SIZE)
-	_style_action_button(_snapshot_button, Style.ACTION_BG, Style.ACTION_BG_HOVER, Style.ACTION_BORDER, VALUE_COLOR)
+	Style.action_button(_snapshot_button, Style.ACTION_BG, Style.ACTION_BG_HOVER, Style.ACTION_BORDER, VALUE_COLOR)
 	_snapshot_button.pressed.connect(_on_snapshot_pressed)
 	toolbar.add_child(_snapshot_button)
 
@@ -373,7 +373,7 @@ func _toolbar_box(parent: Control) -> void:
 	_save_button.focus_mode = Control.FOCUS_NONE
 	_save_button.custom_minimum_size = Vector2(0, 8)
 	_apply_font(_save_button, BODY_FONT_SIZE)
-	_style_action_button(_save_button, Style.SAVE_BG, Style.SAVE_BG_HOVER, Style.SAVE_BORDER, Color.WHITE, Style.SAVE_BG_DISABLED)
+	Style.action_button(_save_button, Style.SAVE_BG, Style.SAVE_BG_HOVER, Style.SAVE_BORDER, Color.WHITE, Style.SAVE_BG_DISABLED)
 	_save_button.pressed.connect(_on_save_pressed)
 	toolbar.add_child(_save_button)
 
@@ -401,37 +401,6 @@ func _add_filter_button(parent: Control, text: String, value: String, store: Arr
 	b.pressed.connect(handler.bind(value))
 	parent.add_child(b)
 	store.append({"button": b, "value": value})
-
-
-## Action-button styling: a filled box with a brighter border, so it reads as an
-## action rather than as another filter toggle. Snapshot Team uses the muted red
-## palette; Save uses the muted green one and dims its disabled state.
-func _style_action_button(b: Button, bg: Color, bg_hover: Color, border: Color, text_color: Color, disabled_bg: Color = Color.TRANSPARENT) -> void:
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = bg
-	normal.border_color = border
-	normal.set_border_width_all(1)
-	normal.set_corner_radius_all(2)
-	normal.set_content_margin_all(1)
-	var hover: StyleBoxFlat = normal.duplicate()
-	hover.bg_color = bg_hover
-	var pressed: StyleBoxFlat = normal.duplicate()
-	pressed.bg_color = border
-	for state in ["normal", "focus"]:
-		b.add_theme_stylebox_override(state, normal)
-	b.add_theme_stylebox_override("hover", hover)
-	b.add_theme_stylebox_override("pressed", pressed)
-	b.add_theme_stylebox_override("hover_pressed", pressed)
-	if disabled_bg == Color.TRANSPARENT:
-		b.add_theme_stylebox_override("disabled", normal)
-	else:
-		var disabled: StyleBoxFlat = normal.duplicate()
-		disabled.bg_color = disabled_bg
-		disabled.border_color = disabled_bg
-		b.add_theme_stylebox_override("disabled", disabled)
-		b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.45))
-	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
-		b.add_theme_color_override(state, text_color)
 
 
 func _sync_filter_buttons(buttons: Array, selected: String) -> void:

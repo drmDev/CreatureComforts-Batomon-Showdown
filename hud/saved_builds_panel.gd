@@ -192,7 +192,8 @@ func _build_row(build: Dictionary) -> Control:
 	delete_button.focus_mode = Control.FOCUS_NONE
 	delete_button.custom_minimum_size = Vector2(0, 8)
 	_apply_font(delete_button, BODY_FONT_SIZE)
-	Style.compact_button(delete_button, Style.ACTION_BORDER if confirming else Color.TRANSPARENT)
+	# Same muted red as Snapshot Team, so Delete reads as a destructive action.
+	Style.action_button(delete_button, Style.ACTION_BG, Style.ACTION_BG_HOVER, Style.ACTION_BORDER, Style.VALUE_COLOR)
 	delete_button.pressed.connect(_on_delete_pressed.bind(build))
 	top.add_child(delete_button)
 
