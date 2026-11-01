@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "1.133"
+const VERSION := "1.137"
 const OUTPUT_DIR := "user://creature_comforts"
 const LOG_FILE := "inspect.log"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
@@ -21,6 +21,8 @@ const LogFormatterScript = preload("core/log_formatter.gd")
 const JUNK_TRINKET_ID := LogFormatterScript.JUNK_TRINKET_ID
 const TrinketGains = preload("core/trinket_gains.gd")
 const RunRegion = preload("core/run_region.gd")
+const RunData = preload("core/run_data.gd")
+const ShopHighlight = preload("hud/shop_highlight.gd")
 const DevConfig = preload("dev/dev_config.gd")
 const ModConfig = preload("core/mod_config.gd")
 
@@ -98,6 +100,7 @@ var _trinket_reminders_alerted := false
 var _last_trinket_reminder_entries: Dictionary = {}  # name -> count, for change-only logging
 
 var _rank_odds_panel = null
+var _rank_odds_popup_open := false
 var _watchlist_panel = null
 var _shop_highlight = null
 var _last_reminder_rule_ids: Dictionary = {}
@@ -153,10 +156,10 @@ func _initialize_mod() -> void:
 	_formatter = LogFormatterScript.new(_has_property)
 	_setup_mod_config()
 	
-	var ShopSnapshot = load("res://mods/CreatureComforts/core/shop_snapshot.gd")
+	var ShopSnapshot = load(_base_dir().path_join("core/shop_snapshot.gd"))
 	_snapshot_builder = ShopSnapshot.new()
 	
-	var ShopChanges = load("res://mods/CreatureComforts/core/shop_changes.gd")
+	var ShopChanges = load(_base_dir().path_join("core/shop_changes.gd"))
 	_changes_comparer = ShopChanges.new()
 	
 	_setup_advisor()
@@ -167,6 +170,9 @@ func _initialize_mod() -> void:
 	_setup_player_hud()
 	_setup_results_panel()
 	_setup_notification_sounds()
+	# The UI is live and the overlay gate must run even if the log file cannot be
+	# opened; _log_message already no-ops when _log_file is null.
+	_initialized = true
 	
 	var dir_path := ProjectSettings.globalize_path(OUTPUT_DIR)
 	var dir_result := DirAccess.make_dir_recursive_absolute(dir_path)
@@ -190,8 +196,6 @@ func _initialize_mod() -> void:
 		push_error("Creature Comforts: Cannot open log file %s: %s" % [abs_log_path, error_string(FileAccess.get_open_error())])
 		return
 	_log_file.seek_end()
-	
-	_initialized = true
 	
 	_log_message("=".repeat(80))
 	_log_message("Creature Comforts %s " % VERSION)
@@ -320,7 +324,7 @@ func _collect_shop_cards(node, out: Array) -> void:
 		return
 	if node is Control:
 		var script: Script = node.get_script()
-		if script != null and str(script.resource_path.get_file().get_basename()) == "shop_slot_ui":
+		if script != null and str(script.resource_path.get_file().get_basename()) == ShopHighlight.CARD_SCRIPT:
 			out.append(node)
 	for child in node.get_children():
 		_collect_shop_cards(child, out)
@@ -381,14 +385,14 @@ func _log_region_diagnostic() -> void:
 
 
 func _setup_advisor() -> void:
-	var TrainerAdvisor = load("res://mods/CreatureComforts/advice/trainer_advisor.gd")
-	var TrainerCatalog = load("res://mods/CreatureComforts/advice/trainer_catalog.gd")
-	var RuleFactory = load("res://mods/CreatureComforts/advice/rule_factory.gd")
+	var TrainerAdvisor = load(_base_dir().path_join("advice/trainer_advisor.gd"))
+	var TrainerCatalog = load(_base_dir().path_join("advice/trainer_catalog.gd"))
+	var RuleFactory = load(_base_dir().path_join("advice/rule_factory.gd"))
 	
 	_advisor = TrainerAdvisor.new()
 	
 	# Cache AdviceContext builder (rules consume snapshot data as plain records)
-	_advice_context_builder = load("res://mods/CreatureComforts/advice/advice_context.gd").new()
+	_advice_context_builder = load(_base_dir().path_join("advice/advice_context.gd")).new()
 	
 	var definitions: Array = TrainerCatalog.TRAINER_DEFINITIONS
 	for trainer_def in definitions:
@@ -404,7 +408,7 @@ func _setup_advisor() -> void:
 
 
 func _setup_reminder_panel() -> void:
-	var ReminderLabel = load("res://mods/CreatureComforts/hud/reminder_label.gd")
+	var ReminderLabel = load(_base_dir().path_join("hud/reminder_label.gd"))
 	
 	_reminder_layer = CanvasLayer.new()
 	_reminder_layer.layer = 100  # Above game UI but below debug overlays
@@ -416,27 +420,28 @@ func _setup_reminder_panel() -> void:
 	_reminder_layer.add_child(_reminder_label)
 	
 	# Bottom-center income readout; the reminder layer's shop gate controls visibility.
-	var ShopIncomePanel = load("res://mods/CreatureComforts/hud/shop_income_panel.gd")
+	var ShopIncomePanel = load(_base_dir().path_join("hud/shop_income_panel.gd"))
 	_shop_income_panel = ShopIncomePanel.new()
 	_shop_income_panel.name = "ShopIncomePanel"
 	_reminder_layer.add_child(_shop_income_panel)
 
 	# Left-aligned trinket reminders ~10% down the screen; shop-gated. Added after the label
 	# so it draws on top while visible.
-	var TrinketRemindersPanel = load("res://mods/CreatureComforts/hud/trinket_reminders_panel.gd")
+	var TrinketRemindersPanel = load(_base_dir().path_join("hud/trinket_reminders_panel.gd"))
 	_trinket_reminders_panel = TrinketRemindersPanel.new()
 	_trinket_reminders_panel.name = "TrinketRemindersPanel"
 	_trinket_reminders_panel.layout_debug.connect(_on_trinket_panel_layout_debug)
 	_reminder_layer.add_child(_trinket_reminders_panel)
 
-	var RankOddsPanel = load("res://mods/CreatureComforts/hud/rank_odds_panel.gd")
+	var RankOddsPanel = load(_base_dir().path_join("hud/rank_odds_panel.gd"))
 	_rank_odds_panel = RankOddsPanel.new()
 	_rank_odds_panel.name = "RankOddsPanel"
 	_rank_odds_panel.log_line.connect(_log_event)
+	_rank_odds_panel.popup_visibility_changed.connect(_on_rank_odds_popup_visibility_changed)
 	_reminder_layer.add_child(_rank_odds_panel)
 
 	# Watchlist button + popup; shop-gated with the rest of the reminder layer.
-	var WatchlistPanel = load("res://mods/CreatureComforts/hud/watchlist_panel.gd")
+	var WatchlistPanel = load(_base_dir().path_join("hud/watchlist_panel.gd"))
 	_watchlist_panel = WatchlistPanel.new()
 	_watchlist_panel.name = "WatchlistPanel"
 	_watchlist_panel.setup(_formatter)
@@ -446,7 +451,6 @@ func _setup_reminder_panel() -> void:
 ## Node-attached shop highlighting. Shares the watchlist panel's selection
 ## dictionary by reference, so selection changes apply on the next frame.
 func _setup_shop_highlight() -> void:
-	var ShopHighlight = load("res://mods/CreatureComforts/hud/shop_highlight.gd")
 	_shop_highlight = ShopHighlight.new()
 	_shop_highlight.name = "ShopHighlight"
 	add_child(_shop_highlight)
@@ -457,7 +461,7 @@ func _setup_shop_highlight() -> void:
 
 
 func _setup_shop_overlay_gate() -> void:
-	var ShopOverlayGate = load("res://mods/CreatureComforts/hud/shop_overlay_gate.gd")
+	var ShopOverlayGate = load(_base_dir().path_join("hud/shop_overlay_gate.gd"))
 	_shop_overlay_gate = ShopOverlayGate.new()
 	_shop_overlay_gate.name = "ShopOverlayGate"
 	add_child(_shop_overlay_gate)
@@ -477,6 +481,16 @@ func _on_shop_visibility_changed(allowed: bool, _reason: String) -> void:
 		_watchlist_panel.close_popup()
 
 
+## The rank-odds popup is a full-screen modal drawn by a sibling panel. The
+## watchlist panel is added after it, so its button would otherwise float above
+## the dim layer. Hide the watchlist while the rank-odds popup is open.
+func _on_rank_odds_popup_visibility_changed(open: bool) -> void:
+	_rank_odds_popup_open = open
+	if _watchlist_panel == null:
+		return
+	_watchlist_panel.visible = not open and _feature_enabled(ModConfig.KEY_SHOP_HIGHLIGHTS)
+
+
 func _on_trinket_panel_layout_debug(message: String) -> void:
 	if not _debug_logging:
 		return
@@ -485,7 +499,7 @@ func _on_trinket_panel_layout_debug(message: String) -> void:
 
 
 func _setup_player_hud() -> void:
-	var PlayerHud = load("res://mods/CreatureComforts/hud/player_hud.gd")
+	var PlayerHud = load(_base_dir().path_join("hud/player_hud.gd"))
 	
 	var layer := CanvasLayer.new()
 	layer.layer = 110  # Above game UI, matching NP_QoL's HUD layer
@@ -505,7 +519,7 @@ func _setup_results_panel() -> void:
 	_results_layer.name = "CreatureComforts_Results"
 	add_child(_results_layer)
 	
-	var TrinketPanel = load("res://mods/CreatureComforts/hud/trinket_panel.gd")
+	var TrinketPanel = load(_base_dir().path_join("hud/trinket_panel.gd"))
 	_trinket_panel = TrinketPanel.new()
 	_trinket_panel.name = "TrinketPanel"
 	_results_layer.add_child(_trinket_panel)
@@ -558,7 +572,7 @@ func _on_feature_toggled(key: String, value: bool) -> void:
 		if _shop_highlight != null:
 			_shop_highlight.set_enabled(value)
 		if _watchlist_panel != null:
-			_watchlist_panel.visible = value
+			_watchlist_panel.visible = value and not _rank_odds_popup_open
 			if not value:
 				_watchlist_panel.close_popup()
 		return
@@ -1194,11 +1208,12 @@ func _script_is(obj, script_path: String) -> bool:
 	return false
 
 
+func _base_dir() -> String:
+	return str(get_script().resource_path).get_base_dir()
+
+
 func _get_run_data():
-	var run_manager = get_node_or_null("/root/RunManager")
-	if run_manager == null or not _has_property(run_manager, "data"):
-		return null
-	return run_manager.get("data")
+	return RunData.get_run_data()
 
 
 func _log_message(message: String) -> void:

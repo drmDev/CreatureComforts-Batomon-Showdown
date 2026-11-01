@@ -1,6 +1,8 @@
 extends "comfort_panel.gd"
 
 signal log_line(message: String)
+## Emitted when the modal popup opens or closes, so sibling HUD widgets can hide.
+signal popup_visibility_changed(open: bool)
 
 const BTN_SIZE := 20.0
 const LEFT_MARGIN := 100.0
@@ -146,6 +148,7 @@ func _open_popup() -> void:
 	_anchor()
 	grab_focus()
 	log_line.emit("RANK ODDS | popup opened | rank=%d" % _rank)
+	popup_visibility_changed.emit(true)
 	queue_redraw()
 
 
@@ -155,6 +158,7 @@ func _close_popup() -> void:
 	_popup_open = false
 	_anchor()
 	log_line.emit("RANK ODDS | popup closed")
+	popup_visibility_changed.emit(false)
 	queue_redraw()
 
 

@@ -36,6 +36,7 @@ const EXCLUDED_TYPES := ["all", "null"]
 # listed here.
 const REGION_NAMES := ["Jinto", "Pantra"]
 const RunRegion = preload("../core/run_region.gd")
+const RunData = preload("../core/run_data.gd")
 
 ## { "monster": { name_key: true }, "item": { id: true } }
 var selection := {"monster": {}, "item": {}}
@@ -63,6 +64,7 @@ var _applied_region := ""  # last auto-applied region, so we only override on ch
 var _snapshot_button: Button
 var _tracked_count_label: Label
 var _tracked_only := false
+var _tracked_only_check: CheckBox
 var _rows_box: GridContainer
 var _popup_open := false
 var _rows_dirty := true
@@ -135,10 +137,14 @@ func _position_panel() -> void:
 	if vp == null:
 		return
 	var vs := vp.get_visible_rect().size
-	_panel.size = Vector2(POPUP_WIDTH, POPUP_HEIGHT)
+	# Clamp to the viewport so the popup cannot overflow on small base resolutions.
+	var w := minf(POPUP_WIDTH, vs.x - 16.0)
+	var h := minf(POPUP_HEIGHT, vs.y - 16.0)
+	_panel.custom_minimum_size = Vector2(w, h)
+	_panel.size = Vector2(w, h)
 	_panel.position = Vector2(
-		roundf((vs.x - POPUP_WIDTH) * 0.5),
-		roundf((vs.y - POPUP_HEIGHT) * 0.5))
+		roundf((vs.x - w) * 0.5),
+		roundf((vs.y - h) * 0.5))
 
 
 func _apply_font(control: Control, size: int) -> void:
@@ -303,6 +309,7 @@ func _build_ui() -> void:
 	_sync_tab_visibility()
 	_sync_filter_buttons(_rarity_buttons, _rarity_filter)
 	_sync_filter_buttons(_type_buttons, _type_filter)
+	_sync_tracked_only_state()
 
 
 ## Tools sitting directly above the list: Snapshot Team (Batomon tab only), the
@@ -330,13 +337,13 @@ func _toolbar_box(parent: Control) -> void:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar.add_child(spacer)
 
-	var tracked_only_check := CheckBox.new()
-	tracked_only_check.text = "Tracked Only"
-	tracked_only_check.tooltip_text = "Show only entries you are tracking"
-	tracked_only_check.focus_mode = Control.FOCUS_NONE
-	_style_checkbox(tracked_only_check)
-	tracked_only_check.toggled.connect(_on_tracked_only_toggled)
-	toolbar.add_child(tracked_only_check)
+	_tracked_only_check = CheckBox.new()
+	_tracked_only_check.text = "Tracked Only"
+	_tracked_only_check.tooltip_text = "Show only entries you are tracking"
+	_tracked_only_check.focus_mode = Control.FOCUS_NONE
+	_style_checkbox(_tracked_only_check)
+	_tracked_only_check.toggled.connect(_on_tracked_only_toggled)
+	toolbar.add_child(_tracked_only_check)
 
 
 func _add_filter_button(parent: Control, text: String, value: String, store: Array, handler: Callable, color: Color = Color.TRANSPARENT) -> void:
@@ -486,21 +493,44 @@ func _on_tab_pressed(tab: String) -> void:
 
 
 func _on_rarity_pressed(value: String) -> void:
+	_exit_tracked_only()
 	_rarity_filter = value
 	_sync_filter_buttons(_rarity_buttons, value)
 	_rebuild_rows()
 
 
 func _on_type_pressed(value: String) -> void:
+	_exit_tracked_only()
 	_type_filter = value
 	_sync_filter_buttons(_type_buttons, value)
 	_rebuild_rows()
 
 
-## View filter only: hides untracked rows, never changes the selection itself.
+## Tracked Only is an independent viewing mode: it shows every tracked entry for
+## the active tab and ignores the Rarity/Type/Region filters. The filters keep
+## their values and are dimmed while the mode is active.
 func _on_tracked_only_toggled(on: bool) -> void:
 	_tracked_only = on
+	_sync_tracked_only_state()
 	_rebuild_rows()
+
+
+## Leave Tracked Only when the player picks a filter, then let the caller apply it.
+func _exit_tracked_only() -> void:
+	if not _tracked_only:
+		return
+	_tracked_only = false
+	_sync_tracked_only_state()
+
+
+func _sync_tracked_only_state() -> void:
+	var dim := Color(1, 1, 1, 0.4) if _tracked_only else Color.WHITE
+	if _filters_box != null:
+		_filters_box.modulate = dim
+	if _region_option != null:
+		_region_option.modulate = dim
+	if _tracked_only_check != null:
+		_tracked_only_check.set_pressed_no_signal(_tracked_only)
 
 
 ## One-time capture: replaces tracked Batomon with the currently fielded team.
@@ -556,10 +586,7 @@ static func _entry_field(obj, field: String):
 
 
 func _get_run_data():
-	var run_manager = get_node_or_null("/root/RunManager")
-	if run_manager == null or not ("data" in run_manager):
-		return null
-	return run_manager.get("data")
+	return RunData.get_run_data()
 
 
 func _update_tracked_count() -> void:
@@ -569,6 +596,7 @@ func _update_tracked_count() -> void:
 
 
 func _on_region_selected(index: int) -> void:
+	_exit_tracked_only()
 	_apply_region_index(index)
 	_rebuild_rows()
 
@@ -754,10 +782,12 @@ func _rebuild_rows() -> void:
 		if str(entry["kind"]) != _tab:
 			continue
 		var watched := is_watched(entry["kind"], entry["key"])
-		# Tracked Only composes with the other filters; it never overrides them.
-		if _tracked_only and not watched:
-			continue
-		if _tab == TAB_MONSTER and not _passes_monster_filters(entry):
+		# Tracked Only is a separate mode: show every tracked entry and ignore
+		# the Rarity/Type/Region filters.
+		if _tracked_only:
+			if not watched:
+				continue
+		elif _tab == TAB_MONSTER and not _passes_monster_filters(entry):
 			continue
 		_add_entry_row(entry, added, watched)
 		added += 1
@@ -914,7 +944,16 @@ func _save_selection() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("watchlist", "monsters", _format_ids(selection["monster"]))
 	cfg.set_value("watchlist", "items", _format_ids(selection["item"]))
-	cfg.save(CFG_PATH)
+	# The mod's user directory is created later in mod_main, so make sure it
+	# exists before the first save (e.g. a toggle before the first shop poll).
+	var abs_dir := ProjectSettings.globalize_path(CFG_PATH.get_base_dir())
+	var dir_err := DirAccess.make_dir_recursive_absolute(abs_dir)
+	if dir_err != OK and dir_err != ERR_ALREADY_EXISTS:
+		push_warning("Creature Comforts: cannot create watchlist directory %s: %s" % [abs_dir, error_string(dir_err)])
+		return
+	var save_err := cfg.save(CFG_PATH)
+	if save_err != OK:
+		push_warning("Creature Comforts: cannot save watchlist to %s: %s" % [CFG_PATH, error_string(save_err)])
 
 
 static func _parse_ids(csv: String) -> Dictionary:
