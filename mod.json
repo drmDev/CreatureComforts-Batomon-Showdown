@@ -19,7 +19,7 @@
 		 "description": "Display income during the shop phase."},
 		{"key": "rank_odds_preview", "label": "Rank Odds Preview", "type": "bool", "default": true,
 		 "description": "Show the shop rank probability table."},
-		{"key": "shop_highlights", "label": "Shop Highlights", "type": "bool", "default": true,
+		{"key": "shop_highlights", "label": "Shop Highlights", "type": "bool", "default": false,
 		 "description": "Highlight shop cards that match your watchlist."}
 	]
 }
