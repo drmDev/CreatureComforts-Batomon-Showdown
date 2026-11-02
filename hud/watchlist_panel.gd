@@ -24,6 +24,14 @@ const ICON_Y_OFFSET := 2.5  # sprites sit slightly high so they line up with nam
 const TAB_MONSTER := "monster"
 const TAB_ITEM := "item"
 
+## List ordering. Name is the historical behaviour; Rarity orders by tier
+## (Common..Mythical) with the name as the tie-break.
+const SORT_NAME := "name"
+const SORT_RARITY := "rarity"
+const SORT_MODES := [SORT_NAME, SORT_RARITY]
+## Entries with no usable tier (0/unknown) sort after every real rarity.
+const UNKNOWN_SORT_TIER := 999
+
 ## Tier -> rarity display name; the keys double as the filter row's order.
 const RARITY_BY_TIER := {1: "Common", 2: "Uncommon", 3: "Rare", 4: "Super Rare", 5: "Legendary", 6: "Mythical"}
 const RARITY_COLORS := Style.RARITY_COLORS_BY_NAME
@@ -62,12 +70,19 @@ var _rarity_filter := ""
 var _type_filter := ""
 var _rarity_buttons: Array = []
 var _type_buttons: Array = []
+var _sort_mode := SORT_NAME
+var _sort_descending := false
+var _sort_option: OptionButton
+var _sort_dir_button: Button
+var _sort_asc_icon: Texture2D
+var _sort_desc_icon: Texture2D
 var _region_filter := ""
 var _region_option: OptionButton
 var _region_map := {}      # set/pack id -> region display name (from the catalog)
 var _applied_region := ""  # last auto-applied region, so we only override on change
 var _snapshot_button: Button
 var _tracked_count_label: Label
+var _clear_button: Button
 var _builds_button: Button
 var _save_button: Button
 var _builds_panel: SavedBuildsPanel
@@ -305,6 +320,13 @@ func _build_ui() -> void:
 	_filters_box.add_child(_type_flow)
 	_add_filter_button(_type_flow, "All", "", _type_buttons, _on_type_pressed)
 
+	# Subtle boundary between the filters and the toolbar, matching the one
+	# above the list.
+	var toolbar_divider := ColorRect.new()
+	toolbar_divider.color = Color(1, 1, 1, 0.12)
+	toolbar_divider.custom_minimum_size.y = 1
+	vbox.add_child(toolbar_divider)
+
 	# Toolbar: one-time team snapshot, tracked count, and the Tracked Only view.
 	_toolbar_box(vbox)
 
@@ -381,6 +403,48 @@ func _toolbar_box(parent: Control) -> void:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar.add_child(spacer)
 
+	# Sort By: a compact dropdown, styled like the Region selector. It sits
+	# outside _filters_box, so it applies to both tabs and to Tracked Only.
+	var sort_label := Label.new()
+	sort_label.text = "Sort"
+	_apply_font(sort_label, BODY_FONT_SIZE)
+	toolbar.add_child(sort_label)
+
+	_sort_option = OptionButton.new()
+	_sort_option.focus_mode = Control.FOCUS_NONE
+	_sort_option.tooltip_text = "Sort the list by name or by rarity"
+	for mode in SORT_MODES:
+		_sort_option.add_item("Name" if mode == SORT_NAME else "Rarity")
+	_apply_font(_sort_option, BODY_FONT_SIZE)
+	Style.compact_button(_sort_option)
+	_sort_option.custom_minimum_size = Vector2(0, 8)
+	# Shrink the dropdown popup to match the compact HUD scale.
+	var sort_popup := _sort_option.get_popup()
+	sort_popup.add_theme_font_size_override("font_size", BODY_FONT_SIZE)
+	if _text_font != null:
+		sort_popup.add_theme_font_override("font", _text_font)
+	sort_popup.add_theme_constant_override("v_separation", 0)
+	sort_popup.add_theme_constant_override("item_start_padding", 2)
+	sort_popup.add_theme_constant_override("item_end_padding", 2)
+	# select() emits nothing, so the initial mode is not re-applied here.
+	_sort_option.select(maxi(SORT_MODES.find(_sort_mode), 0))
+	_sort_option.item_selected.connect(_on_sort_selected)
+	toolbar.add_child(_sort_option)
+
+	# Direction toggle: the icon is the same arrow flipped vertically, so it
+	# points down for ascending and up for descending.
+	_sort_asc_icon = _load_texture("../assets/icons/sort.png")
+	_sort_desc_icon = _flip_texture_vertically(_sort_asc_icon)
+	_sort_dir_button = Button.new()
+	_sort_dir_button.icon = _sort_asc_icon
+	_sort_dir_button.expand_icon = true
+	_sort_dir_button.focus_mode = Control.FOCUS_NONE
+	_sort_dir_button.custom_minimum_size = Vector2(12, 12)
+	Style.compact_button(_sort_dir_button)
+	_sort_dir_button.pressed.connect(_on_sort_direction_pressed)
+	toolbar.add_child(_sort_dir_button)
+	_sync_sort_direction()
+
 	_tracked_only_check = CheckBox.new()
 	_tracked_only_check.text = "Tracked Only"
 	_tracked_only_check.tooltip_text = "Show only entries you are tracking"
@@ -388,6 +452,18 @@ func _toolbar_box(parent: Control) -> void:
 	_style_checkbox(_tracked_only_check)
 	_tracked_only_check.toggled.connect(_on_tracked_only_toggled)
 	toolbar.add_child(_tracked_only_check)
+
+	# Icon-only clear: unchecks every tracked Batomon and item. No text, so the
+	# tooltip carries the meaning.
+	_clear_button = Button.new()
+	_clear_button.icon = _load_texture("../assets/icons/clearFilter.png")
+	_clear_button.expand_icon = true
+	_clear_button.tooltip_text = "Clear all tracked Batomon and items"
+	_clear_button.focus_mode = Control.FOCUS_NONE
+	_clear_button.custom_minimum_size = Vector2(12, 12)
+	Style.compact_button(_clear_button)
+	_clear_button.pressed.connect(_on_clear_pressed)
+	toolbar.add_child(_clear_button)
 
 
 func _add_filter_button(parent: Control, text: String, value: String, store: Array, handler: Callable, color: Color = Color.TRANSPARENT) -> void:
@@ -501,6 +577,58 @@ func _on_tab_pressed(tab: String) -> void:
 	_rebuild_rows()
 
 
+## Uncheck every tracked entry on both tabs. The active filters, sort mode and
+## Tracked Only state are left alone; the list simply rebuilds empty.
+func _on_clear_pressed() -> void:
+	_click_sound.play()
+	selection["monster"] = {}
+	selection["item"] = {}
+	_save_selection()
+	_rebuild_rows()
+
+
+## Sorting is independent of the filters and of Tracked Only, so it never exits
+## that mode.
+func _on_sort_selected(index: int) -> void:
+	if index < 0 or index >= SORT_MODES.size():
+		return
+	_sort_mode = SORT_MODES[index]
+	_save_selection()
+	_rebuild_rows()
+
+
+## Flip between ascending (A-Z, Common..Mythical) and descending.
+func _on_sort_direction_pressed() -> void:
+	_click_sound.play()
+	_sort_descending = not _sort_descending
+	_sync_sort_direction()
+	_save_selection()
+	_rebuild_rows()
+
+
+func _sync_sort_direction() -> void:
+	if _sort_dir_button == null:
+		return
+	_sort_dir_button.icon = _sort_desc_icon if _sort_descending else _sort_asc_icon
+	_sort_dir_button.tooltip_text = (
+		"Descending (Z-A, Mythical to Common). Click for ascending."
+		if _sort_descending else
+		"Ascending (A-Z, Common to Mythical). Click for descending.")
+
+
+## Vertical mirror of a texture, used to point the sort arrow the other way
+## without shipping a second asset.
+func _flip_texture_vertically(tex: Texture2D) -> Texture2D:
+	if tex == null:
+		return null
+	var img := tex.get_image()
+	if img == null:
+		return tex
+	img = img.duplicate()
+	img.flip_y()
+	return ImageTexture.create_from_image(img)
+
+
 func _on_rarity_pressed(value: String) -> void:
 	_exit_tracked_only()
 	_rarity_filter = value
@@ -608,6 +736,10 @@ func _update_save_button_state() -> void:
 		return
 	var tracked: int = selection.get("monster", {}).size() + selection.get("item", {}).size()
 	_save_button.disabled = tracked == 0
+	if _clear_button != null:
+		_clear_button.disabled = tracked == 0
+		# compact_button reuses the normal box for `disabled`, so dim the icon.
+		_clear_button.modulate.a = 0.4 if tracked == 0 else 1.0
 
 
 ## Save the whole watchlist (both tabs, ignoring filters and Tracked Only) as a
@@ -787,7 +919,39 @@ func _load_catalog() -> void:
 				_catalog_index["item:" + key] = entry
 	_available_types = type_set.keys()
 	_available_types.sort()
-	_catalog.sort_custom(func(a, b): return str(a["name"]).naturalnocasecmp_to(str(b["name"])) < 0)
+	# The catalog stays name-sorted as the stable base order; _rebuild_rows
+	# re-sorts a per-tab copy when the Rarity mode is active.
+	_catalog.sort_custom(_compare_by_name)
+
+
+## Sort a list of catalog entries in place for the given mode and direction.
+static func sort_entries(entries: Array, mode: String, descending: bool = false) -> void:
+	entries.sort_custom(func(a, b): return _compare_entries(a, b, mode, descending))
+
+
+static func _compare_by_name(a, b) -> bool:
+	return str(a.get("name", "")).naturalnocasecmp_to(str(b.get("name", ""))) < 0
+
+
+## Ascending is A-Z for names and Common..Mythical for rarity, with the name as
+## the tie-break. Unknown tiers always sort last, in both directions.
+static func _compare_entries(a, b, mode: String, descending: bool) -> bool:
+	if mode == SORT_RARITY:
+		var at := _sort_tier(a)
+		var bt := _sort_tier(b)
+		var a_unknown := at >= UNKNOWN_SORT_TIER
+		var b_unknown := bt >= UNKNOWN_SORT_TIER
+		if a_unknown != b_unknown:
+			return not a_unknown
+		if at != bt:
+			return at > bt if descending else at < bt
+	var cmp := str(a.get("name", "")).naturalnocasecmp_to(str(b.get("name", "")))
+	return cmp > 0 if descending else cmp < 0
+
+
+static func _sort_tier(entry) -> int:
+	var tier := int(entry.get("tier", 0))
+	return tier if tier > 0 else UNKNOWN_SORT_TIER
 
 
 func _rebuild_type_buttons() -> void:
@@ -855,7 +1019,9 @@ func _rebuild_rows() -> void:
 		child.queue_free()
 	_update_tracked_count()
 	_rows_dirty = false
-	var added := 0
+	# Collect the visible entries first so the active sort can be applied to the
+	# filtered list (the catalog itself stays name-sorted).
+	var entries: Array = []
 	for entry in _catalog:
 		if str(entry["kind"]) != _tab:
 			continue
@@ -867,7 +1033,11 @@ func _rebuild_rows() -> void:
 				continue
 		elif _tab == TAB_MONSTER and not _passes_monster_filters(entry):
 			continue
-		_add_entry_row(entry, added, watched)
+		entries.append(entry)
+	sort_entries(entries, _sort_mode, _sort_descending)
+	var added := 0
+	for entry in entries:
+		_add_entry_row(entry, added, is_watched(entry["kind"], entry["key"]))
 		added += 1
 	if added == 0:
 		var empty_label := Label.new()
@@ -932,6 +1102,12 @@ func _add_entry_row(entry: Dictionary, index: int, watched: bool) -> void:
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_apply_font(label, BODY_FONT_SIZE)
+	# In Rarity mode the tint makes the tier grouping readable at a glance.
+	if _sort_mode == SORT_RARITY:
+		var rarity_name: String = RARITY_BY_TIER.get(int(entry.get("tier", 0)), "")
+		var tint: Color = RARITY_COLORS.get(rarity_name, Color.TRANSPARENT)
+		if tint != Color.TRANSPARENT:
+			label.add_theme_color_override("font_color", tint)
 	hbox.add_child(label)
 
 	# Fixed-size holder: a plain Control positions its child by anchors, so the
@@ -1016,12 +1192,17 @@ func _load_selection() -> void:
 		return
 	selection["monster"] = _parse_ids(str(cfg.get_value("watchlist", "monsters", "")))
 	selection["item"] = _parse_ids(str(cfg.get_value("watchlist", "items", "")))
+	var stored_sort := str(cfg.get_value("watchlist", "sort", SORT_NAME)).strip_edges().to_lower()
+	_sort_mode = stored_sort if stored_sort in SORT_MODES else SORT_NAME
+	_sort_descending = bool(cfg.get_value("watchlist", "sort_desc", false))
 
 
 func _save_selection() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("watchlist", "monsters", _format_ids(selection["monster"]))
 	cfg.set_value("watchlist", "items", _format_ids(selection["item"]))
+	cfg.set_value("watchlist", "sort", _sort_mode)
+	cfg.set_value("watchlist", "sort_desc", _sort_descending)
 	# The mod's user directory is created later in mod_main, so make sure it
 	# exists before the first save (e.g. a toggle before the first shop poll).
 	var abs_dir := ProjectSettings.globalize_path(CFG_PATH.get_base_dir())

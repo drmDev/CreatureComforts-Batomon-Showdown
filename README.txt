@@ -10,8 +10,10 @@ Track Batomon and items you want to find in the shop. Matching shop entries are 
 
 - Browse and select Batomon and items.
 - Filter Batomon by rarity, type, and region.
+- Sort the list by name (alphabetical) or by rarity (lowest to highest).
 - Snapshot your active team into the Watchlist.
 - Use Tracked Only to quickly review and adjust selections.
+- Clear every tracked entry at once with the clear button.
 - Save, load, and delete builds to reuse your favorite setups.
 - Watchlist selections persist between sessions.
 
