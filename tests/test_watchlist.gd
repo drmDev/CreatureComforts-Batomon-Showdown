@@ -86,6 +86,13 @@ func test_extract_regions_keeps_all_mapped_sets() -> void:
 	panel.free()
 
 
+func test_toggled_filter_value() -> void:
+	assert_eq(WatchlistPanel.toggled_filter_value("", "Fire"), "Fire")
+	assert_eq(WatchlistPanel.toggled_filter_value("Fire", "Fire"), "")
+	assert_eq(WatchlistPanel.toggled_filter_value("Fire", "Water"), "Water")
+	assert_eq(WatchlistPanel.toggled_filter_value("", ""), "")
+
+
 func test_sort_entries_by_name() -> void:
 	var entries := [
 		{"name": "Zeta", "tier": 1},

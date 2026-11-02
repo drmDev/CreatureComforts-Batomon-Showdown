@@ -1,11 +1,11 @@
 extends "comfort_panel.gd"
 ## Watchlist panel: tabbed Batomon/Items catalog with mouse-driven Rarity, Type
-## and Region filters, selection, and persistence.
+## and Region filters, sorting, selection, and persistence.
 ##
 ## No text inputs: the game handles hotkeys globally (R = reroll), so a focused
 ## text field would let typed letters trigger shop actions. All filtering is
-## clickable. Filters only affect what is displayed; saved selections are never
-## changed by filtering.
+## clickable. Filters and sorting only affect what is displayed; saved selections
+## are never changed by either.
 
 const CFG_PATH := "user://creature_comforts/watchlist.cfg"
 const BTN_SIZE := 20
@@ -72,7 +72,6 @@ var _rarity_buttons: Array = []
 var _type_buttons: Array = []
 var _sort_mode := SORT_NAME
 var _sort_descending := false
-var _sort_option: OptionButton
 var _sort_dir_button: Button
 var _sort_asc_icon: Texture2D
 var _sort_desc_icon: Texture2D
@@ -180,6 +179,21 @@ func _apply_font(control: Control, size: int) -> void:
 	control.add_theme_font_size_override("font_size", size)
 
 
+## Compact OptionButton at the HUD scale, including its dropdown popup (the
+## theme default is far too large at this size).
+func _style_option(option: OptionButton) -> void:
+	_apply_font(option, BODY_FONT_SIZE)
+	Style.compact_button(option)
+	option.custom_minimum_size = Vector2(0, 8)
+	var popup := option.get_popup()
+	popup.add_theme_font_size_override("font_size", BODY_FONT_SIZE)
+	if _text_font != null:
+		popup.add_theme_font_override("font", _text_font)
+	popup.add_theme_constant_override("v_separation", 0)
+	popup.add_theme_constant_override("item_start_padding", 2)
+	popup.add_theme_constant_override("item_end_padding", 2)
+
+
 func _build_ui() -> void:
 	_ensure_row_styles()
 	_click_sound = UiSound.new()
@@ -276,17 +290,7 @@ func _build_ui() -> void:
 	_region_option.focus_mode = Control.FOCUS_NONE
 	for region_name in ["All"] + REGION_NAMES:
 		_region_option.add_item(region_name)
-	_apply_font(_region_option, BODY_FONT_SIZE)
-	Style.compact_button(_region_option)
-	_region_option.custom_minimum_size = Vector2(0, 8)
-	# Shrink the dropdown popup to match the compact HUD scale.
-	var region_popup := _region_option.get_popup()
-	region_popup.add_theme_font_size_override("font_size", BODY_FONT_SIZE)
-	if _text_font != null:
-		region_popup.add_theme_font_override("font", _text_font)
-	region_popup.add_theme_constant_override("v_separation", 0)
-	region_popup.add_theme_constant_override("item_start_padding", 2)
-	region_popup.add_theme_constant_override("item_end_padding", 2)
+	_style_option(_region_option)
 	_region_option.item_selected.connect(_on_region_selected)
 	tab_row.add_child(_region_option)
 
@@ -354,12 +358,12 @@ func _build_ui() -> void:
 	_sync_filter_buttons(_rarity_buttons, _rarity_filter)
 	_sync_filter_buttons(_type_buttons, _type_filter)
 	_sync_tracked_only_state()
-	_update_save_button_state()
+	_update_action_buttons()
 
 
-## Tools sitting directly above the list: Snapshot Team (Batomon tab only), the
-## tracked count for the active tab, the saved-build actions, and the Tracked
-## Only view toggle (kept on the far right).
+## Tools sitting directly above the list: the actions group (Snapshot Team,
+## tracked count, Builds, Save), the Sort group (mode + direction) and the view
+## group (Tracked Only + clear), separated by thin rules.
 func _toolbar_box(parent: Control) -> void:
 	var toolbar := HBoxContainer.new()
 	toolbar.add_theme_constant_override("separation", 4)
@@ -403,6 +407,8 @@ func _toolbar_box(parent: Control) -> void:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar.add_child(spacer)
 
+	_toolbar_separator(toolbar)
+
 	# Sort By: a compact dropdown, styled like the Region selector. It sits
 	# outside _filters_box, so it applies to both tabs and to Tracked Only.
 	var sort_label := Label.new()
@@ -410,26 +416,16 @@ func _toolbar_box(parent: Control) -> void:
 	_apply_font(sort_label, BODY_FONT_SIZE)
 	toolbar.add_child(sort_label)
 
-	_sort_option = OptionButton.new()
-	_sort_option.focus_mode = Control.FOCUS_NONE
-	_sort_option.tooltip_text = "Sort the list by name or by rarity"
+	var sort_option := OptionButton.new()
+	sort_option.focus_mode = Control.FOCUS_NONE
+	sort_option.tooltip_text = "Sort the list by name or by rarity"
 	for mode in SORT_MODES:
-		_sort_option.add_item("Name" if mode == SORT_NAME else "Rarity")
-	_apply_font(_sort_option, BODY_FONT_SIZE)
-	Style.compact_button(_sort_option)
-	_sort_option.custom_minimum_size = Vector2(0, 8)
-	# Shrink the dropdown popup to match the compact HUD scale.
-	var sort_popup := _sort_option.get_popup()
-	sort_popup.add_theme_font_size_override("font_size", BODY_FONT_SIZE)
-	if _text_font != null:
-		sort_popup.add_theme_font_override("font", _text_font)
-	sort_popup.add_theme_constant_override("v_separation", 0)
-	sort_popup.add_theme_constant_override("item_start_padding", 2)
-	sort_popup.add_theme_constant_override("item_end_padding", 2)
+		sort_option.add_item("Name" if mode == SORT_NAME else "Rarity")
+	_style_option(sort_option)
 	# select() emits nothing, so the initial mode is not re-applied here.
-	_sort_option.select(maxi(SORT_MODES.find(_sort_mode), 0))
-	_sort_option.item_selected.connect(_on_sort_selected)
-	toolbar.add_child(_sort_option)
+	sort_option.select(maxi(SORT_MODES.find(_sort_mode), 0))
+	sort_option.item_selected.connect(_on_sort_selected)
+	toolbar.add_child(sort_option)
 
 	# Direction toggle: the icon is the same arrow flipped vertically, so it
 	# points down for ascending and up for descending.
@@ -444,6 +440,8 @@ func _toolbar_box(parent: Control) -> void:
 	_sort_dir_button.pressed.connect(_on_sort_direction_pressed)
 	toolbar.add_child(_sort_dir_button)
 	_sync_sort_direction()
+
+	_toolbar_separator(toolbar)
 
 	_tracked_only_check = CheckBox.new()
 	_tracked_only_check.text = "Tracked Only"
@@ -616,6 +614,15 @@ func _sync_sort_direction() -> void:
 		"Ascending (A-Z, Common to Mythical). Click for descending.")
 
 
+## Thin vertical rule between toolbar groups (actions | sort | view).
+func _toolbar_separator(parent: Control) -> void:
+	var sep := ColorRect.new()
+	sep.color = Color(1, 1, 1, 0.12)
+	sep.custom_minimum_size = Vector2(1, 8)
+	sep.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	parent.add_child(sep)
+
+
 ## Vertical mirror of a texture, used to point the sort arrow the other way
 ## without shipping a second asset.
 func _flip_texture_vertically(tex: Texture2D) -> Texture2D:
@@ -629,17 +636,23 @@ func _flip_texture_vertically(tex: Texture2D) -> Texture2D:
 	return ImageTexture.create_from_image(img)
 
 
+## Clicking the active filter a second time clears it, which is the same as
+## picking "All". Picking "All" while it is already active stays on "All".
+static func toggled_filter_value(current: String, value: String) -> String:
+	return "" if value == current else value
+
+
 func _on_rarity_pressed(value: String) -> void:
 	_exit_tracked_only()
-	_rarity_filter = value
-	_sync_filter_buttons(_rarity_buttons, value)
+	_rarity_filter = toggled_filter_value(_rarity_filter, value)
+	_sync_filter_buttons(_rarity_buttons, _rarity_filter)
 	_rebuild_rows()
 
 
 func _on_type_pressed(value: String) -> void:
 	_exit_tracked_only()
-	_type_filter = value
-	_sync_filter_buttons(_type_buttons, value)
+	_type_filter = toggled_filter_value(_type_filter, value)
+	_sync_filter_buttons(_type_buttons, _type_filter)
 	_rebuild_rows()
 
 
@@ -726,12 +739,12 @@ static func _entry_field(obj, field: String):
 func _update_tracked_count() -> void:
 	if _tracked_count_label != null:
 		_tracked_count_label.text = "%d tracked" % selection.get(_tab, {}).size()
-	_update_save_button_state()
+	_update_action_buttons()
 
 
-## Save is only meaningful with something tracked. Counts both tabs, since a
-## build always captures Batomon and items together.
-func _update_save_button_state() -> void:
+## Save and Clear are only meaningful with something tracked. Counts both tabs,
+## since a build always captures Batomon and items together.
+func _update_action_buttons() -> void:
 	if _save_button == null:
 		return
 	var tracked: int = selection.get("monster", {}).size() + selection.get("item", {}).size()
@@ -920,7 +933,7 @@ func _load_catalog() -> void:
 	_available_types = type_set.keys()
 	_available_types.sort()
 	# The catalog stays name-sorted as the stable base order; _rebuild_rows
-	# re-sorts a per-tab copy when the Rarity mode is active.
+	# re-sorts the filtered per-tab list for the active sort mode.
 	_catalog.sort_custom(_compare_by_name)
 
 
@@ -945,8 +958,7 @@ static func _compare_entries(a, b, mode: String, descending: bool) -> bool:
 			return not a_unknown
 		if at != bt:
 			return at > bt if descending else at < bt
-	var cmp := str(a.get("name", "")).naturalnocasecmp_to(str(b.get("name", "")))
-	return cmp > 0 if descending else cmp < 0
+	return _compare_by_name(b, a) if descending else _compare_by_name(a, b)
 
 
 static func _sort_tier(entry) -> int:
