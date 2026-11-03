@@ -8,6 +8,9 @@ extends SceneTree
 var _test_scripts := {
 	"trainer_rules": preload("test_trainer_rules.gd"),
 	"trinket_gains": preload("test_trinket_gains.gd"),
+	"shop_income": preload("test_shop_income.gd"),
+	"tracked_trinkets": preload("test_tracked_trinkets.gd"),
+	"battle_monitor": preload("test_battle_monitor.gd"),
 	"mod_config": preload("test_mod_config.gd"),
 	"reminder_label": preload("test_reminder_label.gd"),
 	"watchlist": preload("test_watchlist.gd"),
