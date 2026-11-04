@@ -60,7 +60,7 @@ func reset_for_shop() -> void:
 func update() -> void:
 	var main = get_tree().current_scene if get_tree() != null else null
 	var state = main.get("current_state") if main != null else null
-	# The transition hold only needs to survive the shop→battle fade. Once the
+	# The transition hold only needs to survive the shop->battle fade. Once the
 	# phase actually leaves the shop, clear it so a later shop visit is unaffected.
 	if not _is_script.call(state, SHOP_SCRIPT):
 		_gate_hold_until_ms = 0

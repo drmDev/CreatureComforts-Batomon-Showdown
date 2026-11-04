@@ -19,6 +19,7 @@ var _test_scripts := {
 	"ui_sound": preload("test_ui_sound.gd"),
 	"run_region": preload("test_run_region.gd"),
 	"style": preload("test_style.gd"),
+	"auto_updater": preload("test_auto_updater.gd"),
 }
 
 

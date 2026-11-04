@@ -13,9 +13,9 @@ const TRACKED_DESCRIPTIONS := {
 	"upgrade_disc": "Next monster purchase: +1 level",
 	"mega_upgrade_disc": "Monster reaches level 3: level it again",
 	"greedy_gloves": "Next Trinket gift: take all choices",
-	"speed_whistle": "Next monster purchase: +12% CD"
+	"speed_whistle": "Next monster purchase: +12% CD",
 	"ancient_plume": "Only have 1 mon: gain +1 Multicast",
-	"power_band": "First monster purchase each day: +20 dmg"
+	"power_band": "First monster purchase each day: +20 dmg",
 	"candy_jar": "On battle start: common and uncommons level to 3"
 }
 

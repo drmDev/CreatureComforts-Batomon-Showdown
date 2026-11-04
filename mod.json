@@ -1,7 +1,7 @@
 {
 	"id": "creature_comforts",
 	"name": "Creature Comforts",
-	"version": "2.211",
+	"version": "2.212",
 	"author": "NescapePlan",
 	"description": "Creature Comforts - QoL improvements.",
 	"settings": [
@@ -20,6 +20,8 @@
 		{"key": "rank_odds_preview", "label": "Rank Odds Preview", "type": "bool", "default": true,
 		 "description": "Show the shop rank probability table."},
 		{"key": "shop_highlights", "label": "Shop Highlights", "type": "bool", "default": false,
-		 "description": "Highlight shop cards that match your watchlist."}
+		 "description": "Highlight shop cards that match your watchlist."},
+		{"key": "auto_update", "label": "Auto-update", "type": "bool", "default": true,
+		 "description": "Download and install new Creature Comforts versions from GitHub."}
 	]
 }

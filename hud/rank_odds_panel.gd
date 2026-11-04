@@ -264,7 +264,8 @@ func _cell_text(row: Array, column: int) -> String:
 	if column == 0:
 		return "14+" if int(row[0]) == 14 else str(int(row[0]))
 	var pct := int(row[column])
-	return "—" if pct == 0 else "%d%%" % pct
+	# \u2014 keeps the source plain ASCII (the auto-updater rejects non-ASCII scripts).
+	return "\u2014" if pct == 0 else "%d%%" % pct
 
 
 func _gui_input(event) -> void:

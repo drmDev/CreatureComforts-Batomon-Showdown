@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "2.211"
+const VERSION := "2.212"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
 const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 
@@ -25,6 +25,7 @@ const DevHotkeys = preload("core/dev_hotkeys.gd")
 const Diagnostics = preload("core/diagnostics.gd")
 const RunData = preload("core/run_data.gd")
 const ModConfig = preload("core/mod_config.gd")
+const AutoUpdater = preload("core/auto_updater.gd")
 
 var _next_poll := 0
 var _last_phase := ""
@@ -61,6 +62,9 @@ var _shop_overlay_gate = null
 var _chimes = null
 
 var _trinket_reminders = null
+
+# Self-updater: checks the GitHub release manifest and swaps files (core/auto_updater.gd).
+var _updater = null
 
 # Battle completion logging: report each battle's result exactly once.
 var _battle_completion = null
@@ -114,6 +118,7 @@ func _initialize_mod() -> void:
 	_trinket_reminders.setup(_ui.trinket_reminders_panel, _formatter, _logger, _chimes, _feature_enabled)
 	# Owns the shop-overlay gate: visibility checks, transition listeners, timers, view cache
 	_setup_shop_overlay_gate()
+	_setup_auto_updater()
 	_trinket_gains = TrinketGainPresenter.new()
 	_trinket_gains.setup(_ui.trinket_panel, _formatter, _feature_enabled)
 	# The UI is live and the overlay gate must run even if the log file cannot be
@@ -162,6 +167,17 @@ func _setup_shop_overlay_gate() -> void:
 	_shop_overlay_gate.setup(NodeUtils.has_property, NodeUtils.script_is)
 
 
+## The updater lives next to the mod and edits the mod's own folder, so it gets the folder of the
+## running script (not a game path). It refuses to run on a developer install by itself.
+func _setup_auto_updater() -> void:
+	_updater = AutoUpdater.new()
+	_updater.name = "AutoUpdater"
+	add_child(_updater)
+	_updater.setup(VERSION, get_script().resource_path.get_base_dir(),
+		_feature_enabled(ModConfig.KEY_AUTO_UPDATE))
+	_updater.start()
+
+
 func _on_shop_visibility_changed(allowed: bool, _reason: String) -> void:
 	if _ui.apply_gate(allowed):
 		_chimes.try_play(_shop_overlay_gate)
@@ -186,6 +202,8 @@ func _on_feature_toggled(key: String, value: bool) -> void:
 		_chimes.clear()
 	elif key == ModConfig.KEY_TRINKETS_GAINED_PANEL:
 		_trinket_gains.hide()
+	elif key == ModConfig.KEY_AUTO_UPDATE:
+		_updater.set_auto(value)
 
 
 func _process(_delta: float) -> void:

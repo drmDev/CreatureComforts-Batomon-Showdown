@@ -22,6 +22,12 @@ func test_defaults_are_all_enabled() -> void:
 		assert_true(config.is_enabled(key), "default for %s" % key)
 
 
+func test_auto_update_defaults_to_enabled() -> void:
+	var config = ModConfig.new()
+	assert_eq(ModConfig.KEY_AUTO_UPDATE, "auto_update")
+	assert_true(config.is_enabled(ModConfig.KEY_AUTO_UPDATE))
+
+
 func test_unknown_key_defaults_to_enabled() -> void:
 	var config = ModConfig.new()
 	assert_true(config.is_enabled("not_a_real_setting"))
