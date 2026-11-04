@@ -1,0 +1,245 @@
+extends Node
+## Builds and owns the mod's CanvasLayers and panels.
+##
+## Extracted from mod_main.gd. Panels are created once at startup; feature
+## toggles only change visibility, so no UI or signal subscriptions duplicate.
+
+const NodeUtils = preload("../core/node_utils.gd")
+const ModConfig = preload("../core/mod_config.gd")
+const ShopHighlight = preload("shop_highlight.gd")
+const ReminderLabel = preload("reminder_label.gd")
+const ShopIncomePanel = preload("shop_income_panel.gd")
+const TrinketRemindersPanel = preload("trinket_reminders_panel.gd")
+const RankOddsPanel = preload("rank_odds_panel.gd")
+const WatchlistPanel = preload("watchlist_panel.gd")
+const PlayerHud = preload("player_hud.gd")
+const TrinketPanel = preload("trinket_panel.gd")
+
+var reminder_layer: CanvasLayer = null
+var results_layer: CanvasLayer = null
+var player_hud_layer: CanvasLayer = null
+
+var reminder_label = null
+var shop_income_panel = null
+var trinket_reminders_panel = null
+var rank_odds_panel = null
+var watchlist_panel = null
+var trinket_panel = null
+var player_hud = null
+var shop_highlight = null
+
+var _logger = null
+var _formatter = null
+var _feature_enabled: Callable
+var _sounds_enabled: Callable
+var _rank_odds_popup_open := false
+
+
+func setup(formatter, logger, feature_enabled: Callable, sounds_enabled: Callable) -> void:
+	_formatter = formatter
+	_logger = logger
+	_feature_enabled = feature_enabled
+	_sounds_enabled = sounds_enabled
+	_build_reminder_layer()
+	_build_shop_highlight()
+	_build_player_hud()
+	_build_results_layer()
+
+
+func _build_reminder_layer() -> void:
+	reminder_layer = CanvasLayer.new()
+	reminder_layer.layer = 100  # Above game UI but below debug overlays
+	reminder_layer.name = "CreatureComforts_Reminders"
+	add_child(reminder_layer)
+
+	reminder_label = ReminderLabel.new()
+	reminder_label.name = "ReminderLabel"
+	reminder_layer.add_child(reminder_label)
+
+	# Bottom-center income readout; the reminder layer's shop gate controls visibility.
+	shop_income_panel = ShopIncomePanel.new()
+	shop_income_panel.name = "ShopIncomePanel"
+	reminder_layer.add_child(shop_income_panel)
+
+	# Left-aligned trinket reminders ~10% down the screen; shop-gated. Added after the label
+	# so it draws on top while visible.
+	trinket_reminders_panel = TrinketRemindersPanel.new()
+	trinket_reminders_panel.name = "TrinketRemindersPanel"
+	trinket_reminders_panel.layout_debug.connect(_on_trinket_panel_layout_debug)
+	reminder_layer.add_child(trinket_reminders_panel)
+
+	rank_odds_panel = RankOddsPanel.new()
+	rank_odds_panel.name = "RankOddsPanel"
+	rank_odds_panel.log_line.connect(_logger.log_event)
+	rank_odds_panel.popup_visibility_changed.connect(_on_rank_odds_popup_visibility_changed)
+	reminder_layer.add_child(rank_odds_panel)
+
+	# Watchlist button + popup; shop-gated with the rest of the reminder layer.
+	watchlist_panel = WatchlistPanel.new()
+	watchlist_panel.name = "WatchlistPanel"
+	watchlist_panel.setup(_formatter, _sounds_enabled)
+	reminder_layer.add_child(watchlist_panel)
+
+
+## Node-attached shop highlighting. Shares the watchlist panel's selection
+## dictionary by reference, so selection changes apply on the next frame.
+func _build_shop_highlight() -> void:
+	shop_highlight = ShopHighlight.new()
+	shop_highlight.name = "ShopHighlight"
+	add_child(shop_highlight)
+	shop_highlight.setup(watchlist_panel.selection)
+	var enabled: bool = _feature_enabled.call(ModConfig.KEY_SHOP_HIGHLIGHTS)
+	shop_highlight.set_enabled(enabled)
+	watchlist_panel.visible = enabled
+
+
+func _build_player_hud() -> void:
+	player_hud_layer = CanvasLayer.new()
+	player_hud_layer.layer = 110  # Above game UI, matching NP_QoL's HUD layer
+	player_hud_layer.name = "CreatureComforts_PlayerHud"
+	add_child(player_hud_layer)
+
+	player_hud = PlayerHud.new()
+	player_hud.name = "PlayerHud"
+	player_hud_layer.add_child(player_hud)
+
+
+func _build_results_layer() -> void:
+	# Separate layer from the reminder layer: the overlay gate hides reminders outside the
+	# shop, but the trinket panel must be visible after battles (over the results screen).
+	results_layer = CanvasLayer.new()
+	results_layer.layer = 100
+	results_layer.name = "CreatureComforts_Results"
+	add_child(results_layer)
+
+	trinket_panel = TrinketPanel.new()
+	trinket_panel.name = "TrinketPanel"
+	results_layer.add_child(trinket_panel)
+
+
+## Apply the shop overlay gate to the reminder layer. Returns true when the
+## layer is visible (the caller may play queued chimes).
+func apply_gate(allowed: bool) -> bool:
+	if reminder_layer == null:
+		return false
+	reminder_layer.visible = allowed
+	if not allowed and watchlist_panel != null:
+		# The layer is hidden, so a still-open popup would reappear on the next
+		# shop visit. Close it with the rest of the shop UI.
+		watchlist_panel.close_popup()
+	return allowed
+
+
+## Defensive fallback: hide shop-only panels whenever the shop is not current.
+func hide_shop_panels() -> void:
+	if shop_income_panel != null:
+		shop_income_panel.hide_panel()
+	if trinket_reminders_panel != null:
+		trinket_reminders_panel.hide_panel()
+	if rank_odds_panel != null:
+		rank_odds_panel.hide_panel()
+	if watchlist_panel != null:
+		watchlist_panel.close_popup()
+
+
+func reset_rank_odds_for_shop() -> void:
+	if rank_odds_panel != null:
+		rank_odds_panel.reset_for_shop()
+
+
+func update_shop_income(income: int) -> void:
+	if shop_income_panel == null:
+		return
+	if not _feature_enabled.call(ModConfig.KEY_SHOP_INCOME):
+		shop_income_panel.hide_panel()
+		return
+	shop_income_panel.set_income(income)
+
+
+func update_rank_odds(rank: int) -> void:
+	if rank_odds_panel == null:
+		return
+	if not _feature_enabled.call(ModConfig.KEY_RANK_ODDS_PREVIEW):
+		rank_odds_panel.hide_panel()
+		return
+	rank_odds_panel.set_rank(rank)
+
+
+func update_player_hud(state, is_battle: bool) -> void:
+	if player_hud == null:
+		return
+	if not _feature_enabled.call(ModConfig.KEY_BATTLE_STATUS_PANEL):
+		player_hud.visible = false
+		return
+	if not is_battle:
+		player_hud.visible = false
+		return
+
+	var player_run = state.get("_replay_p1_data") if NodeUtils.has_property(state, "_replay_p1_data") else null
+	if player_run == null:
+		player_hud.visible = false
+		return
+
+	player_hud.update_stats(_build_player_stats(player_run))
+	var is_active: bool = state.get("is_battle_active") if NodeUtils.has_property(state, "is_battle_active") else false
+	player_hud.visible = is_active
+
+
+func _build_player_stats(player_run) -> Dictionary:
+	var stats := {
+		"hp": "?",
+		"wins": "?",
+		"day": "?",
+	}
+
+	for pair in [
+		["hp", "lives"],
+		["wins", "current_wins"],
+		["day", "current_round"],
+	]:
+		var value = player_run.get(pair[1])
+		if value != null:
+			stats[pair[0]] = str(value)
+
+	return stats
+
+
+## Apply a live settings change to the panels this UI owns.
+func on_feature_toggled(key: String, value: bool) -> void:
+	# Shop highlighting has no poll-driven re-show, so handle both states here.
+	if key == ModConfig.KEY_SHOP_HIGHLIGHTS:
+		if shop_highlight != null:
+			shop_highlight.set_enabled(value)
+		if watchlist_panel != null:
+			watchlist_panel.visible = value and not _rank_odds_popup_open
+			if not value:
+				watchlist_panel.close_popup()
+		return
+	if value:
+		return
+	if key == ModConfig.KEY_BATTLE_STATUS_PANEL:
+		if player_hud != null:
+			player_hud.visible = false
+	elif key == ModConfig.KEY_SHOP_INCOME:
+		if shop_income_panel != null:
+			shop_income_panel.hide_panel()
+	elif key == ModConfig.KEY_RANK_ODDS_PREVIEW:
+		if rank_odds_panel != null:
+			rank_odds_panel.hide_panel()
+
+
+## The rank-odds popup is a full-screen modal drawn by a sibling panel. The
+## watchlist panel is added after it, so its button would otherwise float above
+## the dim layer. Hide the watchlist while the rank-odds popup is open.
+func _on_rank_odds_popup_visibility_changed(open: bool) -> void:
+	_rank_odds_popup_open = open
+	if watchlist_panel == null:
+		return
+	watchlist_panel.visible = not open and _feature_enabled.call(ModConfig.KEY_SHOP_HIGHLIGHTS)
+
+
+func _on_trinket_panel_layout_debug(message: String) -> void:
+	if not _logger.debug_logging:
+		return
+	for line in message.split("\n"):
+		_logger.log_message(line)

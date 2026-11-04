@@ -11,6 +11,7 @@ var _test_scripts := {
 	"shop_income": preload("test_shop_income.gd"),
 	"tracked_trinkets": preload("test_tracked_trinkets.gd"),
 	"battle_monitor": preload("test_battle_monitor.gd"),
+	"battle_trinket_tracker": preload("test_battle_trinket_tracker.gd"),
 	"mod_config": preload("test_mod_config.gd"),
 	"reminder_label": preload("test_reminder_label.gd"),
 	"watchlist": preload("test_watchlist.gd"),
