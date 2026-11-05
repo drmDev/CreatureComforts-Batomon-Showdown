@@ -59,6 +59,19 @@ func _load_texture(relative_path: String) -> Texture2D:
 	return ImageTexture.create_from_image(image)
 
 
+## Vertical mirror of a texture, used to point an icon the other way without
+## shipping a second asset (e.g. the sort arrow, the Second Chance heart).
+func _flip_texture_vertically(tex: Texture2D) -> Texture2D:
+	if tex == null:
+		return null
+	var img := tex.get_image()
+	if img == null:
+		return tex
+	img = img.duplicate()
+	img.flip_y()
+	return ImageTexture.create_from_image(img)
+
+
 func _connect_viewport_resize(handler: Callable) -> void:
 	var viewport := get_viewport()
 	if viewport != null and not viewport.size_changed.is_connected(handler):

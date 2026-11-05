@@ -18,8 +18,10 @@ const ICON_GAP := 2.0
 var _player_stats: Dictionary = {}
 var _panel_style: StyleBoxFlat
 var _heart_texture: Texture2D = null
+var _heart_second_chance_texture: Texture2D = null
 var _trophy_texture: Texture2D = null
 var _calendar_texture: Texture2D = null
+var _second_chance_used := false
 
 
 func _init() -> void:
@@ -29,6 +31,9 @@ func _init() -> void:
 	_text_font = _build_panel_font()
 	# Verified game asset paths (packed in batomon_showdown.pck).
 	_heart_texture = load("res://assets/ui/textures/shop/lives_icon.png")
+	# The run's last life after the Second Chance is shown with the heart flipped
+	# upside down, so the HUD reads as "one life left" at a glance.
+	_heart_second_chance_texture = _flip_texture_vertically(_heart_texture)
 	_trophy_texture = load("res://assets/ui/textures/shop/wins_icon.png")
 	_calendar_texture = _load_texture("../assets/icons/calendar.png")
 	# Width is fitted to the measured label/value text; start with the placeholder widths.
@@ -53,6 +58,7 @@ func update_stats(new_stats: Dictionary) -> void:
 	if new_stats == _player_stats:
 		return
 	_player_stats = new_stats
+	_second_chance_used = bool(new_stats.get("second_chance", false))
 	var fitted_width := _measure_content_width(new_stats)
 	if not is_equal_approx(size.x, fitted_width):
 		size.x = fitted_width
@@ -66,7 +72,7 @@ func _measure_content_width(stats: Dictionary) -> float:
 	var day := str(stats.get("day", "?"))
 
 	var content_width := 0.0
-	content_width += _stat_group_width("HP", hp, _heart_texture) + GROUP_GAP
+	content_width += _stat_group_width("HP", hp, _active_heart_texture()) + GROUP_GAP
 	content_width += _stat_group_width("Wins", wins, _trophy_texture) + GROUP_GAP
 	content_width += _stat_group_width("Day", day, _calendar_texture)
 
@@ -81,6 +87,12 @@ func _stat_group_width(label: String, value: String, icon: Texture2D) -> float:
 ## Display size for an icon; the calendar art has more transparent padding than the game icons.
 func _icon_size(icon: Texture2D) -> float:
 	return CALENDAR_ICON_SIZE if icon == _calendar_texture else ICON_SIZE
+
+
+## The heart for the current run: upside down once the Second Chance has been
+## used (the run is on its last life).
+func _active_heart_texture() -> Texture2D:
+	return _heart_second_chance_texture if _second_chance_used else _heart_texture
 
 
 func _text_width(text: String) -> float:
@@ -121,7 +133,7 @@ func _draw_stats_row() -> void:
 	var wins := str(_player_stats.get("wins", "?"))
 	var day := str(_player_stats.get("day", "?"))
 
-	cursor_x = _draw_stat(cursor_x, row_top, baseline, "HP", hp, _heart_texture)
+	cursor_x = _draw_stat(cursor_x, row_top, baseline, "HP", hp, _active_heart_texture())
 	cursor_x = _draw_stat(cursor_x, row_top, baseline, "Wins", wins, _trophy_texture)
 	_draw_stat(cursor_x, row_top, baseline, "Day", day, _calendar_texture)
 

@@ -195,6 +195,12 @@ func _build_player_stats(player_run) -> Dictionary:
 		if value != null:
 			stats[pair[0]] = str(value)
 
+	# The game sets this once the first 0-lives revive has happened, so the HUD
+	# can show the run is on its last life (upside-down heart).
+	var used_second_chance = player_run.get("has_used_second_chance")
+	if used_second_chance != null:
+		stats["second_chance"] = bool(used_second_chance)
+
 	return stats
 
 

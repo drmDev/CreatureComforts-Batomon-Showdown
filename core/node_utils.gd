@@ -22,3 +22,23 @@ static func script_is(obj, script_path: String) -> bool:
 			return true
 		script = script.get_base_script()
 	return false
+
+
+## The SceneTree root, or null outside an active scene tree (a headless
+## --script run, e.g. the test suite, has a detached root).
+static func get_root():
+	var tree := Engine.get_main_loop()
+	if tree == null or not (tree is SceneTree):
+		return null
+	var root: Window = (tree as SceneTree).root
+	if root == null or not root.is_inside_tree():
+		return null
+	return root
+
+
+## An autoload node by name (e.g. "GameDatabase"), or null when unavailable.
+static func get_autoload(autoload_name: String):
+	var root = get_root()
+	if root == null:
+		return null
+	return root.get_node_or_null("/root/" + autoload_name)

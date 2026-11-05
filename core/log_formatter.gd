@@ -174,8 +174,8 @@ func format_phase_entry(phase: String, run) -> String:
 	return "BATTLE | Day %s" % day
 
 
+## Full run/shop/team/bench snapshot, used only under Deep Inspection.
 func format_phase_snapshot(phase: String, run, manager) -> Array[String]:
-	"""Full run/shop/team/bench snapshot, used only under Deep Inspection."""
 	var lines: Array[String] = []
 	var day: Variant = run.get("current_round") if _has_prop.call(run, "current_round") else "?"
 	var wins: Variant = run.get("current_wins") if _has_prop.call(run, "current_wins") else "?"
@@ -191,8 +191,8 @@ func format_phase_snapshot(phase: String, run, manager) -> Array[String]:
 	return lines
 
 
+## Format current shop offers with prices.
 func format_shop_offers(manager, run, include_context: bool) -> Array[String]:
-	"""Format current shop offers with prices."""
 	var lines: Array[String] = []
 
 	if not _has_prop.call(manager, "current_shop_items"):

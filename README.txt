@@ -1,4 +1,4 @@
-Creature Comforts v2.217 - Quality of Life Mod for Batomon Showdown
+Creature Comforts v2.221 - Quality of Life Mod for Batomon Showdown
 =================================================================
 Creature Comforts adds helpful reminders, shop planning tools, and quality-of-life improvements to Batomon Showdown.
 
@@ -26,7 +26,8 @@ stack count. The panel waits for you to be back in the shop, so event or gift sc
 it. It stays there until you collapse it or start the next battle.
 
 BATTLE STATUS DISPLAY
-View your current day, remaining lives, and wins during combat.
+View your current day, remaining lives, and wins during combat. Once the Second
+Chance has been used, the heart icon is shown upside down to mark your last life.
 
 SHOP INCOME
 Displays your current income directly in the shop.

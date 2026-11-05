@@ -79,8 +79,8 @@ func update() -> void:
 	visibility_changed.emit(reason.is_empty(), reason)
 
 
+## Empty string = overlay allowed. Cheap checks only (runs every frame).
 func _compute_overlay_gate_reason() -> String:
-	"""Empty string = overlay allowed. Cheap checks only (runs every frame)."""
 	# A transition signal fired recently: keep the overlay closed until the state changes.
 	if Time.get_ticks_msec() < _gate_hold_until_ms:
 		return GATE_TRANSITION

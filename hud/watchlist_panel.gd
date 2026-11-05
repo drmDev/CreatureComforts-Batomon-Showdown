@@ -623,19 +623,6 @@ func _toolbar_separator(parent: Control) -> void:
 	parent.add_child(sep)
 
 
-## Vertical mirror of a texture, used to point the sort arrow the other way
-## without shipping a second asset.
-func _flip_texture_vertically(tex: Texture2D) -> Texture2D:
-	if tex == null:
-		return null
-	var img := tex.get_image()
-	if img == null:
-		return tex
-	img = img.duplicate()
-	img.flip_y()
-	return ImageTexture.create_from_image(img)
-
-
 ## Clicking the active filter a second time clears it, which is the same as
 ## picking "All". Picking "All" while it is already active stays on "All".
 static func toggled_filter_value(current: String, value: String) -> String:

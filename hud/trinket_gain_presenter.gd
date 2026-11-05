@@ -58,7 +58,7 @@ func show_gains(gains: Dictionary) -> bool:
 		hide()
 		return false
 	var entries := summarize(shown_ids, _formatter)
-	_attach_icons(entries)
+	TrinketGains.attach_icons(entries, _icon_provider)
 	_panel.show_gains(entries)
 	return true
 
@@ -81,9 +81,3 @@ static func summarize(ids: Array, formatter) -> Array:
 	return entries
 
 
-## Attach the game's trinket icon to each entry (null when the provider cannot resolve it).
-func _attach_icons(entries: Array) -> void:
-	if _icon_provider == null:
-		return
-	for entry in entries:
-		entry["icon"] = _icon_provider.icon(str(entry.get("id", "")))

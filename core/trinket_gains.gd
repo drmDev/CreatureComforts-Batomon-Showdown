@@ -81,3 +81,11 @@ static func _lookup_icon(lookup: Callable, id: String) -> Texture2D:
 ## Quantity text for a panel row: empty for a single copy, otherwise the count.
 static func qty_text(count: int) -> String:
 	return "" if count <= 1 else str(count)
+
+
+## Attach the game's trinket icon to each entry (null when the provider cannot resolve it).
+static func attach_icons(entries: Array, provider) -> void:
+	if provider == null:
+		return
+	for entry in entries:
+		entry["icon"] = provider.icon(str(entry.get("id", "")))

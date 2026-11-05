@@ -16,7 +16,7 @@ signal load_requested(build: Dictionary)
 
 const TITLE_FONT_SIZE := 12
 const BODY_FONT_SIZE := 7
-const ICON_SIZE := 12.0
+const ICON_SIZE := 14.4
 const PANEL_BG := Color("#18232D")
 const ROW_BG := Color("#1e2a36")
 

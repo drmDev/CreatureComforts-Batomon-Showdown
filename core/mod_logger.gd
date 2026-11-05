@@ -67,10 +67,6 @@ func close() -> void:
 		_log_file = null
 
 
-func is_open() -> bool:
-	return _log_file != null
-
-
 func log_message(message: String) -> void:
 	if _log_file == null:
 		return

@@ -69,7 +69,6 @@ var state := "idle"                   # idle | checking | downloading | one of t
 var detail := ""                      # reason of the last error / version found or installed
 var remote: Dictionary = {}           # last valid manifest
 var installed := ""                   # version installed this session (waits for the restart)
-var last_notice := ""
 
 var _next_check_ms := -1
 var _layer: CanvasLayer
@@ -615,7 +614,6 @@ func _notice_once(key: String, title: String, body: String, urgent := false) -> 
 ## A small, compact notice at the top of the screen (red header = urgent); it fades after a few
 ## seconds, a click dismisses it.
 func notice(title: String, body: String, urgent := false) -> void:
-	last_notice = title + " | " + body
 	print("Creature Comforts: %s - %s" % [title, body])
 	if _layer == null:
 		return

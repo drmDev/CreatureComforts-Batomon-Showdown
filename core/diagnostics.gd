@@ -33,7 +33,7 @@ func on_shop_entered(state) -> void:
 func log_catalog() -> void:
 	_catalog_logged = true
 	_logger.log_message("GAMEDB DIAG | === begin ===")
-	var db = _game_database()
+	var db = NodeUtils.get_autoload("GameDatabase")
 	if db == null:
 		_logger.log_message("GAMEDB DIAG | /root/GameDatabase not found")
 	else:
@@ -196,11 +196,3 @@ func _describe_shop_card(card) -> String:
 	return "%s (%s)%s content=[%s]" % [card.name, card.get_class(), rect, content_desc]
 
 
-func _game_database():
-	var tree := Engine.get_main_loop()
-	if tree == null or not (tree is SceneTree):
-		return null
-	var root: Window = (tree as SceneTree).root
-	if root == null or not root.is_inside_tree():
-		return null
-	return root.get_node_or_null("/root/GameDatabase")

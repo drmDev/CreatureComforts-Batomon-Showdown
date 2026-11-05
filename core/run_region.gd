@@ -8,6 +8,8 @@ extends RefCounted
 ## `detect()` returns `{ "region": String, "report": Array[String] }`; the report
 ## exists so the diagnostic logger can show what was read.
 
+const NodeUtils = preload("node_utils.gd")
+
 ## Fields that may carry the active set/region, most likely first.
 const CANDIDATE_KEYS := ["active_set_id", "region", "current_region", "set_id", "current_set", "active_set"]
 
@@ -25,7 +27,7 @@ const REGION_COLLECTIONS := ["sets_db", "species_packs_db"]
 static func detect(verbose := false) -> Dictionary:
 	var report: Array = []
 	var regions := build_region_map(null)
-	var run_manager = _get_node("/root/RunManager")
+	var run_manager = NodeUtils.get_autoload("RunManager")
 	var run_data = null
 	if run_manager != null and "data" in run_manager:
 		run_data = run_manager.get("data")
@@ -50,7 +52,7 @@ static func detect(verbose := false) -> Dictionary:
 ## with the watchlist, which labels each species with its set's display name.
 static func build_region_map(db = null) -> Dictionary:
 	if db == null:
-		db = _get_database()
+		db = NodeUtils.get_autoload("GameDatabase")
 	var regions := {}
 	for collection in REGION_COLLECTIONS:
 		for entry in _collection_entries(db, collection):
@@ -167,24 +169,3 @@ static func _collection_entries(db, collection: String) -> Array:
 	return []
 
 
-static func _get_node(path: String):
-	var root = _get_root()
-	if root == null:
-		return null
-	return root.get_node_or_null(path)
-
-
-static func _get_database():
-	return _get_node("/root/GameDatabase")
-
-
-static func _get_root():
-	var tree := Engine.get_main_loop()
-	if tree == null or not (tree is SceneTree):
-		return null
-	var root: Window = (tree as SceneTree).root
-	# Absolute get_node paths only resolve inside the active scene tree (a headless
-	# --script run, e.g. the test suite, has a detached root).
-	if root == null or not root.is_inside_tree():
-		return null
-	return root
