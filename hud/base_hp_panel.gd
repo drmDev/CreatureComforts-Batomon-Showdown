@@ -3,11 +3,12 @@ extends "shop_modal_panel.gd"
 
 const BaseHp = preload("../core/base_hp.gd")
 
-const BTN_SIZE := 19.0
-# 25% across the viewport, 24 px above the rank-odds button's row.
+const BTN_SIZE := 20.0
+# 22% across the viewport, 25 px above the rank-odds button's row.
 const LEFT_RATIO := 0.22
+# Same vertical row as the rank-odds button, then shifted up by UP_OFFSET_PX.
 const BOTTOM_OFFSET_RATIO := 0.20
-const UP_OFFSET := 24.0
+const UP_OFFSET_PX := 25.0
 
 const HEADER_ROW_H := 16.0
 const HEADER_GAP := 2.0
@@ -42,7 +43,7 @@ func _button_texture_path() -> String:
 
 
 func _button_position(viewport_size: Vector2) -> Vector2:
-	return Vector2(roundf(viewport_size.x * LEFT_RATIO), roundf(viewport_size.y * (1.0 - BOTTOM_OFFSET_RATIO) - BTN_SIZE - UP_OFFSET))
+	return Vector2(roundf(viewport_size.x * LEFT_RATIO), roundf(viewport_size.y * (1.0 - BOTTOM_OFFSET_RATIO) - BTN_SIZE - UP_OFFSET_PX))
 
 
 func _popup_title() -> String:
