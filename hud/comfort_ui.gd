@@ -15,6 +15,7 @@ const WatchlistPanel = preload("watchlist_panel.gd")
 const PlayerHud = preload("player_hud.gd")
 const TrinketPanel = preload("trinket_panel.gd")
 const BattleElapsedPanel = preload("battle_elapsed_panel.gd")
+const OpponentPanel = preload("opponent_panel.gd")
 
 var reminder_layer: CanvasLayer = null
 var player_hud_layer: CanvasLayer = null
@@ -27,6 +28,7 @@ var watchlist_panel = null
 var trinket_panel = null
 var player_hud = null
 var battle_elapsed_panel = null
+var opponent_panel = null
 var shop_highlight = null
 
 var _logger = null
@@ -115,6 +117,11 @@ func _build_player_hud() -> void:
 	battle_elapsed_panel = BattleElapsedPanel.new()
 	battle_elapsed_panel.name = "BattleElapsedPanel"
 	player_hud_layer.add_child(battle_elapsed_panel)
+
+	# Bottom-right opponent name + MMR readout, battle-only and on the same layer.
+	opponent_panel = OpponentPanel.new()
+	opponent_panel.name = "OpponentPanel"
+	player_hud_layer.add_child(opponent_panel)
 
 
 ## Apply the shop overlay gate to the reminder layer. Returns true when the
@@ -205,6 +212,23 @@ func hide_battle_elapsed() -> void:
 	battle_elapsed_panel.hide_panel()
 
 
+## Show the opponent name and MMR during battle. Shares the Battle Status Panel
+## toggle with the rest of the battle readouts.
+func show_opponent(opp_name: String, mmr: String) -> void:
+	if opponent_panel == null:
+		return
+	if not _feature_enabled.call(ModConfig.KEY_BATTLE_STATUS_PANEL):
+		opponent_panel.hide_panel()
+		return
+	opponent_panel.show_opponent(opp_name, mmr)
+
+
+func hide_opponent_panel() -> void:
+	if opponent_panel == null:
+		return
+	opponent_panel.hide_panel()
+
+
 func _build_player_stats(player_run) -> Dictionary:
 	var stats := {
 		"hp": "?",
@@ -248,6 +272,8 @@ func on_feature_toggled(key: String, value: bool) -> void:
 			player_hud.visible = false
 		if battle_elapsed_panel != null:
 			battle_elapsed_panel.hide_panel()
+		if opponent_panel != null:
+			opponent_panel.hide_panel()
 	elif key == ModConfig.KEY_SHOP_INCOME:
 		if shop_income_panel != null:
 			shop_income_panel.hide_panel()

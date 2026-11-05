@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "2.226"
+const VERSION := "2.229"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
 const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 
@@ -13,6 +13,7 @@ const ShopSnapshot = preload("core/shop_snapshot.gd")
 const ShopChanges = preload("core/shop_changes.gd")
 const ShopOverlayGate = preload("hud/shop_overlay_gate.gd")
 const BattleMonitor = preload("core/battle_monitor.gd")
+const OpponentInfo = preload("core/opponent_info.gd")
 const BattleCompletionReporter = preload("core/battle_completion_reporter.gd")
 const BattleTrinketTracker = preload("core/battle_trinket_tracker.gd")
 const ChimeQueue = preload("core/chime_queue.gd")
@@ -73,6 +74,14 @@ var _updater = null
 # Battle completion logging: report each battle's result exactly once.
 var _battle_completion = null
 
+# Opponent transition data (core/opponent_info.gd): the signal carries the
+# RunData with the matched MMR, which the battle state's copy does not keep.
+var _captured_opponent = null
+var _captured_at := 0
+var _transition_nodes: Array = []
+var _opponent_battle_id := 0
+var _opponent_info: Dictionary = {}
+
 
 func mod_ready() -> void:
 	_initialize_mod()
@@ -91,6 +100,15 @@ func _exit_tree() -> void:
 		_mod_config = null
 	if _logger != null:
 		_logger.close()
+	# Drop transition listeners so a freed mod is never called back.
+	var tree := get_tree()
+	if tree != null and tree.node_added.is_connected(_on_node_added):
+		tree.node_added.disconnect(_on_node_added)
+	for node in _transition_nodes:
+		if is_instance_valid(node) and node.has_signal("transition_requested") \
+				and node.transition_requested.is_connected(_on_transition):
+			node.transition_requested.disconnect(_on_transition)
+	_transition_nodes.clear()
 
 
 func _initialize_mod() -> void:
@@ -124,6 +142,7 @@ func _initialize_mod() -> void:
 	# Owns the shop-overlay gate: visibility checks, transition listeners, timers, view cache
 	_setup_shop_overlay_gate()
 	_setup_auto_updater()
+	_setup_transition_capture()
 	_trinket_gains = TrinketGainPresenter.new()
 	_trinket_gains.setup(_ui.trinket_panel, _formatter, _feature_enabled, _trinket_icons)
 	# The UI is live and the overlay gate must run even if the log file cannot be
@@ -188,6 +207,42 @@ func _on_shop_visibility_changed(allowed: bool, _reason: String) -> void:
 		_chimes.try_play(_shop_overlay_gate)
 
 
+## The battle transition signal carries the opponent RunData (MMR / bot flags).
+## Listen read-only so the panel can show the MMR the game matched us into.
+func _setup_transition_capture() -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	_connect_transition_node(tree.root)
+	if not tree.node_added.is_connected(_on_node_added):
+		tree.node_added.connect(_on_node_added)
+
+
+func _connect_transition_node(node: Node) -> void:
+	if node.has_signal("transition_requested") and node.has_method("request_transition"):
+		if not node.transition_requested.is_connected(_on_transition):
+			node.transition_requested.connect(_on_transition)
+			_transition_nodes.append(node)
+	for child in node.get_children():
+		_connect_transition_node(child)
+
+
+func _on_node_added(node: Node) -> void:
+	if node.has_signal("transition_requested") and node.has_method("request_transition"):
+		if not node.transition_requested.is_connected(_on_transition):
+			node.transition_requested.connect(_on_transition)
+			_transition_nodes.append(node)
+
+
+func _on_transition(target: String, data: Dictionary) -> void:
+	if target != "battle":
+		return
+	var opp = data.get("opponent_data")
+	if opp != null and is_instance_valid(opp):
+		_captured_opponent = opp
+		_captured_at = Time.get_ticks_msec()
+
+
 ## Every sound the mod plays (reminders and UI feedback) is gated by the same
 ## setting, so one toggle mutes all of them.
 func _sounds_enabled() -> bool:
@@ -237,6 +292,7 @@ func _inspect_current_phase() -> void:
 	if not NodeUtils.script_is(state, SHOP_SCRIPT):
 		_ui.hide_shop_panels()
 	if not is_battle:
+		_ui.hide_opponent_panel()
 		# Reset battle-scoped tracking only when actually leaving the battle phase.
 		if _last_phase == "battle":
 			_battle_completion.reset()
@@ -329,8 +385,12 @@ func _handle_battle_phase(state) -> void:
 	if _last_phase != "battle":
 		_ui.hide_battle_elapsed()
 
+	# The opponent card follows the exact same visibility as the lives/wins/day HUD.
+	var is_active: bool = state.get("is_battle_active") if NodeUtils.has_property(state, "is_battle_active") else false
+
 	# Battle completion detection (win/loss/draw) - independent of replay logging
 	_check_battle_completion(state)
+	_update_opponent_panel(state, is_active)
 	
 	var player = state.get("_replay_p1_data") if NodeUtils.has_property(state, "_replay_p1_data") else null
 	var opponent = state.get("_replay_p2_data") if NodeUtils.has_property(state, "_replay_p2_data") else null
@@ -338,8 +398,7 @@ func _handle_battle_phase(state) -> void:
 	if player == null or opponent == null:
 		return
 	
-	# Only log once per battle when battle is actually active
-	var is_active: bool = state.get("is_battle_active") if NodeUtils.has_property(state, "is_battle_active") else false
+	# Only log once per battle when battle is actually active (is_active is above)
 	
 	if not _battle_logged and is_active:
 		_log_phase_entry("BATTLE", player)
@@ -366,6 +425,21 @@ func _handle_battle_phase(state) -> void:
 	if _last_phase != "battle":
 		_reset_transient_state(false, true, true)
 	_last_phase = "battle"
+
+
+func _update_opponent_panel(state, is_active: bool) -> void:
+	var p2 = state.get("_replay_p2_data") if NodeUtils.has_property(state, "_replay_p2_data") else null
+	if p2 == null:
+		_ui.hide_opponent_panel()
+		return
+	var battle_id: int = state.get_instance_id()
+	if battle_id != _opponent_battle_id or _opponent_info.is_empty():
+		_opponent_battle_id = battle_id
+		_opponent_info = OpponentInfo.info(p2, _captured_opponent, _captured_at)
+	if is_active:
+		_ui.show_opponent(str(_opponent_info.get("name", "?")), str(_opponent_info.get("mmr", "-")))
+	else:
+		_ui.hide_opponent_panel()
 
 
 func _check_battle_completion(state) -> void:

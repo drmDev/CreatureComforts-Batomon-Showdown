@@ -94,3 +94,19 @@ static func attach_icons(entries: Array, provider) -> void:
 		return
 	for entry in entries:
 		entry["icon"] = provider.icon(str(entry.get("id", "")))
+
+
+## Sort summarized {id, count, ...} entries by quantity descending. Ties keep the
+## incoming order (first-seen trinket stays first), so the panel is deterministic.
+static func sort_by_count_desc(entries: Array) -> Array:
+	var order := {}
+	for i in entries.size():
+		order[str(entries[i].get("id", ""))] = i
+	entries.sort_custom(func(a, b):
+		var ca := int(a.get("count", 0))
+		var cb := int(b.get("count", 0))
+		if ca != cb:
+			return ca > cb
+		return int(order.get(str(a.get("id", "")), 0)) < int(order.get(str(b.get("id", "")), 0))
+	)
+	return entries

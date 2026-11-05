@@ -1,4 +1,4 @@
-Creature Comforts v2.226 - Quality of Life Mod for Batomon Showdown
+Creature Comforts v2.229 - Quality of Life Mod for Batomon Showdown
 =================================================================
 Creature Comforts adds helpful reminders, shop planning tools, and quality-of-life improvements to Batomon Showdown.
 
@@ -22,8 +22,9 @@ Get reminders for timing-sensitive trinkets such as Duplicators, Treasure Map, U
 
 BATTLE TRINKET REWARDS
 See which trinkets you gained during battle in a collapsible panel, with each trinket's icon and
-stack count. The panel waits for you to be back in the shop, so event or gift screens cannot hide
-it. It stays for 15 seconds after the shop opens, or until you collapse it or start the next battle.
+stack count, sorted by quantity (highest first). The panel waits for you to be back in the shop,
+so event or gift screens cannot hide it. It stays for 15 seconds after the shop opens, or until
+you collapse it or start the next battle.
 
 BATTLE STATUS DISPLAY
 View your current day, remaining lives, and wins during combat. Once the Second
@@ -34,6 +35,11 @@ After a battle finishes, a small panel shows the simulation's total elapsed time
 This is the battle simulation clock, so fast-forwarding and replaying steps make
 it different from real time. It is shown with the battle status HUD and is hidden
 when Battle Status Panel is turned off. The panel auto-hides after 7 seconds.
+
+OPPONENT INFO
+During battle, a small bottom-right panel shows the opponent's name and MMR
+(ranked, casual, or Bot). It shares the Battle Status Panel toggle and hides
+together with the lives/wins/day HUD.
 
 SHOP INCOME
 Displays your current income directly in the shop.

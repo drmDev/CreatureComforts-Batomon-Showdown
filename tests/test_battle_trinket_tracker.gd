@@ -151,6 +151,14 @@ func test_presenter_summarize_carries_the_trinket_id() -> void:
 	assert_eq(entries[0]["id"], "a")
 
 
+func test_presenter_summarize_sorts_by_count_desc() -> void:
+	var entries := TrinketGainPresenter.summarize(
+		["z", "y", "y", "y", "x", "x", "x", "x"], FakeFormatter.new())
+	assert_eq(entries[0]["id"], "x")
+	assert_eq(entries[1]["id"], "y")
+	assert_eq(entries[2]["id"], "z")
+
+
 func _presenter(panel: FakePanel, enabled := true) -> TrinketGainPresenter:
 	var presenter := TrinketGainPresenter.new()
 	presenter.setup(panel, FakeFormatter.new(), func(_key: String) -> bool: return enabled)

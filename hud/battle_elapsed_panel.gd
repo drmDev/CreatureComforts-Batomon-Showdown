@@ -8,9 +8,9 @@ extends "comfort_panel.gd"
 
 const PANEL_WIDTH := 64.0
 const PANEL_HEIGHT := 16.0
-const BOTTOM_MARGIN := 16.0
+const BOTTOM_MARGIN := 32.0
 const OFFSET_RATIO := 0.10
-const UP_PANEL_OFFSET := 2.4
+const UP_PANEL_OFFSET := 2.7
 const AUTO_HIDE_SEC := 6.0
 
 const TEXT_SIZE := 8

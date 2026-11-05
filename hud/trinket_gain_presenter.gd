@@ -100,7 +100,8 @@ func _auto_hide_after_visible(token: int) -> void:
 		hide()
 
 
-## Group ids into {id, name, count} entries, preserving first-seen order.
+## Group ids into {id, name, count} entries, highest quantity first. Ties keep
+## first-seen order.
 static func summarize(ids: Array, formatter) -> Array:
 	var counts := {}
 	for tid in ids:
@@ -110,6 +111,6 @@ static func summarize(ids: Array, formatter) -> Array:
 	var entries: Array = []
 	for tid in counts.keys():
 		entries.append({"id": tid, "name": formatter.format_trinket_name(tid), "count": int(counts[tid])})
-	return entries
+	return TrinketGains.sort_by_count_desc(entries)
 
 

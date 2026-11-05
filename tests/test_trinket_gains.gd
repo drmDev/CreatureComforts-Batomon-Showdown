@@ -299,3 +299,25 @@ func test_icon_for_returns_null_when_missing() -> void:
 		return null
 	assert_eq(TrinketGains.icon_for("treasure_map", lookup), null)
 	assert_eq(TrinketGains.icon_for("", lookup), null)
+
+
+func test_sort_by_count_desc_orders_highest_first() -> void:
+	var entries := [
+		{"id": "z", "count": 1},
+		{"id": "x", "count": 4},
+		{"id": "y", "count": 3},
+	]
+	var sorted := TrinketGains.sort_by_count_desc(entries)
+	assert_eq(sorted[0]["id"], "x")
+	assert_eq(sorted[1]["id"], "y")
+	assert_eq(sorted[2]["id"], "z")
+
+
+func test_sort_by_count_desc_keeps_first_seen_ties() -> void:
+	var entries := [
+		{"id": "b", "count": 2},
+		{"id": "a", "count": 2},
+	]
+	var sorted := TrinketGains.sort_by_count_desc(entries)
+	assert_eq(sorted[0]["id"], "b")
+	assert_eq(sorted[1]["id"], "a")
