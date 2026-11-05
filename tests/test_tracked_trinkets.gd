@@ -33,3 +33,8 @@ func test_entries_follow_catalog_order() -> void:
 func test_description_is_included() -> void:
 	var entries := TrackedTrinkets.build_entries(["treasure_map"], _resolver)
 	assert_eq(entries[0]["desc"], TrackedTrinkets.TRACKED_DESCRIPTIONS["treasure_map"])
+
+
+func test_entries_carry_the_trinket_id() -> void:
+	var entries := TrackedTrinkets.build_entries(["treasure_map"], _resolver)
+	assert_eq(entries[0]["id"], "treasure_map")

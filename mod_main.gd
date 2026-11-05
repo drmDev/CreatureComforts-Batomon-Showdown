@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "2.215"
+const VERSION := "2.217"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
 const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 
@@ -18,6 +18,7 @@ const BattleTrinketTracker = preload("core/battle_trinket_tracker.gd")
 const ChimeQueue = preload("core/chime_queue.gd")
 const TrinketGainPresenter = preload("hud/trinket_gain_presenter.gd")
 const TrinketRemindersController = preload("hud/trinket_reminders_controller.gd")
+const TrinketIcons = preload("core/trinket_icons.gd")
 const ComfortUi = preload("hud/comfort_ui.gd")
 const NodeUtils = preload("core/node_utils.gd")
 const ModLogger = preload("core/mod_logger.gd")
@@ -62,6 +63,9 @@ var _shop_overlay_gate = null
 var _chimes = null
 
 var _trinket_reminders = null
+
+# Resolves the game's trinket icons for the reminder and gains panels.
+var _trinket_icons = null
 
 # Self-updater: checks the GitHub release manifest and swaps files (core/auto_updater.gd).
 var _updater = null
@@ -114,13 +118,14 @@ func _initialize_mod() -> void:
 
 	_setup_advisor()
 	_advice.set_reminder_label(_ui.reminder_label)
+	_trinket_icons = TrinketIcons.new()
 	_trinket_reminders = TrinketRemindersController.new()
-	_trinket_reminders.setup(_ui.trinket_reminders_panel, _formatter, _logger, _chimes, _feature_enabled)
+	_trinket_reminders.setup(_ui.trinket_reminders_panel, _formatter, _logger, _chimes, _feature_enabled, _trinket_icons)
 	# Owns the shop-overlay gate: visibility checks, transition listeners, timers, view cache
 	_setup_shop_overlay_gate()
 	_setup_auto_updater()
 	_trinket_gains = TrinketGainPresenter.new()
-	_trinket_gains.setup(_ui.trinket_panel, _formatter, _feature_enabled)
+	_trinket_gains.setup(_ui.trinket_panel, _formatter, _feature_enabled, _trinket_icons)
 	# The UI is live and the overlay gate must run even if the log file cannot be
 	# opened; the logger no-ops when its file handle is null.
 	_initialized = true
@@ -272,6 +277,9 @@ func _handle_shop_phase(state) -> void:
 			_shop_overlay_gate.reset_for_shop()
 		_log_phase_entry("SHOP", run, manager)
 		_diagnostics.on_shop_entered(state)
+		if _logger.debug_logging:
+			var held = run.get("trinket_ids") if NodeUtils.has_property(run, "trinket_ids") else []
+			_diagnostics.log_trinket_icons(held if held != null else [])
 		if _logger.deep_inspection:
 			_logger.log_lines(_formatter.format_deep_inspect_shop(manager))
 		# Trinket gains are battle-scoped (tracked during the battle state only), so no

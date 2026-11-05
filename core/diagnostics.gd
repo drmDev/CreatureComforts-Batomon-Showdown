@@ -8,6 +8,7 @@ extends RefCounted
 const NodeUtils = preload("node_utils.gd")
 const RunRegion = preload("run_region.gd")
 const ShopHighlight = preload("../hud/shop_highlight.gd")
+const TrinketIcons = preload("trinket_icons.gd")
 
 var _logger = null
 var _catalog_logged := false
@@ -43,7 +44,7 @@ func log_catalog() -> void:
 			if int(prop.get("usage", 0)) & PROPERTY_USAGE_SCRIPT_VARIABLE:
 				_logger.log_message("GAMEDB DIAG | var %s: %s" % [
 					str(prop.get("name", "")), type_string(int(prop.get("type", TYPE_NIL)))])
-		var tokens := ["species", "monster", "batomon", "catalog", "icon", "portrait", "sprite", "item", "get_all", "all_"]
+		var tokens := ["species", "monster", "batomon", "catalog", "icon", "portrait", "sprite", "item", "trinket", "get_all", "all_"]
 		var method_names: Array = []
 		for method in db.get_method_list():
 			var mname := str(method.get("name", ""))
@@ -86,6 +87,21 @@ func log_catalog() -> void:
 					histogram[tier] = histogram.get(tier, 0) + 1
 				_logger.log_message("CATALOG DIAG | species count=%d tier histogram=%s" % [species_list.size(), str(histogram)])
 	_logger.log_message("GAMEDB DIAG | === end ===")
+
+
+## Report which held trinket ids resolve to a game icon, so a wrong icon source
+## shows up in the log instead of silently rendering text-only rows.
+func log_trinket_icons(trinket_ids) -> void:
+	var provider = TrinketIcons.new()
+	var resolved: Array = []
+	var unresolved: Array = []
+	for tid in trinket_ids:
+		if provider.icon(str(tid)) != null:
+			resolved.append(str(tid))
+		else:
+			unresolved.append(str(tid))
+	_logger.log_message("TRINKET ICON DIAG | resolved=%d unresolved=%d | resolved=%s | unresolved=%s" % [
+		resolved.size(), unresolved.size(), str(resolved), str(unresolved)])
 
 
 func log_shop_structure(state) -> void:

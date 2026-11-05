@@ -36,6 +36,7 @@ static func build_entries(held_ids, name_resolver: Callable) -> Array:
 		if count <= 0:
 			continue
 		entries.append({
+			"id": tid,
 			"name": name_resolver.call(tid),
 			"count": count,
 			"desc": TRACKED_DESCRIPTIONS[tid],

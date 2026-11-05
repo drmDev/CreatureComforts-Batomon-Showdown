@@ -146,6 +146,11 @@ func test_presenter_summarize_counts_duplicates() -> void:
 	assert_eq(entries[1]["count"], 1)
 
 
+func test_presenter_summarize_carries_the_trinket_id() -> void:
+	var entries := TrinketGainPresenter.summarize(["a", "a"], FakeFormatter.new())
+	assert_eq(entries[0]["id"], "a")
+
+
 func _presenter(panel: FakePanel, enabled := true) -> TrinketGainPresenter:
 	var presenter := TrinketGainPresenter.new()
 	presenter.setup(panel, FakeFormatter.new(), func(_key: String) -> bool: return enabled)

@@ -5,6 +5,9 @@ extends RefCounted
 # consumption and has_gift_trinket() is used for diagnostics only.
 const GIFT_TRINKET_IDS := ["locked_box", "mysterious_chest"]
 
+# Some callers pass trinket ids with the game's "trinket_" prefix; the database ids do not.
+const TRINKET_PREFIX := "trinket_"
+
 
 static func diff_id_lists(before: Array, after: Array) -> Array:
 	var before_counts := {}
@@ -50,3 +53,31 @@ static func displayable_ids(ids: Array, junk_id: String) -> Array:
 		if str(tid) != junk_id:
 			shown.append(tid)
 	return shown
+
+
+## Resolve a trinket icon through `lookup`, a `Callable(trinket_id) -> Texture2D` (or null).
+## Tries the exact id first, then the id with the "trinket_" prefix stripped, then prefixed,
+## so both the game's database ids and prefixed ids resolve. Returns null when nothing matches.
+static func icon_for(trinket_id: String, lookup: Callable) -> Texture2D:
+	var id := str(trinket_id)
+	if id.is_empty():
+		return null
+	var icon = _lookup_icon(lookup, id)
+	if icon != null:
+		return icon
+	if id.begins_with(TRINKET_PREFIX):
+		var bare := id.substr(TRINKET_PREFIX.length())
+		if not bare.is_empty():
+			return _lookup_icon(lookup, bare)
+		return null
+	return _lookup_icon(lookup, TRINKET_PREFIX + id)
+
+
+static func _lookup_icon(lookup: Callable, id: String) -> Texture2D:
+	var icon = lookup.call(id)
+	return icon if icon is Texture2D else null
+
+
+## Quantity text for a panel row: empty for a single copy, otherwise the count.
+static func qty_text(count: int) -> String:
+	return "" if count <= 1 else str(count)

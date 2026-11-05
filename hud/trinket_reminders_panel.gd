@@ -1,5 +1,7 @@
 extends "collapsible_panel.gd"
 
+const TrinketGains = preload("../core/trinket_gains.gd")
+
 const CONTENT_PADDING := 6.0
 const NAME_LINE_H := 14.0
 const DESC_LINE_H := 13.0
@@ -10,6 +12,10 @@ const MAX_EXPANDED_WIDTH := 320.0  # Cap for very long descriptions; the panel f
 const TAB_EXTRA_WIDTH := 30.0  # Button + header insets for the collapsed tab
 const GEM_SIZE := 10.0
 const GEM_GAP := 2.0
+const ICON_SIZE := 10.0
+const ICON_GAP := 2.0
+const QTY_GAP := 2.0
+const ICON_Y_OFFSET := 2.0  # Nudge the icon down so it lines up with the text baseline
 const DEBUG_SETTLE_SEC := 0.2  # Wait past the reveal tween before logging the settled layout
 
 # Left-aligned with hud/reminder_label.gd but slightly lower
@@ -102,17 +108,36 @@ func reset_collapsed() -> void:
 
 
 func _name_line(entry: Dictionary) -> String:
-	var label := str(entry.get("name", ""))
-	var count := int(entry.get("count", 1))
-	if count > 1:
-		label += " x%d" % count
-	return label
+	return str(entry.get("name", ""))
+
+
+func _qty_text(entry: Dictionary) -> String:
+	return TrinketGains.qty_text(int(entry.get("count", 1)))
+
+
+func _icon(entry: Dictionary) -> Texture2D:
+	var icon = entry.get("icon")
+	return icon if icon is Texture2D else null
+
+
+## Width of the [icon] [qty] [name] row, excluding the panel padding.
+func _row_width(entry: Dictionary) -> float:
+	var w := 0.0
+	if _icon(entry) != null:
+		w += ICON_SIZE + ICON_GAP
+	var qty := _qty_text(entry)
+	if not qty.is_empty():
+		w += _text_font.get_string_size(qty, HORIZONTAL_ALIGNMENT_LEFT, -1, NAME_FONT_SIZE).x + QTY_GAP
+	w += _text_font.get_string_size(_name_line(entry), HORIZONTAL_ALIGNMENT_LEFT, -1, NAME_FONT_SIZE).x
+	return w
 
 
 func _make_content_key(entries: Array) -> String:
 	var parts: Array[String] = []
 	for entry in entries:
-		parts.append("%dx %s | %s" % [int(entry.get("count", 1)), str(entry.get("name", "")), str(entry.get("desc", ""))])
+		parts.append("%dx %s | %s | %s" % [
+			int(entry.get("count", 1)), str(entry.get("name", "")),
+			str(entry.get("desc", "")), str(_icon(entry) != null)])
 	return "|".join(parts)
 
 
@@ -126,7 +151,7 @@ func _content_width() -> float:
 		return MAX_EXPANDED_WIDTH
 	var inner := 0.0
 	for entry in _entries:
-		inner = maxf(inner, _text_font.get_string_size(_name_line(entry), HORIZONTAL_ALIGNMENT_LEFT, -1, NAME_FONT_SIZE).x)
+		inner = maxf(inner, _row_width(entry))
 		inner = maxf(inner, _text_font.get_string_size(str(entry.get("desc", "")), HORIZONTAL_ALIGNMENT_LEFT, -1, DESC_FONT_SIZE).x)
 	return clampf(inner + CONTENT_PADDING * 2.0 + 2.0, _tab_width(), MAX_EXPANDED_WIDTH)
 
@@ -220,11 +245,22 @@ func _draw_body(width: float) -> void:
 	var row_w := width - CONTENT_PADDING * 2.0 - 2.0
 	for entry in _entries:
 		var name_baseline := cursor_y + NAME_LINE_H - 3.0
-		var name_line := _fit_text(_text_font, _name_line(entry), NAME_FONT_SIZE, row_w)
-		_draw_text_shadow(Vector2(CONTENT_PADDING + 1.0, name_baseline), name_line, VALUE_COLOR, NAME_FONT_SIZE)
+		var text_x := CONTENT_PADDING + 1.0
+		var cursor_x := text_x
+		var icon := _icon(entry)
+		if icon != null:
+			var icon_y := cursor_y + (NAME_LINE_H - ICON_SIZE) * 0.5 + ICON_Y_OFFSET
+			draw_texture_rect(icon, Rect2(Vector2(cursor_x, icon_y), Vector2(ICON_SIZE, ICON_SIZE)), false)
+			cursor_x += ICON_SIZE + ICON_GAP
+		var qty := _qty_text(entry)
+		if not qty.is_empty():
+			_draw_text_shadow(Vector2(cursor_x, name_baseline), qty, VALUE_COLOR, NAME_FONT_SIZE)
+			cursor_x += _text_font.get_string_size(qty, HORIZONTAL_ALIGNMENT_LEFT, -1, NAME_FONT_SIZE).x + QTY_GAP
+		var name_line := _fit_text(_text_font, _name_line(entry), NAME_FONT_SIZE, row_w - (cursor_x - text_x))
+		_draw_text_shadow(Vector2(cursor_x, name_baseline), name_line, VALUE_COLOR, NAME_FONT_SIZE)
 		cursor_y += NAME_LINE_H
 		for desc_line in _wrap_text(_text_font, str(entry.get("desc", "")), DESC_FONT_SIZE, row_w):
 			var desc_baseline := cursor_y + DESC_LINE_H - 3.0
-			_draw_text_shadow(Vector2(CONTENT_PADDING + 1.0, desc_baseline), desc_line, LABEL_COLOR, DESC_FONT_SIZE)
+			_draw_text_shadow(Vector2(text_x, desc_baseline), desc_line, LABEL_COLOR, DESC_FONT_SIZE)
 			cursor_y += DESC_LINE_H
 		cursor_y += ROW_GAP

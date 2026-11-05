@@ -260,3 +260,42 @@ func test_duplicate_gains_with_gift_pending() -> void:
 	assert_eq(gains["ids"], ["quick_bell", "quick_bell"])
 	assert_eq(TrinketGains.withheld_count(gains), 1)
 	assert_eq(TrinketGains.displayable_ids(gains["ids"], "junk"), ["quick_bell", "quick_bell"])
+
+
+func _texture() -> Texture2D:
+	return ImageTexture.create_from_image(Image.create(1, 1, false, Image.FORMAT_RGBA8))
+
+
+func test_qty_text_hides_single_copy() -> void:
+	assert_eq(TrinketGains.qty_text(0), "")
+	assert_eq(TrinketGains.qty_text(1), "")
+	assert_eq(TrinketGains.qty_text(2), "2")
+	assert_eq(TrinketGains.qty_text(12), "12")
+
+
+func test_icon_for_resolves_exact_id() -> void:
+	var tex := _texture()
+	var lookup := func(id: String) -> Texture2D:
+		return tex if id == "treasure_map" else null
+	assert_eq(TrinketGains.icon_for("treasure_map", lookup), tex)
+
+
+func test_icon_for_strips_trinket_prefix() -> void:
+	var tex := _texture()
+	var lookup := func(id: String) -> Texture2D:
+		return tex if id == "treasure_map" else null
+	assert_eq(TrinketGains.icon_for("trinket_treasure_map", lookup), tex)
+
+
+func test_icon_for_adds_trinket_prefix() -> void:
+	var tex := _texture()
+	var lookup := func(id: String) -> Texture2D:
+		return tex if id == "trinket_treasure_map" else null
+	assert_eq(TrinketGains.icon_for("treasure_map", lookup), tex)
+
+
+func test_icon_for_returns_null_when_missing() -> void:
+	var lookup := func(_id: String) -> Texture2D:
+		return null
+	assert_eq(TrinketGains.icon_for("treasure_map", lookup), null)
+	assert_eq(TrinketGains.icon_for("", lookup), null)

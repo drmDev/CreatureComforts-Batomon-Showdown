@@ -17,12 +17,14 @@ const JUNK_TRINKET_ID := LogFormatterScript.JUNK_TRINKET_ID
 var _panel = null
 var _formatter = null
 var _feature_enabled: Callable
+var _icon_provider = null
 
 
-func setup(panel, formatter, feature_enabled: Callable) -> void:
+func setup(panel, formatter, feature_enabled: Callable, icon_provider = null) -> void:
 	_panel = panel
 	_formatter = formatter
 	_feature_enabled = feature_enabled
+	_icon_provider = icon_provider
 
 
 ## Apply the result of a finished battle.
@@ -55,7 +57,9 @@ func show_gains(gains: Dictionary) -> bool:
 	if shown_ids.is_empty():
 		hide()
 		return false
-	_panel.show_gains(summarize(shown_ids, _formatter))
+	var entries := summarize(shown_ids, _formatter)
+	_attach_icons(entries)
+	_panel.show_gains(entries)
 	return true
 
 
@@ -64,7 +68,7 @@ func hide() -> void:
 		_panel.hide_panel()
 
 
-## Group ids into {name, count} entries, preserving first-seen order.
+## Group ids into {id, name, count} entries, preserving first-seen order.
 static func summarize(ids: Array, formatter) -> Array:
 	var counts := {}
 	for tid in ids:
@@ -73,5 +77,13 @@ static func summarize(ids: Array, formatter) -> Array:
 
 	var entries: Array = []
 	for tid in counts.keys():
-		entries.append({"name": formatter.format_trinket_name(tid), "count": int(counts[tid])})
+		entries.append({"id": tid, "name": formatter.format_trinket_name(tid), "count": int(counts[tid])})
 	return entries
+
+
+## Attach the game's trinket icon to each entry (null when the provider cannot resolve it).
+func _attach_icons(entries: Array) -> void:
+	if _icon_provider == null:
+		return
+	for entry in entries:
+		entry["icon"] = _icon_provider.icon(str(entry.get("id", "")))

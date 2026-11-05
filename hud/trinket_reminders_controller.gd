@@ -13,16 +13,18 @@ var _formatter = null
 var _logger = null
 var _chimes = null
 var _feature_enabled: Callable
+var _icon_provider = null
 var _alerted := false
 var _last_entries: Dictionary = {}
 
 
-func setup(panel, formatter, logger, chimes, feature_enabled: Callable) -> void:
+func setup(panel, formatter, logger, chimes, feature_enabled: Callable, icon_provider = null) -> void:
 	_panel = panel
 	_formatter = formatter
 	_logger = logger
 	_chimes = chimes
 	_feature_enabled = feature_enabled
+	_icon_provider = icon_provider
 
 
 ## Refresh the panel from the player's held one-shot trinkets. `gate` is the
@@ -41,6 +43,7 @@ func update(run, gate) -> void:
 		held = []
 
 	var entries: Array = TrackedTrinkets.build_entries(held, _formatter.format_trinket_name)
+	_attach_icons(entries)
 
 	if entries.is_empty():
 		# Zero reminders: hide and reset to collapsed so a later regain starts collapsed.
@@ -75,6 +78,14 @@ func on_feature_toggled(key: String, value: bool) -> void:
 		if _panel != null:
 			_panel.hide_panel()
 		_chimes.clear_trinket()
+
+
+## Attach the game's trinket icon to each entry (null when the provider cannot resolve it).
+func _attach_icons(entries: Array) -> void:
+	if _icon_provider == null:
+		return
+	for entry in entries:
+		entry["icon"] = _icon_provider.icon(str(entry.get("id", "")))
 
 
 func _log_changes(entries: Array) -> void:

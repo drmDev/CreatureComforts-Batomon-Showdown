@@ -7,12 +7,18 @@ extends "collapsible_panel.gd"
 ## is interactive. It then stays until the player collapses it (it keeps the collapsed tab) or
 ## the next battle starts, which hides and clears it.
 
+const TrinketGains = preload("../core/trinket_gains.gd")
+
 const PANEL_WIDTH := 185.0
 const CONTENT_PADDING := 5.0
 const ROW_HEIGHT := 14.0
 const ROW_GAP := 1.0
 const FONT_SIZE := 8
 const HEADER_FONT_SIZE := 9  # Smaller than the shared TITLE_FONT_SIZE (11) for a compact header
+const ICON_SIZE := 10.0
+const ICON_GAP := 2.0
+const QTY_GAP := 2.0
+const ICON_Y_OFFSET := 2.0  # Nudge the icon down so it lines up with the text baseline
 
 const MARGIN_RIGHT := 10.0
 const MARGIN_BOTTOM := 130.0  # Leaves room for the shop's bottom-right controls / companion toast
@@ -68,8 +74,26 @@ func hide_panel() -> void:
 func _make_content_key(entries: Array) -> String:
 	var parts: Array[String] = []
 	for entry in entries:
-		parts.append("%dx %s" % [int(entry.get("count", 0)), str(entry.get("name", ""))])
+		parts.append("%dx %s | %s" % [
+			int(entry.get("count", 0)), str(entry.get("name", "")), str(_icon(entry) != null)])
 	return "|".join(parts)
+
+
+func _icon(entry: Dictionary) -> Texture2D:
+	var icon = entry.get("icon")
+	return icon if icon is Texture2D else null
+
+
+## Width of the [icon] [qty] [name] row, excluding the panel padding.
+func _row_width(entry: Dictionary) -> float:
+	var w := 0.0
+	if _icon(entry) != null:
+		w += ICON_SIZE + ICON_GAP
+	var qty := TrinketGains.qty_text(int(entry.get("count", 0)))
+	if not qty.is_empty():
+		w += _text_font.get_string_size(qty, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x + QTY_GAP
+	w += _text_font.get_string_size(str(entry.get("name", "")), HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
+	return w
 
 
 func _apply_size() -> void:
@@ -81,8 +105,7 @@ func _content_width() -> float:
 		return PANEL_WIDTH
 	var row_w := 0.0
 	for entry in _entries:
-		var line := "%dx %s" % [int(entry.get("count", 0)), str(entry.get("name", ""))]
-		row_w = maxf(row_w, _text_font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x)
+		row_w = maxf(row_w, _row_width(entry))
 	var body_min := row_w + CONTENT_PADDING * 2.0 + 2.0
 	var title_w := _text_font.get_string_size(header_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, HEADER_FONT_SIZE).x
 	# Tighter than the base header inset: the title starts 2 px inside the header and
@@ -111,8 +134,17 @@ func _draw_body(_width: float) -> void:
 	var cursor_y := HEAD_H + CONTENT_PADDING
 	for entry in _entries:
 		var baseline := cursor_y + ROW_HEIGHT - 2.0
-		var line := "%dx %s" % [int(entry.get("count", 0)), str(entry.get("name", ""))]
-		_draw_text_shadow(Vector2(CONTENT_PADDING + 1.0, baseline), line, LABEL_COLOR, FONT_SIZE)
+		var cursor_x := CONTENT_PADDING + 1.0
+		var icon := _icon(entry)
+		if icon != null:
+			var icon_y := cursor_y + (ROW_HEIGHT - ICON_SIZE) * 0.5 + ICON_Y_OFFSET
+			draw_texture_rect(icon, Rect2(Vector2(cursor_x, icon_y), Vector2(ICON_SIZE, ICON_SIZE)), false)
+			cursor_x += ICON_SIZE + ICON_GAP
+		var qty := TrinketGains.qty_text(int(entry.get("count", 0)))
+		if not qty.is_empty():
+			_draw_text_shadow(Vector2(cursor_x, baseline), qty, LABEL_COLOR, FONT_SIZE)
+			cursor_x += _text_font.get_string_size(qty, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x + QTY_GAP
+		_draw_text_shadow(Vector2(cursor_x, baseline), str(entry.get("name", "")), LABEL_COLOR, FONT_SIZE)
 		cursor_y += ROW_HEIGHT + ROW_GAP
 
 
