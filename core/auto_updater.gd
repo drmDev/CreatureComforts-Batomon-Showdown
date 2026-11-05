@@ -3,7 +3,7 @@ extends Node
 ## the release manifest (update.json) from the mod's GitHub releases. When a newer Creature Comforts
 ## is out it downloads the release zip and checks it before anything on disk changes:
 ##   * SHA-256 and size = the manifest's, the address starts with the mod's own release URL
-##   * only Mods/CreatureComforts/<file> or <folder>/<file> entries from the folders below, plain
+##   * only CreatureComforts/<file> or <folder>/<file> entries from the folders below, plain
 ##     ASCII text for scripts/data, PNG / OGG signatures for images/sounds, nothing else
 ##   * the version inside (mod.json + mod_main.gd) = the manifest's
 ##   * every script of the update compiles on THIS game build (loaded from a staging folder)
@@ -33,7 +33,9 @@ const MANIFEST_URL := REPO_URL + "/releases/latest/download/update.json"
 const DOWNLOAD_PREFIX := REPO_URL + "/releases/download/"
 const WORK_DIR := "user://creature_comforts_update"
 const CFG_PATH := "user://creature_comforts/update.cfg"
-const ZIP_ROOT := "Mods/CreatureComforts/"
+## The release zip's top-level folder: it is extracted into Mods/, so the entries are
+## CreatureComforts/<file> (same layout as dev/package.ps1).
+const ZIP_ROOT := "CreatureComforts/"
 
 ## Folders of the mod that may be written (and pruned) by an update.
 const TOP_DIRS := ["advice", "core", "hud", "dev", "assets"]
@@ -277,7 +279,7 @@ static func manifest_error(m) -> String:
 
 
 ## The update zip's files ({"files": {relative path: bytes}}) or {"error": why}. Only
-## Mods/CreatureComforts/ entries at an allowed path, ASCII text or a PNG / OGG, the expected
+## CreatureComforts/ entries at an allowed path, ASCII text or a PNG / OGG, the expected
 ## version inside.
 func read_zip(path: String, want: String) -> Dictionary:
 	var z := ZIPReader.new()

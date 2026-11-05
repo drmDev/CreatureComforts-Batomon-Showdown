@@ -49,6 +49,12 @@ func test_version_ok() -> void:
 	assert_false(AutoUpdater.version_ok("2."))
 
 
+func test_zip_root_is_the_mod_folder() -> void:
+	# The release zip is extracted into Mods/, so its top level is CreatureComforts/ - never
+	# Mods/CreatureComforts/ (that would nest the mod one folder too deep).
+	assert_eq(AutoUpdater.ZIP_ROOT, "CreatureComforts/")
+
+
 func test_path_ok_allows_mod_layout() -> void:
 	for ok in [
 		"mod_main.gd", "mod.json", "README.txt",
