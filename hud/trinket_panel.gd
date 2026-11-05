@@ -1,6 +1,11 @@
 extends "collapsible_panel.gd"
 ## Gift content from a consumed Locked Box / Mysterious Chest is excluded upstream (it is
 ## applied after the frozen battle_over snapshot), so this panel only receives legitimate gains.
+##
+## The panel has NO auto-hide timer: it is shop-gated (it lives on the reminder layer), so the
+## overlay gate holds it back through the results/event/gift screens and shows it once the shop
+## is interactive. It then stays until the player collapses it (it keeps the collapsed tab) or
+## the next battle starts, which hides and clears it.
 
 const PANEL_WIDTH := 185.0
 const CONTENT_PADDING := 5.0
@@ -9,11 +14,12 @@ const ROW_GAP := 1.0
 const FONT_SIZE := 8
 const HEADER_FONT_SIZE := 9  # Smaller than the shared TITLE_FONT_SIZE (11) for a compact header
 
-const DISPLAY_DURATION_MS := 8000  # Auto-hide after 8 seconds on the results screen
 const MARGIN_RIGHT := 10.0
-const MARGIN_BOTTOM := 130.0       # Leaves room for a bottom-right toast from a companion mod
+const MARGIN_BOTTOM := 130.0  # Leaves room for the shop's bottom-right controls / companion toast
 
-var _hide_at_ms := 0
+# Anchor only the first time the panel is shown. Later battles reuse the position the player
+# moved it to, so dragging it once is enough.
+var _anchored := false
 
 
 func full_height() -> float:
@@ -25,23 +31,24 @@ func header_text() -> String:
 	return "Trinkets Gained"
 
 
-## Idempotent: only the FIRST call (hidden -> visible) anchors the panel. Later calls with the
-## same content do nothing, which preserves any drag position and the minimize animation.
+## Idempotent: only the FIRST call (hidden -> visible) expands/un-minimizes the panel. Later
+## calls with the same content do nothing, which preserves any drag position and the minimize
+## animation. The panel never hides itself; see the header comment.
 func show_gains(entries: Array) -> void:
 	var key := _make_content_key(entries)
 	var first_show := not visible
 	_entries = entries
 	if first_show:
-		# Start each battle expanded and positioned above the bottom-right toast area.
 		reveal = 1.0
 		minimized = false
 		_content_key = key
 		_apply_size()
-		_anchor_bottom_right()
+		if not _anchored:
+			_anchor_bottom_right()
+			_anchored = true
 	elif key != _content_key:
 		_content_key = key
 		_apply_size()
-	_hide_at_ms = Time.get_ticks_msec() + DISPLAY_DURATION_MS
 	visible = true
 	queue_redraw()
 
@@ -54,7 +61,6 @@ func hide_panel() -> void:
 	_content_key = ""
 	reveal = 1.0
 	minimized = false
-	_hide_at_ms = 0
 	visible = false
 	queue_redraw()
 
@@ -110,6 +116,3 @@ func _draw_body(_width: float) -> void:
 		cursor_y += ROW_HEIGHT + ROW_GAP
 
 
-func _process(_delta: float) -> void:
-	if visible and _hide_at_ms > 0 and Time.get_ticks_msec() >= _hide_at_ms:
-		hide_panel()

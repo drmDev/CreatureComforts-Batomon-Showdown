@@ -21,7 +21,9 @@ TRINKET REMINDERS
 Get reminders for timing-sensitive trinkets such as Duplicators, Treasure Map, Upgrade Disc, and Greedy Gloves. Expand the reminder panel to view their effects.
 
 BATTLE TRINKET REWARDS
-See which trinkets you gained during battle in a collapsible panel.
+See which trinkets you gained during battle in a collapsible panel. The panel waits for you to
+be back in the shop, so event or gift screens cannot hide it. It stays there until you collapse
+it or start the next battle.
 
 BATTLE STATUS DISPLAY
 View your current day, remaining lives, and wins during combat.

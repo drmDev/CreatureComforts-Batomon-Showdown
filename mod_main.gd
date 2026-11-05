@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "2.214"
+const VERSION := "2.215"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
 const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 
@@ -274,8 +274,9 @@ func _handle_shop_phase(state) -> void:
 		_diagnostics.on_shop_entered(state)
 		if _logger.deep_inspection:
 			_logger.log_lines(_formatter.format_deep_inspect_shop(manager))
-		# Trinket gains are battle-scoped now (tracked during the battle state only), so no
-		# shop-to-shop inventory diff happens here; the trinket panel shows on the results screen.
+		# Trinket gains are battle-scoped (tracked during the battle state only), so no
+		# shop-to-shop inventory diff happens here. The gains panel is shop-gated and already
+		# holds this battle's gains; it simply becomes visible now that the shop is interactive.
 		_reset_transient_state(true, false, false)  # Reset suppression for new shop visit
 		_ui.reset_rank_odds_for_shop()
 	elif _last_snapshot != null and _logger.deep_inspection:
@@ -334,7 +335,9 @@ func _handle_battle_phase(state) -> void:
 			_logger.log_lines(_formatter.format_battle_trinket_state(_get_run_data()))
 		
 		# Battle-scoped trinket baseline (prefers the last snapshot taken OUTSIDE battle).
+		# Any gains still on the panel are from the previous battle, so clear them now.
 		_battle_trinkets.start(_get_run_data())
+		_trinket_gains.on_battle_started()
 		
 		_battle_logged = true
 	
@@ -371,20 +374,18 @@ func _log_battle_result(battle_data) -> void:
 
 
 ## Stop battle trinket tracking. Called when leaving the battle state and on trainer/run changes.
-## Gains are always logged once. The panel shows mid-combat gains for any result.
+## Gains are always logged once. This runs on EVERY non-battle poll, so an empty result (no
+## battle was being tracked) must not hide a panel still waiting to be seen in the shop.
+## The panel itself is shop-gated: it appears once the player is back in the shop and stays
+## until collapsed or the next battle starts.
 func _finalize_battle_trinket_tracking(show_panel := true) -> void:
 	var gains: Dictionary = _battle_trinkets.finalize(_get_run_data(), _logger, _formatter, show_panel)
-	var panel_updated := false
-	if show_panel and not gains.is_empty():
-		panel_updated = _trinket_gains.show_gains(gains)
-	if not panel_updated:
-		_trinket_gains.hide()
+	_trinket_gains.apply_finalized(gains, show_panel)
 
 
 func _reset_transient_state(clear_suppression: bool, clear_reminders: bool, clear_chimes: bool) -> void:
-	# Trinket panel lives on the results layer and is shown when leaving the battle
-	# state by _finalize_battle_trinket_tracking (not on the results screen), so this
-	# reset leaves it alone.
+	# The trinket gains panel is shop-gated and only cleared on a battle start or a
+	# trainer/run change, so this per-phase reset leaves it alone.
 	_advice.reset_transient(clear_suppression, clear_reminders)
 	if clear_chimes:
 		_chimes.clear()

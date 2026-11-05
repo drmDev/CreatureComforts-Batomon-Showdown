@@ -49,6 +49,22 @@ class FakeFormatter:
 		return "N:" + tid
 
 
+class FakePanel:
+	extends RefCounted
+	var visible := false
+	var entries: Array = []
+	var hide_calls := 0
+
+	func show_gains(rows: Array) -> void:
+		entries = rows
+		visible = true
+
+	func hide_panel() -> void:
+		hide_calls += 1
+		entries = []
+		visible = false
+
+
 func _run(ids: Array, total := 0, used: Array = []) -> FakeRun:
 	var run := FakeRun.new()
 	run.trinket_ids = ids
@@ -128,3 +144,66 @@ func test_presenter_summarize_counts_duplicates() -> void:
 	assert_eq(entries[0]["name"], "N:a")
 	assert_eq(entries[0]["count"], 2)
 	assert_eq(entries[1]["count"], 1)
+
+
+func _presenter(panel: FakePanel, enabled := true) -> TrinketGainPresenter:
+	var presenter := TrinketGainPresenter.new()
+	presenter.setup(panel, FakeFormatter.new(), func(_key: String) -> bool: return enabled)
+	return presenter
+
+
+## The empty result of every non-battle poll must not wipe a panel still waiting for the shop.
+func test_apply_finalized_empty_result_keeps_panel() -> void:
+	var panel := FakePanel.new()
+	var presenter := _presenter(panel)
+	presenter.apply_finalized({"ids": ["a"], "counter": 1, "newly_used": []})
+	assert_true(panel.visible)
+	presenter.apply_finalized({})
+	assert_true(panel.visible)
+	assert_eq(panel.hide_calls, 0)
+	assert_eq(panel.entries.size(), 1)
+
+
+func test_apply_finalized_shows_displayable_gains() -> void:
+	var panel := FakePanel.new()
+	var presenter := _presenter(panel)
+	var shown := presenter.apply_finalized({"ids": ["a", "a", "junk"], "counter": 3, "newly_used": []})
+	assert_true(shown)
+	assert_true(panel.visible)
+	assert_eq(panel.entries.size(), 1)
+	assert_eq(panel.entries[0]["count"], 2)
+
+
+func test_apply_finalized_hides_when_nothing_displayable() -> void:
+	var panel := FakePanel.new()
+	var presenter := _presenter(panel)
+	presenter.apply_finalized({"ids": ["a"], "counter": 1, "newly_used": []})
+	assert_true(panel.visible)
+	var shown := presenter.apply_finalized({"ids": ["junk"], "counter": 1, "newly_used": []})
+	assert_false(shown)
+	assert_false(panel.visible)
+
+
+func test_apply_finalized_without_panel_shows_hides() -> void:
+	var panel := FakePanel.new()
+	var presenter := _presenter(panel)
+	presenter.apply_finalized({"ids": ["a"], "counter": 1, "newly_used": []})
+	presenter.apply_finalized({"ids": ["b"], "counter": 1, "newly_used": []}, false)
+	assert_false(panel.visible)
+
+
+func test_on_battle_started_hides_panel() -> void:
+	var panel := FakePanel.new()
+	var presenter := _presenter(panel)
+	presenter.apply_finalized({"ids": ["a"], "counter": 1, "newly_used": []})
+	presenter.on_battle_started()
+	assert_false(panel.visible)
+	assert_empty(panel.entries)
+
+
+func test_apply_finalized_respects_feature_toggle() -> void:
+	var panel := FakePanel.new()
+	var presenter := _presenter(panel, false)
+	var shown := presenter.apply_finalized({"ids": ["a"], "counter": 1, "newly_used": []})
+	assert_false(shown)
+	assert_false(panel.visible)

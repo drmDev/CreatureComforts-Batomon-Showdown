@@ -16,7 +16,6 @@ const PlayerHud = preload("player_hud.gd")
 const TrinketPanel = preload("trinket_panel.gd")
 
 var reminder_layer: CanvasLayer = null
-var results_layer: CanvasLayer = null
 var player_hud_layer: CanvasLayer = null
 
 var reminder_label = null
@@ -43,7 +42,6 @@ func setup(formatter, logger, feature_enabled: Callable, sounds_enabled: Callabl
 	_build_reminder_layer()
 	_build_shop_highlight()
 	_build_player_hud()
-	_build_results_layer()
 
 
 func _build_reminder_layer() -> void:
@@ -67,6 +65,13 @@ func _build_reminder_layer() -> void:
 	trinket_reminders_panel.name = "TrinketRemindersPanel"
 	trinket_reminders_panel.layout_debug.connect(_on_trinket_panel_layout_debug)
 	reminder_layer.add_child(trinket_reminders_panel)
+
+	# Battle trinket gains. Lives here (not on a separate layer) so the shop overlay gate
+	# holds it back through the results/event/gift screens and reveals it once the shop is
+	# interactive again. The presenter keeps its content across that wait.
+	trinket_panel = TrinketPanel.new()
+	trinket_panel.name = "TrinketPanel"
+	reminder_layer.add_child(trinket_panel)
 
 	rank_odds_panel = RankOddsPanel.new()
 	rank_odds_panel.name = "RankOddsPanel"
@@ -104,19 +109,6 @@ func _build_player_hud() -> void:
 	player_hud_layer.add_child(player_hud)
 
 
-func _build_results_layer() -> void:
-	# Separate layer from the reminder layer: the overlay gate hides reminders outside the
-	# shop, but the trinket panel must be visible after battles (over the results screen).
-	results_layer = CanvasLayer.new()
-	results_layer.layer = 100
-	results_layer.name = "CreatureComforts_Results"
-	add_child(results_layer)
-
-	trinket_panel = TrinketPanel.new()
-	trinket_panel.name = "TrinketPanel"
-	results_layer.add_child(trinket_panel)
-
-
 ## Apply the shop overlay gate to the reminder layer. Returns true when the
 ## layer is visible (the caller may play queued chimes).
 func apply_gate(allowed: bool) -> bool:
@@ -131,6 +123,8 @@ func apply_gate(allowed: bool) -> bool:
 
 
 ## Defensive fallback: hide shop-only panels whenever the shop is not current.
+## The trinket gains panel is deliberately NOT hidden here: it lives on the gated reminder
+## layer and its content must survive the results/event screens until the shop returns.
 func hide_shop_panels() -> void:
 	if shop_income_panel != null:
 		shop_income_panel.hide_panel()

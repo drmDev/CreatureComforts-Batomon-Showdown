@@ -1,8 +1,13 @@
 extends RefCounted
-## Shows battle trinket gains on the results panel.
+## Shows battle trinket gains on the panel.
 ##
 ## Extracted from mod_main.gd. Filters junk trinkets, summarizes duplicate ids,
 ## and respects the Trinkets Gained Panel feature toggle.
+##
+## Lifecycle: `apply_finalized` is called once per battle, when the battle state ends (which may
+## be an event or gift screen). The panel is shop-gated, so the gains simply wait there until the
+## player is back in the shop, then stay until collapsed or the next battle (`on_battle_started`).
+## An empty result means "no battle was being tracked" and must NOT hide an already visible panel.
 
 const TrinketGains = preload("../core/trinket_gains.gd")
 const LogFormatterScript = preload("../core/log_formatter.gd")
@@ -18,6 +23,25 @@ func setup(panel, formatter, feature_enabled: Callable) -> void:
 	_panel = panel
 	_formatter = formatter
 	_feature_enabled = feature_enabled
+
+
+## Apply the result of a finished battle.
+## - {} (nothing was tracked): leave the panel exactly as it is.
+## - non-empty gains with show_panel: show them (or hide when nothing is displayable).
+## - non-empty gains with show_panel == false (e.g. a trainer/run change): clear the panel.
+## Returns true when the panel shows gains.
+func apply_finalized(gains: Dictionary, show_panel := true) -> bool:
+	if gains.is_empty():
+		return false
+	if not show_panel:
+		hide()
+		return false
+	return show_gains(gains)
+
+
+## Hide and clear the panel when a new battle starts; gains from the previous battle are stale.
+func on_battle_started() -> void:
+	hide()
 
 
 ## Show the non-junk gains. Returns true when the panel was updated.
