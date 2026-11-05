@@ -92,3 +92,22 @@ func test_reporter_reset() -> void:
 	assert_true(reporter.check(state))
 	reporter.reset()
 	assert_true(reporter.check(state))
+
+
+func test_time_elapsed_reads_simulated_time() -> void:
+	assert_eq(BattleMonitor.time_elapsed({"time_elapsed": 12.34}), 12.34)
+
+
+func test_time_elapsed_defaults_to_zero() -> void:
+	assert_eq(BattleMonitor.time_elapsed(null), 0.0)
+	assert_eq(BattleMonitor.time_elapsed({}), 0.0)
+
+
+func test_time_elapsed_clamps_negative() -> void:
+	assert_eq(BattleMonitor.time_elapsed({"time_elapsed": -5.0}), 0.0)
+
+
+func test_format_seconds() -> void:
+	assert_eq(BattleMonitor.format_seconds(12.34), "12.3s")
+	assert_eq(BattleMonitor.format_seconds(0.0), "0.0s")
+	assert_eq(BattleMonitor.format_seconds(-5.0), "0.0s")

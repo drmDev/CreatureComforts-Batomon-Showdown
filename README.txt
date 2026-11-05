@@ -1,4 +1,4 @@
-Creature Comforts v2.222 - Quality of Life Mod for Batomon Showdown
+Creature Comforts v2.226 - Quality of Life Mod for Batomon Showdown
 =================================================================
 Creature Comforts adds helpful reminders, shop planning tools, and quality-of-life improvements to Batomon Showdown.
 
@@ -28,6 +28,12 @@ it. It stays for 15 seconds after the shop opens, or until you collapse it or st
 BATTLE STATUS DISPLAY
 View your current day, remaining lives, and wins during combat. Once the Second
 Chance has been used, the heart icon is shown upside down to mark your last life.
+
+BATTLE ELAPSED TIME
+After a battle finishes, a small panel shows the simulation's total elapsed time.
+This is the battle simulation clock, so fast-forwarding and replaying steps make
+it different from real time. It is shown with the battle status HUD and is hidden
+when Battle Status Panel is turned off. The panel auto-hides after 4 seconds.
 
 SHOP INCOME
 Displays your current income directly in the shop.

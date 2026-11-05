@@ -43,3 +43,20 @@ static func classify(battle_data) -> Dictionary:
 	elif player_hp <= 0 and enemy_hp > 0:
 		result = RESULT_DEFEAT
 	return {"result": result, "hp": player_hp, "detail": ""}
+
+
+## Total simulated battle time in seconds from simulation.data. This is the
+## simulation's own clock (affected by fast-forwarding), not wall-clock time.
+## Returns 0.0 when the field is missing or invalid.
+static func time_elapsed(battle_data) -> float:
+	if battle_data == null:
+		return 0.0
+	var value = battle_data.get("time_elapsed")
+	if value == null:
+		return 0.0
+	return maxf(0.0, float(value))
+
+
+## Format a simulated duration for the elapsed-time panel (e.g. "12.3s").
+static func format_seconds(secs: float) -> String:
+	return "%.1fs" % maxf(0.0, secs)

@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "2.222"
+const VERSION := "2.226"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
 const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 
@@ -273,6 +273,7 @@ func _handle_shop_phase(state) -> void:
 	
 	if phase_changed:
 		_battle_logged = false
+		_ui.hide_battle_elapsed()
 		if _shop_overlay_gate != null:
 			_shop_overlay_gate.reset_for_shop()
 		_log_phase_entry("SHOP", run, manager)
@@ -323,6 +324,11 @@ func _compute_daily_income(run) -> int:
 
 
 func _handle_battle_phase(state) -> void:
+	# On battle entry, clear the previous battle's elapsed readout before checking
+	# completion, so a battle that is already over still shows its own time.
+	if _last_phase != "battle":
+		_ui.hide_battle_elapsed()
+
 	# Battle completion detection (win/loss/draw) - independent of replay logging
 	_check_battle_completion(state)
 	
@@ -368,6 +374,7 @@ func _check_battle_completion(state) -> void:
 	var sim = state.get("simulation") if NodeUtils.has_property(state, "simulation") else null
 	var battle_data = sim.get("data") if sim != null and NodeUtils.has_property(sim, "data") else null
 	_log_battle_result(battle_data)
+	_ui.show_battle_elapsed(BattleMonitor.format_seconds(BattleMonitor.time_elapsed(battle_data)))
 
 
 func _log_battle_result(battle_data) -> void:

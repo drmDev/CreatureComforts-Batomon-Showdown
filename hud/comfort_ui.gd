@@ -14,6 +14,7 @@ const RankOddsPanel = preload("rank_odds_panel.gd")
 const WatchlistPanel = preload("watchlist_panel.gd")
 const PlayerHud = preload("player_hud.gd")
 const TrinketPanel = preload("trinket_panel.gd")
+const BattleElapsedPanel = preload("battle_elapsed_panel.gd")
 
 var reminder_layer: CanvasLayer = null
 var player_hud_layer: CanvasLayer = null
@@ -25,6 +26,7 @@ var rank_odds_panel = null
 var watchlist_panel = null
 var trinket_panel = null
 var player_hud = null
+var battle_elapsed_panel = null
 var shop_highlight = null
 
 var _logger = null
@@ -108,6 +110,12 @@ func _build_player_hud() -> void:
 	player_hud.name = "PlayerHud"
 	player_hud_layer.add_child(player_hud)
 
+	# Post-battle simulation time. Lives on the battle HUD layer (not the shop-gated
+	# reminder layer) so it can appear during the battle results screen.
+	battle_elapsed_panel = BattleElapsedPanel.new()
+	battle_elapsed_panel.name = "BattleElapsedPanel"
+	player_hud_layer.add_child(battle_elapsed_panel)
+
 
 ## Apply the shop overlay gate to the reminder layer. Returns true when the
 ## layer is visible (the caller may play queued chimes).
@@ -179,6 +187,24 @@ func update_player_hud(state, is_battle: bool) -> void:
 	player_hud.visible = is_active
 
 
+## Show the simulated battle duration once the battle is over. Shares the Battle
+## Status Panel toggle with the lives/wins/day HUD, so one setting controls every
+## battle readout.
+func show_battle_elapsed(seconds_text: String) -> void:
+	if battle_elapsed_panel == null:
+		return
+	if not _feature_enabled.call(ModConfig.KEY_BATTLE_STATUS_PANEL):
+		battle_elapsed_panel.hide_panel()
+		return
+	battle_elapsed_panel.show_elapsed(seconds_text)
+
+
+func hide_battle_elapsed() -> void:
+	if battle_elapsed_panel == null:
+		return
+	battle_elapsed_panel.hide_panel()
+
+
 func _build_player_stats(player_run) -> Dictionary:
 	var stats := {
 		"hp": "?",
@@ -220,6 +246,8 @@ func on_feature_toggled(key: String, value: bool) -> void:
 	if key == ModConfig.KEY_BATTLE_STATUS_PANEL:
 		if player_hud != null:
 			player_hud.visible = false
+		if battle_elapsed_panel != null:
+			battle_elapsed_panel.hide_panel()
 	elif key == ModConfig.KEY_SHOP_INCOME:
 		if shop_income_panel != null:
 			shop_income_panel.hide_panel()
