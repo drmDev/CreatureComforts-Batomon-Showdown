@@ -5,9 +5,10 @@ extends RefCounted
 ## and respects the Trinkets Gained Panel feature toggle.
 ##
 ## Lifecycle: `apply_finalized` is called once per battle, when the battle state ends (which may
-## be an event or gift screen). The panel is shop-gated, so the gains simply wait there until the
-## player is back in the shop, then stay until collapsed or the next battle (`on_battle_started`).
-## An empty result means "no battle was being tracked" and must NOT hide an already visible panel.
+## be an event or gift screen). The panel is shop-gated, so the gains wait there until the player
+## is back in the shop, then auto-hide after AUTO_HIDE_SEC (or sooner on collapse / the next
+## battle). An empty result means "no battle was being tracked" and must NOT hide an already
+## visible panel.
 
 const TrinketGains = preload("../core/trinket_gains.gd")
 const LogFormatterScript = preload("../core/log_formatter.gd")
@@ -18,6 +19,9 @@ var _panel = null
 var _formatter = null
 var _feature_enabled: Callable
 var _icon_provider = null
+# Bumped whenever the panel is hidden or re-shown, so a stale auto-hide timer
+# cannot close a newer panel.
+var _auto_hide_token := 0
 
 
 func setup(panel, formatter, feature_enabled: Callable, icon_provider = null) -> void:
@@ -60,12 +64,40 @@ func show_gains(gains: Dictionary) -> bool:
 	var entries := summarize(shown_ids, _formatter)
 	TrinketGains.attach_icons(entries, _icon_provider)
 	_panel.show_gains(entries)
+	_start_auto_hide()
 	return true
 
 
 func hide() -> void:
+	_auto_hide_token += 1
 	if _panel != null:
 		_panel.hide_panel()
+
+
+## Hide the panel after AUTO_HIDE_SEC of being actually visible. The panel is
+## shop-gated, so it can be marked visible during the results/event screens while
+## the reminder layer is still hidden; waiting for is_visible_in_tree() gives the
+## player the full countdown once the shop opens instead of counting through
+## those screens.
+func _start_auto_hide() -> void:
+	_auto_hide_token += 1
+	# Tests use a plain RefCounted stand-in for the panel; only a real Control
+	# can report visibility and own a SceneTreeTimer.
+	if not (_panel is CanvasItem):
+		return
+	_auto_hide_after_visible(_auto_hide_token)
+
+
+func _auto_hide_after_visible(token: int) -> void:
+	while token == _auto_hide_token and _panel is CanvasItem and _panel.get_tree() != null:
+		if _panel.is_visible_in_tree():
+			break
+		await _panel.get_tree().create_timer(0.25).timeout
+	if token != _auto_hide_token or not (_panel is CanvasItem) or _panel.get_tree() == null:
+		return
+	await _panel.get_tree().create_timer(TrinketGains.AUTO_HIDE_SEC).timeout
+	if token == _auto_hide_token:
+		hide()
 
 
 ## Group ids into {id, name, count} entries, preserving first-seen order.

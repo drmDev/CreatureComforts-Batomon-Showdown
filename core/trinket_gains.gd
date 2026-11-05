@@ -8,6 +8,11 @@ const GIFT_TRINKET_IDS := ["locked_box", "mysterious_chest"]
 # Some callers pass trinket ids with the game's "trinket_" prefix; the database ids do not.
 const TRINKET_PREFIX := "trinket_"
 
+## How long the battle-gains panel stays on screen once it is actually visible.
+## The panel is shop-gated, so the countdown starts when the shop overlay opens,
+## not when the gains are first handed to the panel.
+const AUTO_HIDE_SEC := 15.0
+
 
 static func diff_id_lists(before: Array, after: Array) -> Array:
 	var before_counts := {}
