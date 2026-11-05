@@ -57,13 +57,6 @@ func close_panel() -> void:
 	visible = false
 
 
-## Re-render after the watchlist saved a new build while this panel is open.
-func refresh(store: Dictionary) -> void:
-	_store = store
-	if visible:
-		_rebuild_rows()
-
-
 ## Match the watchlist popup's panel rect so the overlay reads as a sub-view of it.
 func layout(rect: Rect2) -> void:
 	if _panel == null:
@@ -251,7 +244,10 @@ func _on_delete_pressed(build: Dictionary) -> void:
 		return
 	_confirm_id = ""
 	if SavedBuilds.delete_build(_store, id):
-		SavedBuilds.save_store(_store)
+		if not SavedBuilds.save_store(_store):
+			# The write failed; reload from disk so the UI matches what is
+			# actually stored instead of hiding a build that still exists.
+			_store = SavedBuilds.load_store()
 	_rebuild_rows()
 
 

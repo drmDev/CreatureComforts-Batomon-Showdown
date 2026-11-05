@@ -9,6 +9,9 @@ extends Node
 ## Empty reason string = overlay allowed.
 
 signal visibility_changed(allowed: bool, reason: String)
+## Forwarded from the game's transition_requested signal so mod_main does not
+## need a second subscription of its own.
+signal transition_requested(target: String, data)
 
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
 
@@ -41,6 +44,10 @@ var _gate_hold_until_ms := 0  # Transition signal hold: keep the overlay hidden 
 var _search_end_hold_until_ms := 0  # Brief hold after search ends, before the battle transition fires
 var _view_member_cache: Dictionary = {}
 var _transition_nodes: Dictionary = {}
+# The overlay probe allocates child arrays, so it runs at ~10 Hz instead of
+# every frame. The cheap checks above still run per frame.
+var _overlay_probe_cache := ""
+var _overlay_probe_next_ms := 0
 
 
 func setup(has_prop: Callable, is_script: Callable) -> void:
@@ -55,6 +62,8 @@ func is_allowed() -> bool:
 
 func reset_for_shop() -> void:
 	_view_member_cache.clear()
+	_overlay_probe_cache = ""
+	_overlay_probe_next_ms = 0
 
 
 func update() -> void:
@@ -152,8 +161,18 @@ func _is_shop_transition_active(view) -> bool:
 	return false
 
 
-## Direct-child overlay probe. Cheap enough to run every frame.
+## Direct-child overlay probe, throttled to ~10 Hz because it allocates child
+## arrays and lowercases names. The visible overlay set changes rarely.
 func _find_visible_overlay(view, main) -> String:
+	var now := Time.get_ticks_msec()
+	if now < _overlay_probe_next_ms:
+		return _overlay_probe_cache
+	_overlay_probe_next_ms = now + 100
+	_overlay_probe_cache = _probe_visible_overlay(view, main)
+	return _overlay_probe_cache
+
+
+func _probe_visible_overlay(view, main) -> String:
 	for name in OVERLAY_NODE_NAMES:
 		var node = _get_direct_child(view, name)
 		if node == null:
@@ -212,8 +231,13 @@ func _get_view_member(view, property_names: Array, node_name: String):
 		var cached = _view_member_cache[cache_key]
 		if cached != null and is_instance_valid(cached):
 			return cached
-		if cached == null and not view.is_node_ready():
+		if cached == null:
+			# A miss is only cached once the view is ready (see the store below),
+			# so it is authoritative: the node is absent and a recursive search
+			# would not find it either. Keep the miss instead of re-searching
+			# every frame.
 			return null
+		# The cached node was freed; the view may have been rebuilt.
 		_view_member_cache.erase(cache_key)
 
 	for prop in property_names:
@@ -255,6 +279,9 @@ func _scan_transition_nodes(node: Node) -> void:
 func _on_node_added_transition(node: Node) -> void:
 	if node == null or not is_instance_valid(node):
 		return
+	# A node without a script cannot declare the signal; skip the lookup.
+	if node.get_script() == null:
+		return
 	if not node.has_signal("transition_requested"):
 		return
 	if not node.has_method("request_transition"):
@@ -278,6 +305,8 @@ func _on_transition_requested(target: String, data) -> void:
 	if _overlay_gate_reason.is_empty():
 		_overlay_gate_reason = GATE_TRANSITION
 		visibility_changed.emit(false, GATE_TRANSITION)
+	# Forward to mod_main (opponent capture) without a second subscription.
+	transition_requested.emit(target, data)
 
 
 func _exit_tree() -> void:

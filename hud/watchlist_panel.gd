@@ -91,6 +91,7 @@ var _save_sound = null
 var _tracked_only := false
 var _tracked_only_check: CheckBox
 var _rows_box: GridContainer
+var _scroll: ScrollContainer
 var _popup_open := false
 var _rows_dirty := true
 
@@ -340,17 +341,17 @@ func _build_ui() -> void:
 	divider.custom_minimum_size.y = 1
 	vbox.add_child(divider)
 
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	vbox.add_child(scroll)
+	_scroll = ScrollContainer.new()
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vbox.add_child(_scroll)
 
 	_rows_box = GridContainer.new()
 	_rows_box.columns = LIST_COLUMNS
 	_rows_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_rows_box.add_theme_constant_override("h_separation", 4)
 	_rows_box.add_theme_constant_override("v_separation", 1)
-	scroll.add_child(_rows_box)
+	_scroll.add_child(_rows_box)
 
 	# Initial state: Batomon tab, "All" filters.
 	_sync_tab_buttons()
@@ -630,16 +631,26 @@ static func toggled_filter_value(current: String, value: String) -> String:
 
 
 func _on_rarity_pressed(value: String) -> void:
+	var was_tracked_only := _tracked_only
 	_exit_tracked_only()
-	_rarity_filter = toggled_filter_value(_rarity_filter, value)
-	_sync_filter_buttons(_rarity_buttons, _rarity_filter)
+	var next := toggled_filter_value(_rarity_filter, value)
+	# Re-clicking the active filter (or "All" while it is active) changes
+	# nothing, so only the button state needs re-syncing.
+	_sync_filter_buttons(_rarity_buttons, next)
+	if next == _rarity_filter and not was_tracked_only:
+		return
+	_rarity_filter = next
 	_rebuild_rows()
 
 
 func _on_type_pressed(value: String) -> void:
+	var was_tracked_only := _tracked_only
 	_exit_tracked_only()
-	_type_filter = toggled_filter_value(_type_filter, value)
-	_sync_filter_buttons(_type_buttons, _type_filter)
+	var next := toggled_filter_value(_type_filter, value)
+	_sync_filter_buttons(_type_buttons, next)
+	if next == _type_filter and not was_tracked_only:
+		return
+	_type_filter = next
 	_rebuild_rows()
 
 
@@ -752,10 +763,7 @@ func _on_save_pressed() -> void:
 		return
 	var store := SavedBuilds.load_store()
 	SavedBuilds.create_build(store, monsters, items, int(Time.get_unix_time_from_system()))
-	if not SavedBuilds.save_store(store):
-		return
-	if _builds_panel != null:
-		_builds_panel.refresh(store)
+	SavedBuilds.save_store(store)
 
 
 func _on_builds_pressed() -> void:
@@ -801,8 +809,12 @@ func _catalog_lookup(kind: String, key: String):
 
 
 func _on_region_selected(index: int) -> void:
+	var was_tracked_only := _tracked_only
 	_exit_tracked_only()
+	var before := _region_filter
 	_apply_region_index(index)
+	if _region_filter == before and not was_tracked_only:
+		return
 	_rebuild_rows()
 
 
@@ -1013,6 +1025,10 @@ func _display_name(kind: String, key: String) -> String:
 func _rebuild_rows() -> void:
 	if _rows_box == null:
 		return
+	# Rebuilding frees and re-creates every row, which resets the scroll offset.
+	# Keep the player where they were (e.g. while unchecking entries in Tracked
+	# Only mode).
+	var scroll_before := _scroll.scroll_vertical if _scroll != null else 0
 	for child in _rows_box.get_children():
 		_rows_box.remove_child(child)
 		child.queue_free()
@@ -1050,6 +1066,11 @@ func _rebuild_rows() -> void:
 		empty_label.custom_minimum_size.x = POPUP_WIDTH - 24
 		_apply_font(empty_label, BODY_FONT_SIZE)
 		_rows_box.add_child(empty_label)
+
+	# Deferred so the new rows have been laid out and the scroll bar's maximum
+	# reflects them before the offset is restored.
+	if _scroll != null:
+		_scroll.set_deferred("scroll_vertical", scroll_before)
 
 
 ## One clickable entry: [icon] [name] [checkbox]. The whole row toggles tracking;
@@ -1154,14 +1175,19 @@ func _passes_monster_filters(entry: Dictionary) -> bool:
 		if not types.has(_type_filter):
 			return false
 	if not _region_filter.is_empty():
-		var filter := _region_filter.to_lower()
-		var matched := false
-		for region in entry.get("regions", []):
-			if str(region).to_lower().contains(filter):
-				matched = true
-				break
-		if not matched:
-			return false
+		var regions: Array = entry.get("regions", [])
+		# Species with no region data (e.g. a catalog entry without sets) are
+		# not hidden by the region filter; only entries that declare regions
+		# are filtered.
+		if not regions.is_empty():
+			var filter := _region_filter.to_lower()
+			var matched := false
+			for region in regions:
+				if str(region).to_lower().contains(filter):
+					matched = true
+					break
+			if not matched:
+				return false
 	return true
 
 

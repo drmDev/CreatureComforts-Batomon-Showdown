@@ -109,7 +109,9 @@ func _build_shop_highlight() -> void:
 	shop_highlight.setup(watchlist_panel.selection)
 	var enabled: bool = _feature_enabled.call(ModConfig.KEY_SHOP_HIGHLIGHTS)
 	shop_highlight.set_enabled(enabled)
-	watchlist_panel.visible = enabled
+	# The watchlist button stays available even when highlighting is off, so
+	# the player can still edit the list and reach Saved Builds.
+	watchlist_panel.visible = true
 
 
 func _build_player_hud() -> void:
@@ -293,10 +295,10 @@ func on_feature_toggled(key: String, value: bool) -> void:
 	if key == ModConfig.KEY_SHOP_HIGHLIGHTS:
 		if shop_highlight != null:
 			shop_highlight.set_enabled(value)
-		if watchlist_panel != null:
-			watchlist_panel.visible = value and not _rank_odds_popup_open
-			if not value:
-				watchlist_panel.close_popup()
+		if not value and watchlist_panel != null:
+			watchlist_panel.close_popup()
+		# Restore the button row, which also respects an open Base HP popup.
+		_restore_shop_buttons()
 		return
 	if value:
 		return
@@ -350,7 +352,9 @@ func _restore_shop_buttons() -> void:
 	if base_hp_panel != null:
 		base_hp_panel.visible = _feature_enabled.call(ModConfig.KEY_BASE_HP_CHART)
 	if watchlist_panel != null:
-		watchlist_panel.visible = _feature_enabled.call(ModConfig.KEY_SHOP_HIGHLIGHTS)
+		# Independent of the Shop Highlights setting: the button is the only
+		# way to edit the watchlist and open Saved Builds.
+		watchlist_panel.visible = true
 
 
 func _on_trinket_panel_layout_debug(message: String) -> void:

@@ -78,10 +78,16 @@ class HighlightOverlay extends Control:
 	const BORDER_COLOR := Style.WATCHLIST_HIGHLIGHT_BORDER
 	const FILL_COLOR := Style.WATCHLIST_HIGHLIGHT_FILL
 	const BORDER_WIDTH := 2.0
+	## Card content only changes on rerolls/purchases, so a 10 Hz probe is
+	## plenty and avoids the reflection cost every frame.
+	const PROCESS_INTERVAL := 0.1
+	## Shared empty bucket so `get(..., {})` does not allocate per call.
+	const EMPTY_SELECTION := {}
 
 	var watchlist = null
 	var enabled := true
 	var _active := false
+	var _process_accum := 0.0
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -97,9 +103,13 @@ class HighlightOverlay extends Control:
 			_active = false
 			queue_redraw()
 
-	func _process(_delta: float) -> void:
+	func _process(delta: float) -> void:
 		if not enabled or not is_visible_in_tree():
 			return
+		_process_accum += delta
+		if _process_accum < PROCESS_INTERVAL:
+			return
+		_process_accum = 0.0
 		var next := _matches()
 		if next != _active:
 			_active = next
@@ -118,9 +128,9 @@ class HighlightOverlay extends Control:
 		if content.has_method("get_gold_cost") and ("data" in content):
 			var data = content.get("data")
 			if data != null and ("name_key" in data):
-				return watchlist.get("monster", {}).has(str(data.get("name_key")))
+				return watchlist.get("monster", EMPTY_SELECTION).has(str(data.get("name_key")))
 		elif "id" in content:
-			return watchlist.get("item", {}).has(str(content.get("id")))
+			return watchlist.get("item", EMPTY_SELECTION).has(str(content.get("id")))
 		return false
 
 	func _draw() -> void:
