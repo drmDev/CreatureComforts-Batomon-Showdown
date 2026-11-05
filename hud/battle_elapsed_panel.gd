@@ -11,7 +11,7 @@ const PANEL_HEIGHT := 16.0
 const BOTTOM_MARGIN := 32.0
 const OFFSET_RATIO := 0.10
 const UP_PANEL_OFFSET := 2.7
-const AUTO_HIDE_SEC := 6.0
+const AUTO_HIDE_SEC := 4.0
 
 const TEXT_SIZE := 8
 const TEXT_BASELINE := 11.0
