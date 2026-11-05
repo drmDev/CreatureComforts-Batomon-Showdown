@@ -612,8 +612,8 @@ func _notice_once(key: String, title: String, body: String, urgent := false) -> 
 	notice(title, body, urgent)
 
 
-## A small notice at the top of the screen (red header = urgent); it fades after a few seconds, a
-## click dismisses it.
+## A small, compact notice at the top of the screen (red header = urgent); it fades after a few
+## seconds, a click dismisses it.
 func notice(title: String, body: String, urgent := false) -> void:
 	last_notice = title + " | " + body
 	print("Creature Comforts: %s - %s" % [title, body])
@@ -629,11 +629,15 @@ func notice(title: String, body: String, urgent := false) -> void:
 
 
 ## A plain, self-contained notice: no game or mod UI classes, so it survives a broken overlay.
+## Deliberately small (about half the footprint it had at first) so it reads as a corner notice
+## instead of covering the HUD; long bodies wrap inside MAX_W rather than widening the box.
 class Toast extends Control:
-	const FS := 14
-	const HEAD := 22.0
-	const PAD := 8.0
-	const MAX_W := 460.0
+	const FS := 11
+	const TITLE_FS := 13
+	const HEAD := 15.0
+	const PAD := 4.0
+	const MIN_W := 150.0
+	const MAX_W := 240.0
 	const LIFE_MS := 12000
 	const FADE_MS := 600
 
@@ -654,8 +658,8 @@ class Toast extends Control:
 		_font = ThemeDB.fallback_font
 		_hfont = ThemeDB.fallback_font
 		var one: float = _font.get_string_size(body, HORIZONTAL_ALIGNMENT_LEFT, -1, FS).x
-		var head: float = _hfont.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, FS + 2).x
-		var w: float = clampf(maxf(one, head) + PAD * 2 + 4, 200.0, MAX_W)
+		var head: float = _hfont.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, TITLE_FS).x
+		var w: float = clampf(maxf(one, head) + PAD * 2 + 4, MIN_W, MAX_W)
 		var text_h: float = _font.get_multiline_string_size(body, HORIZONTAL_ALIGNMENT_LEFT, w - PAD * 2 - 4, FS).y
 		size = Vector2(w, HEAD + PAD + text_h + PAD + 2)
 		var vp := get_viewport_rect().size if is_inside_tree() else Vector2(1280, 720)
@@ -680,5 +684,5 @@ class Toast extends Control:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.12, 0.12, 0.14, 0.94))
 		draw_rect(Rect2(Vector2.ZERO, Vector2(w, HEAD)),
 			Color(0.85, 0.3, 0.25) if urgent else Color(0.85, 0.65, 0.2))
-		draw_string(_hfont, Vector2(0, HEAD - 7), title, HORIZONTAL_ALIGNMENT_CENTER, w, FS + 2, Color.WHITE)
+		draw_string(_hfont, Vector2(0, HEAD - 4), title, HORIZONTAL_ALIGNMENT_CENTER, w, TITLE_FS, Color.WHITE)
 		draw_multiline_string(_font, tp, body, HORIZONTAL_ALIGNMENT_LEFT, tw, FS, -1, Color(0.95, 0.95, 0.95))
