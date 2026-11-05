@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "2.230"
+const VERSION := "2.231"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
 const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 
