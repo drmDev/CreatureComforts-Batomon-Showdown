@@ -1,4 +1,4 @@
-Creature Comforts v2.229 - Quality of Life Mod for Batomon Showdown
+Creature Comforts v2.230 - Quality of Life Mod for Batomon Showdown
 =================================================================
 Creature Comforts adds helpful reminders, shop planning tools, and quality-of-life improvements to Batomon Showdown.
 
@@ -34,7 +34,7 @@ BATTLE ELAPSED TIME
 After a battle finishes, a small panel shows the simulation's total elapsed time.
 This is the battle simulation clock, so fast-forwarding and replaying steps make
 it different from real time. It is shown with the battle status HUD and is hidden
-when Battle Status Panel is turned off. The panel auto-hides after 7 seconds.
+when Battle Status Panel is turned off. The panel auto-hides after 6 seconds.
 
 OPPONENT INFO
 During battle, a small bottom-right panel shows the opponent's name and MMR

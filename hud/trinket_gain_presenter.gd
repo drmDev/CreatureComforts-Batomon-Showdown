@@ -1,8 +1,8 @@
 extends RefCounted
 ## Shows battle trinket gains on the panel.
 ##
-## Extracted from mod_main.gd. Filters junk trinkets, summarizes duplicate ids,
-## and respects the Trinkets Gained Panel feature toggle.
+## Extracted from mod_main.gd. Filters junk trinkets, summarizes duplicate ids
+## (highest quantity first), and respects the Trinkets Gained Panel toggle.
 ##
 ## Lifecycle: `apply_finalized` is called once per battle, when the battle state ends (which may
 ## be an event or gift screen). The panel is shop-gated, so the gains wait there until the player

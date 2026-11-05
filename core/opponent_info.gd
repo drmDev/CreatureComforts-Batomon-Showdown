@@ -9,6 +9,7 @@ extends RefCounted
 const NodeUtils = preload("node_utils.gd")
 
 const MMR_UNKNOWN := "-"
+const MMR_MATCH_WINDOW_MS := 600000
 
 
 ## Build the two facts the panel needs.
@@ -62,7 +63,7 @@ static func same_opponent(captured, p2, captured_at: int) -> bool:
 		return false
 	if _text(captured, "trainer_id") != _text(p2, "trainer_id"):
 		return false
-	return Time.get_ticks_msec() - captured_at < 600000
+	return Time.get_ticks_msec() - captured_at < MMR_MATCH_WINDOW_MS
 
 
 static func _hide_usernames() -> bool:

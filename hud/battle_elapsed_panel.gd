@@ -3,8 +3,8 @@ extends "comfort_panel.gd"
 ##
 ## The value is the battle simulation's own clock (simulation.data.time_elapsed),
 ## not wall-clock time: fast-forwarding and replay steps make the two differ. The
-## panel is shown once battle_over is detected and hidden when the battle state
-## ends or a new battle starts.
+## panel is shown once battle_over is detected, auto-hides after AUTO_HIDE_SEC,
+## and is hidden on shop entry or when a new battle starts.
 
 const PANEL_WIDTH := 64.0
 const PANEL_HEIGHT := 16.0

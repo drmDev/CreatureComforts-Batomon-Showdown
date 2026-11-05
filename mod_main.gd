@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "2.229"
+const VERSION := "2.230"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
 const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 
@@ -219,15 +219,16 @@ func _setup_transition_capture() -> void:
 
 
 func _connect_transition_node(node: Node) -> void:
-	if node.has_signal("transition_requested") and node.has_method("request_transition"):
-		if not node.transition_requested.is_connected(_on_transition):
-			node.transition_requested.connect(_on_transition)
-			_transition_nodes.append(node)
+	_connect_transition_listener(node)
 	for child in node.get_children():
 		_connect_transition_node(child)
 
 
 func _on_node_added(node: Node) -> void:
+	_connect_transition_listener(node)
+
+
+func _connect_transition_listener(node: Node) -> void:
 	if node.has_signal("transition_requested") and node.has_method("request_transition"):
 		if not node.transition_requested.is_connected(_on_transition):
 			node.transition_requested.connect(_on_transition)
