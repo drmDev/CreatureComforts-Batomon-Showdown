@@ -11,6 +11,7 @@ const ReminderLabel = preload("reminder_label.gd")
 const ShopIncomePanel = preload("shop_income_panel.gd")
 const TrinketRemindersPanel = preload("trinket_reminders_panel.gd")
 const RankOddsPanel = preload("rank_odds_panel.gd")
+const BaseHpPanel = preload("base_hp_panel.gd")
 const WatchlistPanel = preload("watchlist_panel.gd")
 const PlayerHud = preload("player_hud.gd")
 const TrinketPanel = preload("trinket_panel.gd")
@@ -24,6 +25,7 @@ var reminder_label = null
 var shop_income_panel = null
 var trinket_reminders_panel = null
 var rank_odds_panel = null
+var base_hp_panel = null
 var watchlist_panel = null
 var trinket_panel = null
 var player_hud = null
@@ -36,6 +38,7 @@ var _formatter = null
 var _feature_enabled: Callable
 var _sounds_enabled: Callable
 var _rank_odds_popup_open := false
+var _base_hp_popup_open := false
 
 
 func setup(formatter, logger, feature_enabled: Callable, sounds_enabled: Callable) -> void:
@@ -82,6 +85,13 @@ func _build_reminder_layer() -> void:
 	rank_odds_panel.log_line.connect(_logger.log_event)
 	rank_odds_panel.popup_visibility_changed.connect(_on_rank_odds_popup_visibility_changed)
 	reminder_layer.add_child(rank_odds_panel)
+
+	# Base HP by day table, 25% across the viewport.
+	base_hp_panel = BaseHpPanel.new()
+	base_hp_panel.name = "BaseHpPanel"
+	base_hp_panel.log_line.connect(_logger.log_event)
+	base_hp_panel.popup_visibility_changed.connect(_on_base_hp_popup_visibility_changed)
+	reminder_layer.add_child(base_hp_panel)
 
 	# Watchlist button + popup; shop-gated with the rest of the reminder layer.
 	watchlist_panel = WatchlistPanel.new()
@@ -130,10 +140,15 @@ func apply_gate(allowed: bool) -> bool:
 	if reminder_layer == null:
 		return false
 	reminder_layer.visible = allowed
-	if not allowed and watchlist_panel != null:
+	if not allowed:
 		# The layer is hidden, so a still-open popup would reappear on the next
-		# shop visit. Close it with the rest of the shop UI.
-		watchlist_panel.close_popup()
+		# shop visit. Close every shop popup with the rest of the shop UI.
+		if watchlist_panel != null:
+			watchlist_panel.close_popup()
+		if rank_odds_panel != null:
+			rank_odds_panel.reset_for_shop()
+		if base_hp_panel != null:
+			base_hp_panel.reset_for_shop()
 	return allowed
 
 
@@ -147,13 +162,18 @@ func hide_shop_panels() -> void:
 		trinket_reminders_panel.hide_panel()
 	if rank_odds_panel != null:
 		rank_odds_panel.hide_panel()
+	if base_hp_panel != null:
+		base_hp_panel.hide_panel()
 	if watchlist_panel != null:
 		watchlist_panel.close_popup()
 
 
-func reset_rank_odds_for_shop() -> void:
+## Close any open shop modal when the shop becomes interactive again.
+func reset_shop_popups_for_shop() -> void:
 	if rank_odds_panel != null:
 		rank_odds_panel.reset_for_shop()
+	if base_hp_panel != null:
+		base_hp_panel.reset_for_shop()
 
 
 func update_shop_income(income: int) -> void:
@@ -171,7 +191,20 @@ func update_rank_odds(rank: int) -> void:
 	if not _feature_enabled.call(ModConfig.KEY_RANK_ODDS_PREVIEW):
 		rank_odds_panel.hide_panel()
 		return
+	if _base_hp_popup_open:
+		return
 	rank_odds_panel.set_rank(rank)
+
+
+func update_base_hp(day: int, total_hp: int) -> void:
+	if base_hp_panel == null:
+		return
+	if not _feature_enabled.call(ModConfig.KEY_BASE_HP_CHART):
+		base_hp_panel.hide_panel()
+		return
+	if _rank_odds_popup_open:
+		return
+	base_hp_panel.set_day(day, total_hp)
 
 
 func update_player_hud(state, is_battle: bool) -> void:
@@ -280,16 +313,44 @@ func on_feature_toggled(key: String, value: bool) -> void:
 	elif key == ModConfig.KEY_RANK_ODDS_PREVIEW:
 		if rank_odds_panel != null:
 			rank_odds_panel.hide_panel()
+	elif key == ModConfig.KEY_BASE_HP_CHART:
+		if base_hp_panel != null:
+			base_hp_panel.hide_panel()
 
 
-## The rank-odds popup is a full-screen modal drawn by a sibling panel. The
-## watchlist panel is added after it, so its button would otherwise float above
-## the dim layer. Hide the watchlist while the rank-odds popup is open.
+## The shop popups are full-screen modals drawn by sibling panels. Hide the other
+## buttons while one is open so they do not float above its dim backdrop.
 func _on_rank_odds_popup_visibility_changed(open: bool) -> void:
 	_rank_odds_popup_open = open
-	if watchlist_panel == null:
+	if open:
+		if base_hp_panel != null:
+			base_hp_panel.visible = false
+		if watchlist_panel != null:
+			watchlist_panel.visible = false
+	else:
+		_restore_shop_buttons()
+
+
+func _on_base_hp_popup_visibility_changed(open: bool) -> void:
+	_base_hp_popup_open = open
+	if open:
+		if rank_odds_panel != null:
+			rank_odds_panel.visible = false
+		if watchlist_panel != null:
+			watchlist_panel.visible = false
+	else:
+		_restore_shop_buttons()
+
+
+func _restore_shop_buttons() -> void:
+	if _rank_odds_popup_open or _base_hp_popup_open:
 		return
-	watchlist_panel.visible = not open and _feature_enabled.call(ModConfig.KEY_SHOP_HIGHLIGHTS)
+	if rank_odds_panel != null:
+		rank_odds_panel.visible = _feature_enabled.call(ModConfig.KEY_RANK_ODDS_PREVIEW)
+	if base_hp_panel != null:
+		base_hp_panel.visible = _feature_enabled.call(ModConfig.KEY_BASE_HP_CHART)
+	if watchlist_panel != null:
+		watchlist_panel.visible = _feature_enabled.call(ModConfig.KEY_SHOP_HIGHLIGHTS)
 
 
 func _on_trinket_panel_layout_debug(message: String) -> void:

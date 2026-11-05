@@ -48,6 +48,20 @@ func _build_hud_box(radius := 3, border_width := 1) -> StyleBoxFlat:
 	return box
 
 
+## Draw a texture inside `rect` at its natural aspect ratio (contain), centred.
+## Keeps a wide icon from being stretched into a square button.
+func _draw_texture_fit(tex: Texture2D, rect: Rect2) -> void:
+	if tex == null:
+		return
+	var tex_size := tex.get_size()
+	if tex_size.x <= 0.0 or tex_size.y <= 0.0:
+		return
+	var scale := minf(rect.size.x / tex_size.x, rect.size.y / tex_size.y)
+	var draw_size := tex_size * scale
+	var pos := rect.position + (rect.size - draw_size) * 0.5
+	draw_texture_rect(tex, Rect2(pos, draw_size), false)
+
+
 ## Load a mod-local PNG at runtime (loose mod assets are not imported by the game).
 ## The path is relative to the calling subclass script's directory.
 func _load_texture(relative_path: String) -> Texture2D:

@@ -9,6 +9,7 @@ var _test_scripts := {
 	"trainer_rules": preload("test_trainer_rules.gd"),
 	"trinket_gains": preload("test_trinket_gains.gd"),
 	"shop_income": preload("test_shop_income.gd"),
+	"base_hp": preload("test_base_hp.gd"),
 	"tracked_trinkets": preload("test_tracked_trinkets.gd"),
 	"battle_monitor": preload("test_battle_monitor.gd"),
 	"opponent_info": preload("test_opponent_info.gd"),

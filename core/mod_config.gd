@@ -18,6 +18,7 @@ const KEY_BATTLE_STATUS_PANEL := "battle_status_panel"
 const KEY_TRINKETS_GAINED_PANEL := "trinkets_gained_panel"
 const KEY_SHOP_INCOME := "shop_income"
 const KEY_RANK_ODDS_PREVIEW := "rank_odds_preview"
+const KEY_BASE_HP_CHART := "base_hp_chart"
 const KEY_SHOP_HIGHLIGHTS := "shop_highlights"
 const KEY_AUTO_UPDATE := "auto_update"
 
@@ -30,6 +31,7 @@ const DEFAULTS := {
 	KEY_TRINKETS_GAINED_PANEL: true,
 	KEY_SHOP_INCOME: true,
 	KEY_RANK_ODDS_PREVIEW: true,
+	KEY_BASE_HP_CHART: true,
 	KEY_SHOP_HIGHLIGHTS: true,
 	KEY_AUTO_UPDATE: true,
 }

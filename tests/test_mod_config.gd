@@ -28,6 +28,12 @@ func test_auto_update_defaults_to_enabled() -> void:
 	assert_true(config.is_enabled(ModConfig.KEY_AUTO_UPDATE))
 
 
+func test_base_hp_chart_defaults_to_enabled() -> void:
+	var config = ModConfig.new()
+	assert_eq(ModConfig.KEY_BASE_HP_CHART, "base_hp_chart")
+	assert_true(config.is_enabled(ModConfig.KEY_BASE_HP_CHART))
+
+
 func test_unknown_key_defaults_to_enabled() -> void:
 	var config = ModConfig.new()
 	assert_true(config.is_enabled("not_a_real_setting"))

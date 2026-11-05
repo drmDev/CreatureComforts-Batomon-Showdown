@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "2.231"
+const VERSION := "2.239"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
 const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 
@@ -344,7 +344,7 @@ func _handle_shop_phase(state) -> void:
 		# shop-to-shop inventory diff happens here. The gains panel is shop-gated and already
 		# holds this battle's gains; it simply becomes visible now that the shop is interactive.
 		_reset_transient_state(true, false, false)  # Reset suppression for new shop visit
-		_ui.reset_rank_odds_for_shop()
+		_ui.reset_shop_popups_for_shop()
 	elif _last_snapshot != null and _logger.deep_inspection:
 		# Full snapshot diffs are troubleshooting detail, not regular event logging.
 		var comparison = _changes_comparer.compare(_last_snapshot, current_snapshot)
@@ -358,9 +358,12 @@ func _handle_shop_phase(state) -> void:
 	
 	_advice.evaluate(current_snapshot, _shop_overlay_gate)
 	
-	_ui.update_shop_income(_compute_daily_income(run))
+	var current_day := int(run.get("current_round")) if NodeUtils.has_property(run, "current_round") else 1
+	_ui.update_shop_income(_compute_daily_income(run, current_day))
 	_trinket_reminders.update(run, _shop_overlay_gate)
 	_ui.update_rank_odds(int(run.get("shop_rank")) if NodeUtils.has_property(run, "shop_rank") else 1)
+	var total_hp := int(run.get("player_hp")) if NodeUtils.has_property(run, "player_hp") else 0
+	_ui.update_base_hp(current_day, total_hp)
 
 	# (overlay visibility is handled every frame by the shop overlay gate)
 	
@@ -368,8 +371,7 @@ func _handle_shop_phase(state) -> void:
 	_last_snapshot = current_snapshot
 
 
-func _compute_daily_income(run) -> int:
-	var day := int(run.get("current_round")) if NodeUtils.has_property(run, "current_round") else 1
+func _compute_daily_income(run, day: int) -> int:
 	var passive_gains: Array = []
 	if NodeUtils.has_property(run, "_active_passives"):
 		var passives = run.get("_active_passives")
