@@ -40,7 +40,6 @@ const ZIP_ROOT := "CreatureComforts/"
 ## Folders of the mod that may be written (and pruned) by an update.
 const TOP_DIRS := ["advice", "core", "hud", "dev", "assets"]
 const TEXT_EXT := ["gd", "json", "txt"]
-const BINARY_EXT := ["png", "ogg"]
 
 const FIRST_CHECK_SEC := 4.0
 const RECHECK_SEC := 6.0 * 3600.0

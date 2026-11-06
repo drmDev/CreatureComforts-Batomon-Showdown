@@ -53,6 +53,24 @@ func test_build_species_region_map_handles_dictionary_packs() -> void:
 	assert_eq(map.get("cairnage", []), ["Pantra"])
 
 
+## A species can belong to a set's dex without appearing in any shop pack
+## (Onsetra in Jinto). The dex helper must win over the pack-only map.
+func test_build_species_region_map_uses_dex_membership() -> void:
+	var db := DexDb.new()
+	var map = RunRegion.build_species_region_map(db)
+	assert_eq(map.get("onsetra", []), ["Jinto"])
+	assert_eq(map.get("gemwing", []), ["Jinto"])
+
+
+## When the dex helper returns nothing, the pack-derived map is still used.
+func test_build_species_region_map_falls_back_to_packs() -> void:
+	var db := DexDb.new()
+	db.has_dex = false
+	var map = RunRegion.build_species_region_map(db)
+	assert_eq(map.get("gemwing", []), ["Jinto"])
+	assert_eq(map.get("onsetra", []), [])
+
+
 func test_build_species_region_map_empty_db() -> void:
 	assert_empty(RunRegion.build_species_region_map({}))
 
@@ -97,3 +115,18 @@ func test_detect_reports_no_region_headless() -> void:
 	assert_true(result.has("region"))
 	assert_eq(str(result.get("region", "")), "")
 	assert_true(result.get("report") is Array)
+
+
+## Minimal GameDatabase stand-in exposing the dex helper. `has_dex` lets a test
+## exercise the pack-only fallback without a second class.
+class DexDb extends RefCounted:
+	var has_dex := true
+	var sets_db := [{"id": "oshima", "name": "Jinto"}]
+	var species_packs_db := [
+		{"id": "pack_a", "set_id": "oshima", "species_ids": ["gemwing"]},
+	]
+
+	func get_dex_species_for_set(set_id: String) -> Array:
+		if not has_dex or set_id != "oshima":
+			return []
+		return [{"id": "onsetra"}, {"id": "gemwing"}]

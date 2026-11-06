@@ -26,7 +26,7 @@ const REGION_COLLECTIONS := ["sets_db", "species_packs_db"]
 ## logger asks for it.
 static func detect(verbose := false) -> Dictionary:
 	var report: Array = []
-	var regions := build_region_map(null)
+	var regions := build_region_map()
 	var run_manager = NodeUtils.get_autoload("RunManager")
 	var run_data = null
 	if run_manager != null and "data" in run_manager:
@@ -66,14 +66,27 @@ static func build_region_map(db = null) -> Dictionary:
 	return regions
 
 
-## Species id -> region display names, built from species_packs_db. Packs are the
-## per-region shop pools; species.sets is too broad (many species list every set).
-## Keys are lowercased so callers can look up by species.id or name_key.
+## Species id -> region display names. The game's own dex membership
+## (`get_dex_species_for_set`) is authoritative: it includes species that belong
+## to a set but are not in any shop pack (e.g. Onsetra in Jinto). Packs are the
+## fallback for game builds without that helper, and fill in any species the dex
+## list does not cover. Keys are lowercased so callers can look up by species.id
+## or name_key.
 static func build_species_region_map(db = null) -> Dictionary:
 	if db == null:
 		db = NodeUtils.get_autoload("GameDatabase")
 	var regions := build_region_map(db)
 	var out := {}
+	if db is Object and is_instance_valid(db) and db.has_method("get_dex_species_for_set"):
+		for set_id in _set_ids(db, regions):
+			var region := str(regions.get(set_id.to_lower(), ""))
+			if region.is_empty():
+				continue
+			var dex = db.call("get_dex_species_for_set", set_id)
+			if not (dex is Array):
+				continue
+			for entry in dex:
+				_add_species_region(out, _species_id(entry), region)
 	for pack in _collection_entries(db, "species_packs_db"):
 		var set_id := _string_field(pack, "set_id")
 		if set_id.is_empty():
@@ -85,14 +98,42 @@ static func build_species_region_map(db = null) -> Dictionary:
 		if not (ids is Array):
 			continue
 		for raw_id in ids:
-			var species_id := str(raw_id).strip_edges().to_lower()
-			if species_id.is_empty():
-				continue
-			var list: Array = out.get(species_id, [])
-			if not list.has(region):
-				list.append(region)
-			out[species_id] = list
+			_add_species_region(out, str(raw_id).strip_edges().to_lower(), region)
 	return out
+
+
+## Set ids to ask the game's dex helper about. Prefer the raw ids from sets_db
+## (the helper expects the original casing); fall back to the region map keys.
+static func _set_ids(db, regions: Dictionary) -> Array:
+	var ids: Array = []
+	for set_entry in _collection_entries(db, "sets_db"):
+		var set_id := _string_field(set_entry, "id")
+		if not set_id.is_empty() and not ids.has(set_id):
+			ids.append(set_id)
+	if ids.is_empty():
+		ids = regions.keys()
+	return ids
+
+
+## Species id from a dex entry: a plain id string, a dictionary, or a species
+## object exposing `id` (preferred) or `name_key`.
+static func _species_id(entry) -> String:
+	if entry is String or entry is StringName:
+		return str(entry).strip_edges().to_lower()
+	for field in ["id", "name_key"]:
+		var value := _string_field(entry, field).to_lower()
+		if not value.is_empty():
+			return value
+	return ""
+
+
+static func _add_species_region(out: Dictionary, species_id: String, region: String) -> void:
+	if species_id.is_empty() or region.is_empty():
+		return
+	var list: Array = out.get(species_id, [])
+	if not list.has(region):
+		list.append(region)
+	out[species_id] = list
 
 
 ## Normalizes a raw property value (a String or an Array of ids) to a region name.

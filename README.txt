@@ -1,4 +1,4 @@
-Creature Comforts v3.101 - Quality of Life Mod for Batomon Showdown
+Creature Comforts v3.103 - Quality of Life Mod for Batomon Showdown
 =================================================================
 Creature Comforts adds helpful reminders, shop planning tools, and quality-of-life improvements to Batomon Showdown.
 
@@ -9,7 +9,7 @@ WATCHLIST & SHOP HIGHLIGHTING
 Track Batomon and items you want to find in the shop. Matching shop entries are automatically highlighted.
 
 - Browse and select Batomon and items.
-- Filter Batomon by rarity, type, and region. A specific region shows only that region's pool; use All for special circumstances.
+- Filter Batomon by rarity, type, and region. A specific region shows the Batomon in that region's dex; use All for special circumstances.
 - Sort the list by name (alphabetical) or by rarity (lowest to highest).
 - Snapshot your active team into the Watchlist.
 - Use Tracked Only to quickly review and adjust selections.

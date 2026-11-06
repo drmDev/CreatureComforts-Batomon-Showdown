@@ -983,9 +983,11 @@ func _resolve_type(type_resource) -> String:
 	return ""
 
 
-## Species carry no region field: the region is the set they belong to, resolved
-## through `_region_map` (set id -> display name). Unmapped ids are used verbatim.
-## A species can belong to several sets, so every mapped region is kept.
+## Fallback region list from species.sets, used only when the game database has
+## no dex/pack data. Species carry no region field: the region is the set they
+## belong to, resolved through `_region_map` (set id -> display name). Unmapped
+## ids are used verbatim. A species can belong to several sets, so every mapped
+## region is kept.
 func _extract_regions(species) -> Array:
 	var out: Array = []
 	if not ("sets" in species):
@@ -1001,15 +1003,14 @@ func _extract_regions(species) -> Array:
 			sid = str(set_entry.get("id"))
 		if sid.is_empty():
 			continue
-		var mapped := RunRegion.normalize_value(sid, _region_map)
-		var display := mapped if not mapped.is_empty() else sid
+		var display := RunRegion.normalize_value(sid, _region_map)
 		if not out.has(display):
 			out.append(display)
 	return out
 
 
-## Regions for a species. The pack-derived map is authoritative; species.sets is
-## only a fallback for when the game database has no pack data yet.
+## Regions for a species from the dex/pack-derived map. species.sets is only a
+## fallback for when the game database has no region data yet.
 func _regions_for_species(species, key: String) -> Array:
 	if _species_regions.is_empty():
 		return _extract_regions(species)
