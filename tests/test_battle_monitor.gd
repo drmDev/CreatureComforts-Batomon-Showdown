@@ -94,6 +94,34 @@ func test_reporter_reset() -> void:
 	assert_true(reporter.check(state))
 
 
+func test_reporter_rearms_after_replay() -> void:
+	var reporter := BattleCompletionReporter.new()
+	var state := _state(true)
+	assert_true(reporter.check(state))
+	assert_true(reporter.is_first_completion())
+	# Replay starts: battle_over drops back to false inside the same battle state.
+	state.simulation.data["battle_over"] = false
+	assert_false(reporter.check(state))
+	# Replay finishes: report again, but it is not the first completion.
+	state.simulation.data["battle_over"] = true
+	assert_true(reporter.check(state))
+	assert_false(reporter.is_first_completion())
+	assert_false(reporter.check(state))
+
+
+func test_reporter_rearms_for_new_simulation() -> void:
+	var reporter := BattleCompletionReporter.new()
+	var state := _state(true)
+	assert_true(reporter.check(state))
+	# A replay can replace the simulation object; the next poll may already see
+	# battle_over, so the new instance alone must re-arm the report.
+	var replay_sim := FakeSim.new()
+	replay_sim.data = {"battle_over": true}
+	state.simulation = replay_sim
+	assert_true(reporter.check(state))
+	assert_false(reporter.is_first_completion())
+
+
 func test_time_elapsed_reads_simulated_time() -> void:
 	assert_eq(BattleMonitor.time_elapsed({"time_elapsed": 12.34}), 12.34)
 

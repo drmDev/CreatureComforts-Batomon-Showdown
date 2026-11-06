@@ -219,6 +219,10 @@ func update_player_hud(state, is_battle: bool) -> void:
 	if not is_battle:
 		player_hud.visible = false
 		return
+	# The elapsed readout occupies the same spot; never show both.
+	if battle_elapsed_panel != null and battle_elapsed_panel.visible:
+		player_hud.visible = false
+		return
 
 	var player_run = state.get("_replay_p1_data") if NodeUtils.has_property(state, "_replay_p1_data") else null
 	if player_run == null:
@@ -228,6 +232,13 @@ func update_player_hud(state, is_battle: bool) -> void:
 	player_hud.update_stats(_build_player_stats(player_run))
 	var is_active: bool = state.get("is_battle_active") if NodeUtils.has_property(state, "is_battle_active") else false
 	player_hud.visible = is_active
+
+
+## Hide the lives/wins/day HUD without changing its stored stats. Used when the
+## elapsed readout takes over the same screen space.
+func hide_player_hud() -> void:
+	if player_hud != null:
+		player_hud.visible = false
 
 
 ## Show the simulated battle duration once the battle is over. Shares the Battle

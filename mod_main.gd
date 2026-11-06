@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "3.201"
+const VERSION := "3.203"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
 const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 
@@ -268,6 +268,9 @@ func _inspect_current_phase() -> void:
 		_ui.hide_shop_panels()
 	if not is_battle:
 		_ui.hide_opponent_panel()
+		# The elapsed readout belongs to the battle screen; drop it as soon as the
+		# battle state is left (shop, event, or trinket select).
+		_ui.hide_battle_elapsed()
 		# Reset battle-scoped tracking only when actually leaving the battle phase.
 		if _last_phase == "battle":
 			_battle_completion.reset()
@@ -362,6 +365,12 @@ func _handle_battle_phase(state) -> void:
 	if _last_phase != "battle":
 		_ui.hide_battle_elapsed()
 
+	# A replay restarts the simulation inside the same battle state. Hide the
+	# previous readout while the replay runs; _check_battle_completion shows it
+	# again when the replay finishes.
+	if not BattleMonitor.is_over(state):
+		_ui.hide_battle_elapsed()
+
 	# The opponent card follows the exact same visibility as the lives/wins/day HUD.
 	var is_active: bool = state.get("is_battle_active") if NodeUtils.has_property(state, "is_battle_active") else false
 
@@ -424,8 +433,12 @@ func _check_battle_completion(state) -> void:
 		return
 	var sim = state.get("simulation") if NodeUtils.has_property(state, "simulation") else null
 	var battle_data = sim.get("data") if sim != null and NodeUtils.has_property(sim, "data") else null
-	_log_battle_result(battle_data)
+	# Log the result once per battle; a replay only refreshes the elapsed readout.
+	if _battle_completion.is_first_completion():
+		_log_battle_result(battle_data)
 	_ui.show_battle_elapsed(BattleMonitor.format_seconds(BattleMonitor.time_elapsed(battle_data)))
+	# The elapsed readout sits over the lives/wins/day HUD; show only one of them.
+	_ui.hide_player_hud()
 
 
 func _log_battle_result(battle_data) -> void:
