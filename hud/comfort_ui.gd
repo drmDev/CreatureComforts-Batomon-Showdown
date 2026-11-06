@@ -326,38 +326,38 @@ func on_feature_toggled(key: String, value: bool) -> void:
 ## buttons while one is open so they do not float above its dim backdrop.
 func _on_rank_odds_popup_visibility_changed(open: bool) -> void:
 	_rank_odds_popup_open = open
-	if open:
-		if base_hp_panel != null:
-			base_hp_panel.visible = false
-		if watchlist_panel != null:
-			watchlist_panel.visible = false
-	else:
-		_restore_shop_buttons()
+	_on_shop_modal_visibility_changed(open, rank_odds_panel)
 
 
 func _on_base_hp_popup_visibility_changed(open: bool) -> void:
 	_base_hp_popup_open = open
-	if open:
-		if rank_odds_panel != null:
-			rank_odds_panel.visible = false
-		if watchlist_panel != null:
-			watchlist_panel.visible = false
-	else:
+	_on_shop_modal_visibility_changed(open, base_hp_panel)
+
+
+func _on_shop_modal_visibility_changed(open: bool, modal) -> void:
+	if not open:
 		_restore_shop_buttons()
+		return
+	for panel in [rank_odds_panel, base_hp_panel, watchlist_panel]:
+		if panel != null and panel != modal:
+			panel.visible = false
 
 
-## `shop_highlights` overrides the stored value for the watchlist button, so a
-## live toggle applies immediately even before the loader persists it.
-func _restore_shop_buttons(shop_highlights = null) -> void:
+## Restore the shop button row after a modal closes or a setting changes.
+## `watchlist_override` applies a live Shop Highlights value before the loader
+## has persisted it; null reads the stored setting.
+func _restore_shop_buttons(watchlist_override = null) -> void:
 	if _rank_odds_popup_open or _base_hp_popup_open:
 		return
 	if rank_odds_panel != null:
 		rank_odds_panel.visible = _feature_enabled.call(ModConfig.KEY_RANK_ODDS_PREVIEW)
 	if base_hp_panel != null:
 		base_hp_panel.visible = _feature_enabled.call(ModConfig.KEY_BASE_HP_CHART)
-	if watchlist_panel != null:
-		var enabled: bool = _feature_enabled.call(ModConfig.KEY_SHOP_HIGHLIGHTS) if shop_highlights == null else bool(shop_highlights)
-		watchlist_panel.visible = enabled
+	if watchlist_panel == null:
+		return
+	if watchlist_override == null:
+		watchlist_override = _feature_enabled.call(ModConfig.KEY_SHOP_HIGHLIGHTS)
+	watchlist_panel.visible = bool(watchlist_override)
 
 
 func _on_trinket_panel_layout_debug(message: String) -> void:

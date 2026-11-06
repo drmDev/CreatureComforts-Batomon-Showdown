@@ -3,9 +3,9 @@ extends Node
 ##
 ## Detects shop_slot_ui cards as they appear (including rerolls and purchases)
 ## and attaches a full-rect overlay child to each. The overlay reads the card's
-## live current_content every frame, so highlights follow rerolls and never use
-## stale coordinates. Non-blocking (mouse_filter IGNORE) and deduplicated by
-## node name, so repeated detection cannot stack overlays.
+## live current_content on a short interval, so highlights follow rerolls and
+## never use stale coordinates. Non-blocking (mouse_filter IGNORE) and
+## deduplicated by node name, so repeated detection cannot stack overlays.
 
 const CARD_SCRIPT := "shop_slot_ui"
 const OVERLAY_NAME := "CreatureComfortsHighlight"
