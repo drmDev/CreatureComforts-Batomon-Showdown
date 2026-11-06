@@ -19,6 +19,9 @@ const KEY_TRINKETS_GAINED_PANEL := "trinkets_gained_panel"
 const KEY_SHOP_INCOME := "shop_income"
 const KEY_RANK_ODDS_PREVIEW := "rank_odds_preview"
 const KEY_BASE_HP_CHART := "base_hp_chart"
+## Gates the watchlist button/popup and the matching-card shop highlights
+## together: highlighting is only useful with the watchlist, so one setting
+## controls both. The key keeps its original name so saved values carry over.
 const KEY_SHOP_HIGHLIGHTS := "shop_highlights"
 const KEY_AUTO_UPDATE := "auto_update"
 

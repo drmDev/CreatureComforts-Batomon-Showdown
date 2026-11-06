@@ -93,15 +93,18 @@ func _build_reminder_layer() -> void:
 	base_hp_panel.popup_visibility_changed.connect(_on_base_hp_popup_visibility_changed)
 	reminder_layer.add_child(base_hp_panel)
 
-	# Watchlist button + popup; shop-gated with the rest of the reminder layer.
+	# Watchlist button + popup; shop-gated with the rest of the reminder layer
+	# and hidden entirely when the Shop Highlights setting is off.
 	watchlist_panel = WatchlistPanel.new()
 	watchlist_panel.name = "WatchlistPanel"
 	watchlist_panel.setup(_formatter, _sounds_enabled)
 	reminder_layer.add_child(watchlist_panel)
 
 
-## Node-attached shop highlighting. Shares the watchlist panel's selection
-## dictionary by reference, so selection changes apply on the next frame.
+## Shop highlighting and the watchlist button share one setting: highlights are
+## only useful with the watchlist, so disabling the feature hides both. The
+## selection dictionary is shared by reference, so watchlist edits apply to the
+## highlights on the next frame.
 func _build_shop_highlight() -> void:
 	shop_highlight = ShopHighlight.new()
 	shop_highlight.name = "ShopHighlight"
@@ -109,9 +112,7 @@ func _build_shop_highlight() -> void:
 	shop_highlight.setup(watchlist_panel.selection)
 	var enabled: bool = _feature_enabled.call(ModConfig.KEY_SHOP_HIGHLIGHTS)
 	shop_highlight.set_enabled(enabled)
-	# The watchlist button stays available even when highlighting is off, so
-	# the player can still edit the list and reach Saved Builds.
-	watchlist_panel.visible = true
+	watchlist_panel.visible = enabled
 
 
 func _build_player_hud() -> void:
@@ -292,13 +293,14 @@ func _build_player_stats(player_run) -> Dictionary:
 ## Apply a live settings change to the panels this UI owns.
 func on_feature_toggled(key: String, value: bool) -> void:
 	# Shop highlighting has no poll-driven re-show, so handle both states here.
+	# The same setting shows/hides the watchlist button and popup.
 	if key == ModConfig.KEY_SHOP_HIGHLIGHTS:
 		if shop_highlight != null:
 			shop_highlight.set_enabled(value)
 		if not value and watchlist_panel != null:
 			watchlist_panel.close_popup()
 		# Restore the button row, which also respects an open Base HP popup.
-		_restore_shop_buttons()
+		_restore_shop_buttons(value)
 		return
 	if value:
 		return
@@ -344,7 +346,9 @@ func _on_base_hp_popup_visibility_changed(open: bool) -> void:
 		_restore_shop_buttons()
 
 
-func _restore_shop_buttons() -> void:
+## `shop_highlights` overrides the stored value for the watchlist button, so a
+## live toggle applies immediately even before the loader persists it.
+func _restore_shop_buttons(shop_highlights = null) -> void:
 	if _rank_odds_popup_open or _base_hp_popup_open:
 		return
 	if rank_odds_panel != null:
@@ -352,9 +356,8 @@ func _restore_shop_buttons() -> void:
 	if base_hp_panel != null:
 		base_hp_panel.visible = _feature_enabled.call(ModConfig.KEY_BASE_HP_CHART)
 	if watchlist_panel != null:
-		# Independent of the Shop Highlights setting: the button is the only
-		# way to edit the watchlist and open Saved Builds.
-		watchlist_panel.visible = true
+		var enabled: bool = _feature_enabled.call(ModConfig.KEY_SHOP_HIGHLIGHTS) if shop_highlights == null else bool(shop_highlights)
+		watchlist_panel.visible = enabled
 
 
 func _on_trinket_panel_layout_debug(message: String) -> void:

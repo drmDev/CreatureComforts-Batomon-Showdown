@@ -34,6 +34,22 @@ func test_base_hp_chart_defaults_to_enabled() -> void:
 	assert_true(config.is_enabled(ModConfig.KEY_BASE_HP_CHART))
 
 
+func test_shop_highlights_key_is_stable_and_defaults_to_enabled() -> void:
+	# The key is unchanged so existing saved values keep working. It now gates
+	# the watchlist button/popup and the shop highlights together.
+	var config = ModConfig.new()
+	assert_eq(ModConfig.KEY_SHOP_HIGHLIGHTS, "shop_highlights")
+	assert_true(config.is_enabled(ModConfig.KEY_SHOP_HIGHLIGHTS))
+
+
+func test_shop_highlights_override_disables_watchlist_and_highlights() -> void:
+	var loader = FakeLoader.new()
+	loader.values[ModConfig.KEY_SHOP_HIGHLIGHTS] = false
+	var config = ModConfig.new()
+	config.setup(loader)
+	assert_false(config.is_enabled(ModConfig.KEY_SHOP_HIGHLIGHTS))
+
+
 func test_unknown_key_defaults_to_enabled() -> void:
 	var config = ModConfig.new()
 	assert_true(config.is_enabled("not_a_real_setting"))

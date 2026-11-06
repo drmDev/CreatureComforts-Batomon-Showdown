@@ -8,7 +8,7 @@ extends RefCounted
 const BASE_HP := 300
 const LATE_HP_START_ROUND := 10
 const LATE_HP_STEP := 0.1
-const MAX_DAY := 17
+const MAX_DAY := 16
 
 const CUBIC_B := 15.0
 const LIN := 100.0
