@@ -5,19 +5,16 @@ const RunRegion = preload("../core/run_region.gd")
 
 
 func test_build_region_map_translates_ids() -> void:
-	# sets_db is an Array; species_packs_db is exercised as a Dictionary too.
 	var db := {
 		"sets_db": [
 			{"id": "oshima", "name": "Jinto"},
 			{"id": "set_pantra", "name_key": "Pantra"},
 		],
-		"species_packs_db": {"pack_extra": {"id": "pack_extra", "name": "Verdant"}},
 	}
 	var regions = RunRegion.build_region_map(db)
-	assert_eq(regions.size(), 3)
+	assert_eq(regions.size(), 2)
 	assert_eq(str(regions.get("oshima", "")), "Jinto")
 	assert_eq(str(regions.get("set_pantra", "")), "Pantra")
-	assert_eq(str(regions.get("pack_extra", "")), "Verdant")
 
 
 func test_build_region_map_ignores_incomplete_entries() -> void:
@@ -25,36 +22,8 @@ func test_build_region_map_ignores_incomplete_entries() -> void:
 	assert_empty(RunRegion.build_region_map(db))
 
 
-func test_build_species_region_map_groups_by_set() -> void:
-	var db := {
-		"sets_db": [
-			{"id": "starter", "name": "Pantra"},
-			{"id": "oshima", "name": "Jinto"},
-		],
-		"species_packs_db": [
-			{"id": "starter_pack", "set_id": "starter", "species_ids": ["cairnage", "gemwing"]},
-			{"id": "oshima_pack", "set_id": "oshima", "species_ids": ["gemwing", "dracana"]},
-		],
-	}
-	var map = RunRegion.build_species_region_map(db)
-	assert_eq(map.get("cairnage", []), ["Pantra"])
-	assert_eq(map.get("gemwing", []), ["Pantra", "Jinto"])
-	assert_eq(map.get("dracana", []), ["Jinto"])
-
-
-func test_build_species_region_map_handles_dictionary_packs() -> void:
-	var db := {
-		"sets_db": [{"id": "starter", "name": "Pantra"}],
-		"species_packs_db": {
-			"pack_a": {"id": "pack_a", "set_id": "starter", "species_ids": ["cairnage"]},
-		},
-	}
-	var map = RunRegion.build_species_region_map(db)
-	assert_eq(map.get("cairnage", []), ["Pantra"])
-
-
 ## A species can belong to a set's dex without appearing in any shop pack
-## (Onsetra in Jinto). The dex helper must win over the pack-only map.
+## (Onsetra in Jinto).
 func test_build_species_region_map_uses_dex_membership() -> void:
 	var db := DexDb.new()
 	var map = RunRegion.build_species_region_map(db)
@@ -62,13 +31,16 @@ func test_build_species_region_map_uses_dex_membership() -> void:
 	assert_eq(map.get("gemwing", []), ["Jinto"])
 
 
-## When the dex helper returns nothing, the pack-derived map is still used.
-func test_build_species_region_map_falls_back_to_packs() -> void:
-	var db := DexDb.new()
-	db.has_dex = false
-	var map = RunRegion.build_species_region_map(db)
-	assert_eq(map.get("gemwing", []), ["Jinto"])
-	assert_eq(map.get("onsetra", []), [])
+## Without the dex helper the map is empty; the watchlist then falls back to
+## species.sets via _extract_regions().
+func test_build_species_region_map_without_dex_helper_is_empty() -> void:
+	var db := {
+		"sets_db": [{"id": "oshima", "name": "Jinto"}],
+		"species_packs_db": [
+			{"id": "pack_a", "set_id": "oshima", "species_ids": ["gemwing"]},
+		],
+	}
+	assert_empty(RunRegion.build_species_region_map(db))
 
 
 func test_build_species_region_map_empty_db() -> void:
@@ -117,16 +89,11 @@ func test_detect_reports_no_region_headless() -> void:
 	assert_true(result.get("report") is Array)
 
 
-## Minimal GameDatabase stand-in exposing the dex helper. `has_dex` lets a test
-## exercise the pack-only fallback without a second class.
+## Minimal GameDatabase stand-in exposing the dex helper.
 class DexDb extends RefCounted:
-	var has_dex := true
 	var sets_db := [{"id": "oshima", "name": "Jinto"}]
-	var species_packs_db := [
-		{"id": "pack_a", "set_id": "oshima", "species_ids": ["gemwing"]},
-	]
 
 	func get_dex_species_for_set(set_id: String) -> Array:
-		if not has_dex or set_id != "oshima":
+		if set_id != "oshima":
 			return []
 		return [{"id": "onsetra"}, {"id": "gemwing"}]

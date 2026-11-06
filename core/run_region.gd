@@ -3,7 +3,7 @@ extends RefCounted
 ##
 ## `RunManager.data.active_set_id` holds the region as a set id (e.g. "oshima"),
 ## which `sets_db` maps to a display name. The watchlist labels species with the
-## same map (species.sets -> set name), so both sides agree on the string.
+## same set display names, so both sides agree on the string.
 ##
 ## `detect()` returns `{ "region": String, "report": Array[String] }`; the report
 ## exists so the diagnostic logger can show what was read.
@@ -13,8 +13,8 @@ const NodeUtils = preload("node_utils.gd")
 ## Fields that may carry the active set/region, most likely first.
 const CANDIDATE_KEYS := ["active_set_id", "region", "current_region", "set_id", "current_set", "active_set"]
 
-## GameDatabase collections that describe a region, keyed by id.
-const REGION_COLLECTIONS := ["sets_db", "species_packs_db"]
+## GameDatabase collection that describes a region, keyed by id.
+const REGION_COLLECTIONS := ["sets_db"]
 
 
 ## Detects the current region.
@@ -68,37 +68,28 @@ static func build_region_map(db = null) -> Dictionary:
 
 ## Species id -> region display names. The game's own dex membership
 ## (`get_dex_species_for_set`) is authoritative: it includes species that belong
-## to a set but are not in any shop pack (e.g. Onsetra in Jinto). Packs are the
-## fallback for game builds without that helper, and fill in any species the dex
-## list does not cover. Keys are lowercased so callers can look up by species.id
-## or name_key.
+## to a set but are not in any shop pack (e.g. Onsetra in Jinto) and excludes
+## foreign/event-only entries. Keys are lowercased so callers can look up by
+## species.id or name_key.
+##
+## When the game has no dex helper, this returns an empty map and the watchlist
+## falls back to `species.sets` (hud/watchlist_panel.gd `_extract_regions`).
 static func build_species_region_map(db = null) -> Dictionary:
 	if db == null:
 		db = NodeUtils.get_autoload("GameDatabase")
-	var regions := build_region_map(db)
 	var out := {}
-	if db is Object and is_instance_valid(db) and db.has_method("get_dex_species_for_set"):
-		for set_id in _set_ids(db, regions):
-			var region := str(regions.get(set_id.to_lower(), ""))
-			if region.is_empty():
-				continue
-			var dex = db.call("get_dex_species_for_set", set_id)
-			if not (dex is Array):
-				continue
-			for entry in dex:
-				_add_species_region(out, _species_id(entry), region)
-	for pack in _collection_entries(db, "species_packs_db"):
-		var set_id := _string_field(pack, "set_id")
-		if set_id.is_empty():
-			continue
+	if not (db is Object and is_instance_valid(db) and db.has_method("get_dex_species_for_set")):
+		return out
+	var regions := build_region_map(db)
+	for set_id in _set_ids(db, regions):
 		var region := str(regions.get(set_id.to_lower(), ""))
 		if region.is_empty():
-			region = set_id
-		var ids = _field(pack, "species_ids")
-		if not (ids is Array):
 			continue
-		for raw_id in ids:
-			_add_species_region(out, str(raw_id).strip_edges().to_lower(), region)
+		var dex = db.call("get_dex_species_for_set", set_id)
+		if not (dex is Array):
+			continue
+		for entry in dex:
+			_add_species_region(out, _species_id(entry), region)
 	return out
 
 
@@ -214,16 +205,6 @@ static func _has(obj, key: String) -> bool:
 	if obj is Dictionary:
 		return obj.has(key)
 	return obj is Object and key in obj
-
-
-static func _field(obj, field: String):
-	if obj == null:
-		return null
-	if obj is Dictionary:
-		return obj.get(field)
-	if obj is Object and field in obj:
-		return obj.get(field)
-	return null
 
 
 static func _string_field(obj, field: String) -> String:

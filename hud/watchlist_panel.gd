@@ -1046,13 +1046,15 @@ func _is_excluded_key(key: String) -> bool:
 	return false
 
 
-## Placeholder and non-obtainable species are hidden from the watchlist. The
-## game flags them explicitly, and the name check catches translated placeholders
+## Placeholder and non-dex species are hidden from the watchlist. The game flags
+## them with `exclude_from_dex`; `exclude_from_grants` is deliberately ignored
+## because legitimate shop species can carry it (e.g. Leafleap, Toximoth,
+## Aviarab, Cordycant, Sproach). The name check catches translated placeholders
 ## such as "Mysterious Trainer" even when the raw key uses camelCase.
 func _is_excluded_species(species, key: String, display: String) -> bool:
 	if _is_excluded_key(key) or _is_excluded_key(display):
 		return true
-	return _flag(species, "exclude_from_dex") or _flag(species, "exclude_from_grants")
+	return _flag(species, "exclude_from_dex")
 
 
 static func _flag(obj, field: String) -> bool:

@@ -220,7 +220,9 @@ func test_is_excluded_key_splits_camel_case() -> void:
 func test_is_excluded_species_flags() -> void:
 	var panel = WatchlistPanel.new()
 	assert_true(panel._is_excluded_species({"exclude_from_dex": true}, "monster.name.foo", "Foo"))
-	assert_true(panel._is_excluded_species({"exclude_from_grants": true}, "monster.name.foo", "Foo"))
+	# exclude_from_grants only excludes random grants; legitimate shop species
+	# such as Leafleap and Toximoth carry it and must stay in the watchlist.
+	assert_false(panel._is_excluded_species({"exclude_from_grants": true}, "monster.name.leafleap", "Leafleap"))
 	assert_false(panel._is_excluded_species({}, "monster.name.cairnage", "Cairnage"))
 	panel.free()
 
