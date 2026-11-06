@@ -3,9 +3,8 @@ extends "collapsible_panel.gd"
 ## applied after the frozen battle_over snapshot), so this panel only receives legitimate gains.
 ##
 ## The panel is shop-gated (it lives on the reminder layer), so the overlay gate holds it back
-## through the results/event/gift screens and shows it once the shop is interactive. The
-## presenter then auto-hides it after AUTO_HIDE_SEC; the player can also collapse it (it keeps
-## the collapsed tab) or start the next battle, which hides and clears it.
+## through the results/event/gift screens and shows it once the shop is interactive. It stays
+## visible until the player collapses it or starts the next battle, which hides and clears it.
 
 const TrinketGains = preload("../core/trinket_gains.gd")
 

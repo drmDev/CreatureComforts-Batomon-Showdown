@@ -25,6 +25,38 @@ func test_build_region_map_ignores_incomplete_entries() -> void:
 	assert_empty(RunRegion.build_region_map(db))
 
 
+func test_build_species_region_map_groups_by_set() -> void:
+	var db := {
+		"sets_db": [
+			{"id": "starter", "name": "Pantra"},
+			{"id": "oshima", "name": "Jinto"},
+		],
+		"species_packs_db": [
+			{"id": "starter_pack", "set_id": "starter", "species_ids": ["cairnage", "gemwing"]},
+			{"id": "oshima_pack", "set_id": "oshima", "species_ids": ["gemwing", "dracana"]},
+		],
+	}
+	var map = RunRegion.build_species_region_map(db)
+	assert_eq(map.get("cairnage", []), ["Pantra"])
+	assert_eq(map.get("gemwing", []), ["Pantra", "Jinto"])
+	assert_eq(map.get("dracana", []), ["Jinto"])
+
+
+func test_build_species_region_map_handles_dictionary_packs() -> void:
+	var db := {
+		"sets_db": [{"id": "starter", "name": "Pantra"}],
+		"species_packs_db": {
+			"pack_a": {"id": "pack_a", "set_id": "starter", "species_ids": ["cairnage"]},
+		},
+	}
+	var map = RunRegion.build_species_region_map(db)
+	assert_eq(map.get("cairnage", []), ["Pantra"])
+
+
+func test_build_species_region_map_empty_db() -> void:
+	assert_empty(RunRegion.build_species_region_map({}))
+
+
 func test_normalize_value_keeps_plain_names() -> void:
 	assert_eq(RunRegion.normalize_value("Jinto", {}), "Jinto")
 	assert_eq(RunRegion.normalize_value("  Pantra  ", {}), "Pantra")

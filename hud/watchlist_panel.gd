@@ -78,6 +78,7 @@ var _sort_desc_icon: Texture2D
 var _region_filter := ""
 var _region_option: OptionButton
 var _region_map := {}      # set/pack id -> region display name (from the catalog)
+var _species_regions := {} # species id -> region display names (from species packs)
 var _applied_region := ""  # last auto-applied region, so we only override on change
 var _snapshot_button: Button
 var _tracked_count_label: Label
@@ -874,6 +875,7 @@ func _load_catalog() -> void:
 	var seen := {}
 	var type_set := {}
 	_region_map = RunRegion.build_region_map(db)
+	_species_regions = RunRegion.build_species_region_map(db)
 	if db.has_method("get_all_species"):
 		for species in db.get_all_species():
 			if species == null:
@@ -886,7 +888,7 @@ func _load_catalog() -> void:
 			if key.is_empty() or seen.has("m:" + key):
 				continue
 			var display := _display_name("monster", key)
-			if display.strip_edges().is_empty() or _is_excluded_key(key):
+			if display.strip_edges().is_empty() or _is_excluded_species(species, key, display):
 				continue
 			seen["m:" + key] = true
 			var tier := int(species.get("tier")) if "tier" in species else 0
@@ -906,7 +908,7 @@ func _load_catalog() -> void:
 				"kind": "monster", "key": key, "name": display,
 				"tier": tier, "types": types,
 				"icon": icon if icon is Texture2D else null,
-				"regions": _extract_regions(species),
+				"regions": _regions_for_species(species, key),
 			}
 			_catalog.append(entry)
 			_catalog_index["monster:" + key] = entry
@@ -999,21 +1001,63 @@ func _extract_regions(species) -> Array:
 			sid = str(set_entry.get("id"))
 		if sid.is_empty():
 			continue
-		var mapped := str(_region_map.get(sid.to_lower(), ""))
+		var mapped := RunRegion.normalize_value(sid, _region_map)
 		var display := mapped if not mapped.is_empty() else sid
 		if not out.has(display):
 			out.append(display)
 	return out
 
 
+## Regions for a species. The pack-derived map is authoritative; species.sets is
+## only a fallback for when the game database has no pack data yet.
+func _regions_for_species(species, key: String) -> Array:
+	if _species_regions.is_empty():
+		return _extract_regions(species)
+	var out: Array = []
+	var ids: Array = [key]
+	for field in ["id", "name_key"]:
+		if field in species:
+			ids.append(str(species.get(field)))
+	for raw_id in ids:
+		var sid := str(raw_id).strip_edges().to_lower()
+		if sid.is_empty():
+			continue
+		for region in _species_regions.get(sid, []):
+			if not out.has(region):
+				out.append(region)
+	return out
+
+
 ## Match the raw key against the exclusion list, not the translated display name.
 ## Splitting on non-alphanumeric characters keeps "eggplant" from matching "egg".
+## CamelCase is split too, so "mysteriousTrainer" is caught.
 func _is_excluded_key(key: String) -> bool:
-	var parts := key.to_lower().replace("_", " ").replace("-", " ").replace(".", " ").split(" ", false)
+	var spaced := ""
+	for i in range(key.length()):
+		var c := key[i]
+		if i > 0 and c == c.to_upper() and c != c.to_lower():
+			spaced += " "
+		spaced += c
+	var parts := spaced.to_lower().replace("_", " ").replace("-", " ").replace(".", " ").split(" ", false)
 	for part in parts:
 		if part in EXCLUDED_NAME_PARTS:
 			return true
 	return false
+
+
+## Placeholder and non-obtainable species are hidden from the watchlist. The
+## game flags them explicitly, and the name check catches translated placeholders
+## such as "Mysterious Trainer" even when the raw key uses camelCase.
+func _is_excluded_species(species, key: String, display: String) -> bool:
+	if _is_excluded_key(key) or _is_excluded_key(display):
+		return true
+	return _flag(species, "exclude_from_dex") or _flag(species, "exclude_from_grants")
+
+
+static func _flag(obj, field: String) -> bool:
+	if obj == null or not (field in obj):
+		return false
+	return bool(obj.get(field))
 
 
 func _display_name(kind: String, key: String) -> String:
@@ -1176,18 +1220,16 @@ func _passes_monster_filters(entry: Dictionary) -> bool:
 			return false
 	if not _region_filter.is_empty():
 		var regions: Array = entry.get("regions", [])
-		# Species with no region data (e.g. a catalog entry without sets) are
-		# not hidden by the region filter; only entries that declare regions
-		# are filtered.
-		if not regions.is_empty():
-			var filter := _region_filter.to_lower()
-			var matched := false
-			for region in regions:
-				if str(region).to_lower().contains(filter):
-					matched = true
-					break
-			if not matched:
-				return false
+		# A specific region only shows species associated with it. Species with
+		# no region data (event-only or foreign) remain available under "All".
+		var filter := _region_filter.to_lower()
+		var matched := false
+		for region in regions:
+			if str(region).to_lower() == filter:
+				matched = true
+				break
+		if not matched:
+			return false
 	return true
 
 

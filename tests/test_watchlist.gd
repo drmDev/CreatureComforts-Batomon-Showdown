@@ -65,6 +65,44 @@ func test_region_filter_matches_any_region() -> void:
 	panel.free()
 
 
+func test_region_filter_hides_entries_without_regions() -> void:
+	var panel = WatchlistPanel.new()
+	panel._region_filter = "Jinto"
+	var entry := {"tier": 1, "types": [], "regions": []}
+	assert_false(panel._passes_monster_filters(entry))
+	panel._region_filter = ""
+	assert_true(panel._passes_monster_filters(entry))
+	panel.free()
+
+
+func test_region_filter_uses_exact_region_names() -> void:
+	var panel = WatchlistPanel.new()
+	panel._region_filter = "Jinto"
+	var entry := {"tier": 1, "types": [], "regions": ["Jinto Base"]}
+	assert_false(panel._passes_monster_filters(entry))
+	entry["regions"] = ["jinto"]
+	assert_true(panel._passes_monster_filters(entry))
+	panel.free()
+
+
+func test_regions_for_species_uses_pack_map() -> void:
+	var panel = WatchlistPanel.new()
+	panel._species_regions = {"cairnage": ["Pantra"], "monster.name.gemwing": ["Jinto"]}
+	var cairnage := {"id": "cairnage", "name_key": "monster.name.cairnage"}
+	assert_eq(panel._regions_for_species(cairnage, "monster.name.cairnage"), ["Pantra"])
+	var gemwing := {"id": "gemwing", "name_key": "monster.name.gemwing"}
+	assert_eq(panel._regions_for_species(gemwing, "monster.name.gemwing"), ["Jinto"])
+	panel.free()
+
+
+func test_regions_for_species_falls_back_to_sets() -> void:
+	var panel = WatchlistPanel.new()
+	panel._region_map = {"starter": "Pantra", "oshima": "Jinto"}
+	var species := {"sets": ["starter"]}
+	assert_eq(panel._regions_for_species(species, "monster.name.cairnage"), ["Pantra"])
+	panel.free()
+
+
 func test_rarity_and_type_filters() -> void:
 	var panel = WatchlistPanel.new()
 	panel._rarity_filter = "Rare"
@@ -169,6 +207,28 @@ func test_is_excluded_key_uses_word_boundaries() -> void:
 	assert_true(panel._is_excluded_key("monster.name.egg"))
 	assert_true(panel._is_excluded_key("monster.name.mysterious_egg"))
 	assert_false(panel._is_excluded_key("monster.name.eggplant"))
+	panel.free()
+
+
+func test_is_excluded_key_splits_camel_case() -> void:
+	var panel = WatchlistPanel.new()
+	assert_true(panel._is_excluded_key("monster.name.mysteriousTrainer"))
+	assert_false(panel._is_excluded_key("monster.name.eggplant"))
+	panel.free()
+
+
+func test_is_excluded_species_flags() -> void:
+	var panel = WatchlistPanel.new()
+	assert_true(panel._is_excluded_species({"exclude_from_dex": true}, "monster.name.foo", "Foo"))
+	assert_true(panel._is_excluded_species({"exclude_from_grants": true}, "monster.name.foo", "Foo"))
+	assert_false(panel._is_excluded_species({}, "monster.name.cairnage", "Cairnage"))
+	panel.free()
+
+
+func test_is_excluded_species_checks_display_name() -> void:
+	var panel = WatchlistPanel.new()
+	assert_true(panel._is_excluded_species({}, "monster.name.mysteriousTrainer", "Mysterious Trainer"))
+	assert_false(panel._is_excluded_species({}, "monster.name.eggplant", "Eggplant"))
 	panel.free()
 
 

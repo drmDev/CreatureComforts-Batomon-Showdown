@@ -66,6 +66,35 @@ static func build_region_map(db = null) -> Dictionary:
 	return regions
 
 
+## Species id -> region display names, built from species_packs_db. Packs are the
+## per-region shop pools; species.sets is too broad (many species list every set).
+## Keys are lowercased so callers can look up by species.id or name_key.
+static func build_species_region_map(db = null) -> Dictionary:
+	if db == null:
+		db = NodeUtils.get_autoload("GameDatabase")
+	var regions := build_region_map(db)
+	var out := {}
+	for pack in _collection_entries(db, "species_packs_db"):
+		var set_id := _string_field(pack, "set_id")
+		if set_id.is_empty():
+			continue
+		var region := str(regions.get(set_id.to_lower(), ""))
+		if region.is_empty():
+			region = set_id
+		var ids = _field(pack, "species_ids")
+		if not (ids is Array):
+			continue
+		for raw_id in ids:
+			var species_id := str(raw_id).strip_edges().to_lower()
+			if species_id.is_empty():
+				continue
+			var list: Array = out.get(species_id, [])
+			if not list.has(region):
+				list.append(region)
+			out[species_id] = list
+	return out
+
+
 ## Normalizes a raw property value (a String or an Array of ids) to a region name.
 static func normalize_value(value, aliases: Dictionary) -> String:
 	if value is String or value is StringName:
@@ -144,6 +173,16 @@ static func _has(obj, key: String) -> bool:
 	if obj is Dictionary:
 		return obj.has(key)
 	return obj is Object and key in obj
+
+
+static func _field(obj, field: String):
+	if obj == null:
+		return null
+	if obj is Dictionary:
+		return obj.get(field)
+	if obj is Object and field in obj:
+		return obj.get(field)
+	return null
 
 
 static func _string_field(obj, field: String) -> String:
