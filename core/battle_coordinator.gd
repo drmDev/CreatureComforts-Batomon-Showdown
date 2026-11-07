@@ -148,7 +148,9 @@ func _update_opponent_panel(state, is_active: bool) -> void:
 	if battle_id != _opponent_battle_id or _opponent_info.is_empty():
 		_opponent_battle_id = battle_id
 		_opponent_info = OpponentInfo.info(p2, _captured_opponent, _captured_at)
-	if is_active:
+	# Keep the card up through the results screen, matching the elapsed readout;
+	# both are hidden when the battle state is left (PhaseRouter).
+	if is_active or BattleMonitor.is_over(state):
 		_ui.show_opponent(str(_opponent_info.get("name", "?")), str(_opponent_info.get("mmr", "-")))
 	else:
 		_ui.hide_opponent_panel()
