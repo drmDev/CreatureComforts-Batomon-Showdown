@@ -1,7 +1,7 @@
 {
 	"id": "creature_comforts",
 	"name": "Creature Comforts",
-	"version": "3.203",
+	"version": "3.205",
 	"author": "NescapePlan",
 	"description": "Creature Comforts - QoL improvements.",
 	"settings": [
@@ -9,6 +9,8 @@
 		 "description": "Show reminders before important trainer events."},
 		{"key": "trinket_reminders", "label": "Trinket Reminders", "type": "bool", "default": true,
 		 "description": "Show collapsible reminders for timing-sensitive trinkets."},
+		{"key": "positional_trinkets", "label": "Positional Trinket Summary", "type": "bool", "default": true,
+		 "description": "Show a movable summary of positional trinket bonuses in the shop."},
 		{"key": "notification_sounds", "label": "Notification Sounds", "type": "bool", "default": true,
 		 "description": "Play reminder and UI sound effects."},
 		{"key": "battle_status_panel", "label": "Battle Status Panel", "type": "bool", "default": true,

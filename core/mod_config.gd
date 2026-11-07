@@ -13,6 +13,7 @@ const MOD_ID := "creature_comforts"
 
 const KEY_DAY_REMINDERS := "day_reminders"
 const KEY_TRINKET_REMINDERS := "trinket_reminders"
+const KEY_POSITIONAL_TRINKETS := "positional_trinkets"
 const KEY_NOTIFICATION_SOUNDS := "notification_sounds"
 const KEY_BATTLE_STATUS_PANEL := "battle_status_panel"
 const KEY_TRINKETS_GAINED_PANEL := "trinkets_gained_panel"
@@ -29,6 +30,7 @@ const KEY_AUTO_UPDATE := "auto_update"
 const DEFAULTS := {
 	KEY_DAY_REMINDERS: true,
 	KEY_TRINKET_REMINDERS: true,
+	KEY_POSITIONAL_TRINKETS: true,
 	KEY_NOTIFICATION_SOUNDS: true,
 	KEY_BATTLE_STATUS_PANEL: true,
 	KEY_TRINKETS_GAINED_PANEL: true,

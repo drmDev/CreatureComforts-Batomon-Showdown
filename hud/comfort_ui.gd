@@ -10,6 +10,7 @@ const ShopHighlight = preload("shop_highlight.gd")
 const ReminderLabel = preload("reminder_label.gd")
 const ShopIncomePanel = preload("shop_income_panel.gd")
 const TrinketRemindersPanel = preload("trinket_reminders_panel.gd")
+const PositionalTrinketsPanel = preload("positional_trinkets_panel.gd")
 const RankOddsPanel = preload("rank_odds_panel.gd")
 const BaseHpPanel = preload("base_hp_panel.gd")
 const WatchlistPanel = preload("watchlist_panel.gd")
@@ -24,6 +25,7 @@ var player_hud_layer: CanvasLayer = null
 var reminder_label = null
 var shop_income_panel = null
 var trinket_reminders_panel = null
+var positional_trinkets_panel = null
 var rank_odds_panel = null
 var base_hp_panel = null
 var watchlist_panel = null
@@ -72,6 +74,12 @@ func _build_reminder_layer() -> void:
 	trinket_reminders_panel.name = "TrinketRemindersPanel"
 	trinket_reminders_panel.layout_debug.connect(_on_trinket_panel_layout_debug)
 	reminder_layer.add_child(trinket_reminders_panel)
+
+	# Movable positional trinket summary. Starts collapsed at 25% of the viewport
+	# and is refreshed by the controller on every shop poll.
+	positional_trinkets_panel = PositionalTrinketsPanel.new()
+	positional_trinkets_panel.name = "PositionalTrinketsPanel"
+	reminder_layer.add_child(positional_trinkets_panel)
 
 	# Battle trinket gains. Lives here (not on a separate layer) so the shop overlay gate
 	# holds it back through the results/event/gift screens and reveals it once the shop is
@@ -163,6 +171,8 @@ func hide_shop_panels() -> void:
 		shop_income_panel.hide_panel()
 	if trinket_reminders_panel != null:
 		trinket_reminders_panel.hide_panel()
+	if positional_trinkets_panel != null:
+		positional_trinkets_panel.hide_panel()
 	if rank_odds_panel != null:
 		rank_odds_panel.hide_panel()
 	if base_hp_panel != null:
@@ -325,6 +335,9 @@ func on_feature_toggled(key: String, value: bool) -> void:
 	elif key == ModConfig.KEY_SHOP_INCOME:
 		if shop_income_panel != null:
 			shop_income_panel.hide_panel()
+	elif key == ModConfig.KEY_POSITIONAL_TRINKETS:
+		if positional_trinkets_panel != null:
+			positional_trinkets_panel.hide_panel()
 	elif key == ModConfig.KEY_RANK_ODDS_PREVIEW:
 		if rank_odds_panel != null:
 			rank_odds_panel.hide_panel()

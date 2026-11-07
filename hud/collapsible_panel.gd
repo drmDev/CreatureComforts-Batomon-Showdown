@@ -25,6 +25,11 @@ var _dragged := false
 var _press_pos := Vector2.ZERO
 var _tween: Tween
 
+## When true, dragging and resizing keep the panel inside the viewport.
+var clamp_to_viewport := false
+## When true, the header is drawn even with no entries and while collapsed.
+var draw_when_empty := false
+
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -111,7 +116,7 @@ func button_rect() -> Rect2:
 func _draw() -> void:
 	if _panel_style == null or _text_font == null:
 		return
-	if _entries.is_empty() and reveal <= 0.01:
+	if _entries.is_empty() and reveal <= 0.01 and not draw_when_empty:
 		return
 
 	var ci := get_canvas_item()
@@ -161,4 +166,18 @@ func _gui_input(event) -> void:
 			# local event.position against a fixed press point) avoids the feedback loop that made
 			# the panel jump/snap back as it moved under the cursor.
 			position += event.relative
+			_clamp_to_viewport()
 		accept_event()
+
+
+## Keep the panel inside the viewport when the subclass opts in. Called after a
+## drag and by subclasses after resizing (expand/collapse or viewport resize).
+func _clamp_to_viewport() -> void:
+	if not clamp_to_viewport:
+		return
+	var viewport := get_viewport()
+	if viewport == null:
+		return
+	var bounds := viewport.get_visible_rect().size
+	position.x = clampf(position.x, 0.0, maxf(0.0, bounds.x - size.x))
+	position.y = clampf(position.y, 0.0, maxf(0.0, bounds.y - size.y))

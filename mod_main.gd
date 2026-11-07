@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "3.203"
+const VERSION := "3.205"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
 const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 
@@ -19,6 +19,7 @@ const BattleTrinketTracker = preload("core/battle_trinket_tracker.gd")
 const ChimeQueue = preload("core/chime_queue.gd")
 const TrinketGainPresenter = preload("hud/trinket_gain_presenter.gd")
 const TrinketRemindersController = preload("hud/trinket_reminders_controller.gd")
+const PositionalTrinketsController = preload("hud/positional_trinkets_controller.gd")
 const TrinketIcons = preload("core/trinket_icons.gd")
 const ComfortUi = preload("hud/comfort_ui.gd")
 const NodeUtils = preload("core/node_utils.gd")
@@ -64,6 +65,9 @@ var _shop_overlay_gate = null
 var _chimes = null
 
 var _trinket_reminders = null
+
+# Feeds the movable positional trinket summary panel.
+var _positional_trinkets = null
 
 # Resolves the game's trinket icons for the reminder and gains panels.
 var _trinket_icons = null
@@ -129,6 +133,8 @@ func _initialize_mod() -> void:
 	_trinket_icons = TrinketIcons.new()
 	_trinket_reminders = TrinketRemindersController.new()
 	_trinket_reminders.setup(_ui.trinket_reminders_panel, _formatter, _logger, _chimes, _feature_enabled, _trinket_icons)
+	_positional_trinkets = PositionalTrinketsController.new()
+	_positional_trinkets.setup(_ui.positional_trinkets_panel, _feature_enabled)
 	# Owns the shop-overlay gate: visibility checks, transition listeners, timers, view cache
 	_setup_shop_overlay_gate()
 	_setup_auto_updater()
@@ -233,6 +239,8 @@ func _on_feature_toggled(key: String, value: bool) -> void:
 		_advice.on_feature_toggled(key, value)
 	elif key == ModConfig.KEY_TRINKET_REMINDERS:
 		_trinket_reminders.on_feature_toggled(key, value)
+	elif key == ModConfig.KEY_POSITIONAL_TRINKETS:
+		_positional_trinkets.on_feature_toggled(key, value)
 	elif key == ModConfig.KEY_NOTIFICATION_SOUNDS:
 		_chimes.clear()
 	elif key == ModConfig.KEY_TRINKETS_GAINED_PANEL:
@@ -332,12 +340,14 @@ func _handle_shop_phase(state) -> void:
 		_advice.on_trainer_changed()
 		_finalize_battle_trinket_tracking(false)  # Prevent false gains/panel from a previous run
 		_trinket_reminders.on_trainer_changed()
+		_positional_trinkets.on_trainer_changed()
 	
 	_advice.evaluate(current_snapshot, _shop_overlay_gate)
 	
 	var current_day := int(run.get("current_round")) if NodeUtils.has_property(run, "current_round") else 1
 	_ui.update_shop_income(_compute_daily_income(run, current_day))
 	_trinket_reminders.update(run, _shop_overlay_gate)
+	_positional_trinkets.update(run)
 	_ui.update_rank_odds(int(run.get("shop_rank")) if NodeUtils.has_property(run, "shop_rank") else 1)
 	var total_hp := int(run.get("player_hp")) if NodeUtils.has_property(run, "player_hp") else 0
 	_ui.update_base_hp(current_day, total_hp)

@@ -11,6 +11,7 @@ var _test_scripts := {
 	"shop_income": preload("test_shop_income.gd"),
 	"base_hp": preload("test_base_hp.gd"),
 	"tracked_trinkets": preload("test_tracked_trinkets.gd"),
+	"positional_trinkets": preload("test_positional_trinkets.gd"),
 	"battle_monitor": preload("test_battle_monitor.gd"),
 	"opponent_info": preload("test_opponent_info.gd"),
 	"battle_trinket_tracker": preload("test_battle_trinket_tracker.gd"),

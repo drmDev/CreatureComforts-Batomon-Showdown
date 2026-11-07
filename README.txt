@@ -1,4 +1,4 @@
-Creature Comforts v3.203 - Quality of Life Mod for Batomon Showdown
+Creature Comforts v3.205 - Quality of Life Mod for Batomon Showdown
 =================================================================
 Creature Comforts adds helpful reminders, shop planning tools, and quality-of-life improvements to Batomon Showdown.
 
@@ -20,6 +20,13 @@ The Watchlist and Shop Highlights setting shows the Watchlist button and enables
 
 TRINKET REMINDERS
 Get reminders for timing-sensitive trinkets such as Duplicators, Treasure Map, Upgrade Disc, and Greedy Gloves. Each row shows the trinket's icon and stack count; expand the reminder panel to view their effects.
+
+POSITIONAL TRINKET SUMMARY
+A movable, collapsible panel in the shop summarizes the bonuses from your positional trinkets
+(left column, top middle, right column). Passive effects and permanent battle-start effects are
+listed separately, and duplicate copies are added together. The panel starts collapsed and can be
+dragged anywhere on screen. When you hold 10 or more trinkets, a small clippy icon appears to the
+left of the panel.
 
 BATTLE TRINKET REWARDS
 See which trinkets you gained during battle in a collapsible panel, with each trinket's icon and
