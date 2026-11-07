@@ -25,8 +25,7 @@ POSITIONAL TRINKET SUMMARY
 A movable, collapsible panel in the shop summarizes the bonuses from your positional trinkets
 (left column, top middle, right column). Passive effects and permanent battle-start effects are
 listed separately, and duplicate copies are added together. The panel starts collapsed and can be
-dragged anywhere on screen. When you hold 10 or more trinkets, a small clippy icon appears to the
-left of the panel.
+dragged anywhere on screen.
 
 BATTLE TRINKET REWARDS
 See which trinkets you gained during battle in a collapsible panel, with each trinket's icon and

@@ -16,9 +16,6 @@ const FONT_SIZE := 8
 const SECTION_FONT_SIZE := 9
 const MAX_WIDTH := 280.0
 const TAB_EXTRA_WIDTH := 30.0
-const CLIPPY_SIZE := 16.0
-const CLIPPY_GAP := 2.0
-const CLIPPY_THRESHOLD := 10
 
 const SECTION_ORDER := ["left", "top_middle", "right"]
 const SECTION_LABELS := {
@@ -30,21 +27,16 @@ const SECTION_LABELS := {
 var _summary: Dictionary = {}
 var _anchored := false
 var _initialized := false
-var _clippy_texture: Texture2D = null
-var _trinket_count := 0
 
 
 func _init() -> void:
-	# Base _init sets up styles and the panel font. Without it, _draw() returns early and
-	# only the clippy icon is visible.
+	# Base _init sets up styles and the panel font. Without it, _draw() returns early.
 	super._init()
 	clamp_to_viewport = true
 	draw_when_empty = true
-	clip_contents = false
 
 
 func _ready() -> void:
-	_clippy_texture = _load_texture("../assets/icons/clippy.png")
 	minimized = true
 	reveal = 0.0
 	_apply_size()
@@ -61,13 +53,10 @@ func header_width() -> float:
 
 ## Show the current summary. The first call starts collapsed and anchors the
 ## panel; later calls preserve the player's position and collapsed state.
-## `trinket_count` is the total number of held trinkets, used for the clippy
-## icon threshold.
-func show_summary(summary: Dictionary, trinket_count: int = 0) -> void:
-	var key := "%d|%s" % [trinket_count, str(summary)]
+func show_summary(summary: Dictionary) -> void:
+	var key := str(summary)
 	var first_show := not _initialized
 	_summary = summary
-	_trinket_count = trinket_count
 	if first_show:
 		_initialized = true
 		minimized = true
@@ -155,27 +144,6 @@ func _anchor_initial() -> void:
 
 func _on_viewport_resized() -> void:
 	_clamp_to_viewport()
-
-
-## Draw the clippy icon just to the left of the panel once the player holds at
-## least CLIPPY_THRESHOLD trinkets. The panel disables clipping so the icon can
-## sit outside its own rect.
-func _draw() -> void:
-	if _trinket_count >= CLIPPY_THRESHOLD and _clippy_texture != null:
-		draw_texture_rect(
-			_clippy_texture,
-			Rect2(Vector2(-CLIPPY_SIZE - CLIPPY_GAP, 0.0), Vector2(CLIPPY_SIZE, CLIPPY_SIZE)),
-			false
-		)
-	super._draw()
-
-
-## Keep the icon inside the viewport too: when it is visible, the panel cannot
-## be dragged closer than the icon's width plus gap to the left edge.
-func _clamp_to_viewport() -> void:
-	super._clamp_to_viewport()
-	if _trinket_count >= CLIPPY_THRESHOLD and _clippy_texture != null:
-		position.x = maxf(position.x, CLIPPY_SIZE + CLIPPY_GAP)
 
 
 func _build_rows() -> Array:

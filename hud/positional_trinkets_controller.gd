@@ -30,7 +30,7 @@ func update(run) -> void:
 	var held = run.get("trinket_ids") if NodeUtils.has_property(run, "trinket_ids") else []
 	if held == null:
 		held = []
-	_panel.show_summary(PositionalTrinkets.summarize(held), held.size())
+	_panel.show_summary(PositionalTrinkets.summarize(held))
 
 
 func on_trainer_changed() -> void:
