@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "3.205"
+const VERSION := "3.301"
 
 const LogFormatterScript = preload("core/log_formatter.gd")
 const ShopOverlayGate = preload("hud/shop_overlay_gate.gd")

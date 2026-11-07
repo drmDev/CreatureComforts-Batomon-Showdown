@@ -1,4 +1,4 @@
-Creature Comforts v3.205 - Quality of Life Mod for Batomon Showdown
+Creature Comforts v3.301 - Quality of Life Mod for Batomon Showdown
 =================================================================
 Creature Comforts adds helpful reminders, shop planning tools, and quality-of-life improvements to Batomon Showdown.
 
@@ -74,11 +74,7 @@ Settings are saved automatically and persist between sessions.
 
 AUTO-UPDATE
 -----------
-Creature Comforts keeps itself current. On game start (and every few hours while
-the game runs) it checks this mod's GitHub releases for a newer version:
-
-    https://github.com/drmDev/CreatureComforts-Batomon-Showdown/releases
-
+Creature Comforts keeps itself current. On game start it checks for a newer version. 
 When a new version is out, Auto-update (Settings > Mods > Creature Comforts,
 on by default) downloads it and checks it before anything is replaced: the
 download must match the release's checksum, contain only Creature Comforts
@@ -90,10 +86,6 @@ effect the next time Batomon Showdown starts.
 
 Turn Auto-update off to get a notice only and install new versions yourself
 (e.g. from Nexus Mods or GitHub) by replacing the Mods\CreatureComforts folder.
-
-The updater never runs on a developer copy (a folder with a .git folder or the
-mod's dev\run_tests.ps1), so it cannot overwrite a working tree.
-
 
 REQUIREMENTS
 ------------
@@ -125,7 +117,6 @@ INSTALLATION
       ...additional mod files and assets...
 
    IMPORTANT:
-   - Do not place the ZIP file itself in the Mods folder.
    - Do not create an extra nested CreatureComforts folder.
    - mod_main.gd and mod.json must be directly inside Mods\CreatureComforts\.
 
