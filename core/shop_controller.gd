@@ -66,8 +66,6 @@ func handle(state, phase_changed: bool) -> bool:
 
 	var run_id := RunData.identity(run)
 	var run_changed := not _last_run_id.is_empty() and _last_run_id != run_id
-	if run_changed:
-		_context.logger.log_event("RUN CHANGED | %s -> %s" % [_last_run_id, run_id])
 	_last_run_id = run_id
 
 	var current_snapshot = _snapshot_builder.capture(run, manager, NodeUtils.has_property, _context.formatter.resolve_type_name)
@@ -147,6 +145,5 @@ func _compute_daily_income(run, day: int) -> int:
 
 func _log_phase_entry(run, manager) -> void:
 	_context.logger.log_event(_context.formatter.format_phase_entry("SHOP", run))
-	_context.logger.log_event("RUN ID | %s" % RunData.identity(run))
 	if _context.logger.deep_inspection:
 		_context.logger.log_lines(_context.formatter.format_phase_snapshot("SHOP", run, manager))
