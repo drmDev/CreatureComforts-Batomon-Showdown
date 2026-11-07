@@ -10,8 +10,6 @@ class BaseRule:
 	# Display modes tell the UI layer how this rule should be shown.
 	const DISPLAY_NONE := "none"
 	const DISPLAY_LABEL := "label"
-	const DISPLAY_HIGHLIGHT := "highlight"
-	const DISPLAY_BOTH := "both"
 
 	var rule_id: String
 	var trainer_id: String  # Empty = any trainer
@@ -46,52 +44,6 @@ class BaseRule:
 	func _matches_trainer(context: AdviceContext) -> bool:
 		return trainer_id.is_empty() or context.trainer_id == trainer_id
 
-
-class ShopTargetsRule extends BaseRule:
-	var target_monsters: Array
-	var target_items: Array
-	var target_types: Array
-	var severity: String
-	var message_template: String
-	var formatter
-
-	func _init(p_rule_id: String, p_trainer_id: String, p_target_monsters: Array, p_target_items: Array, p_severity: String, p_message_template: String, p_formatter, p_target_types: Array = []) -> void:
-		super._init(p_rule_id, p_trainer_id, DISPLAY_HIGHLIGHT, "", false)
-		target_monsters = p_target_monsters
-		target_items = p_target_items
-		target_types = p_target_types
-		severity = p_severity
-		message_template = p_message_template
-		formatter = p_formatter
-
-	func evaluate(context: AdviceContext) -> Dictionary:
-		if not _matches_trainer(context):
-			return {}
-
-		var matches: Array = []
-
-		for shop_item in context.shop_items:
-			var display_name := ""
-			if shop_item.is_monster and (shop_item.name_key in target_monsters or _matches_target_type(shop_item.types)):
-				display_name = formatter.format_species_name(shop_item.name_key)
-			elif not shop_item.item_id.is_empty() and shop_item.item_id in target_items:
-				display_name = formatter.format_item_name(shop_item.item_id)
-			if display_name.is_empty():
-				continue
-			matches.append("[%d] %s" % [shop_item.slot, display_name])
-
-		if matches.is_empty():
-			return {}
-
-		return _make_advice(severity, message_template % ", ".join(matches))
-
-	func _matches_target_type(types: Array) -> bool:
-		if target_types.is_empty():
-			return false
-		for type_name in types:
-			if str(type_name) in target_types:
-				return true
-		return false
 
 ## Two modes:
 ##   Anchor mode (monster_key set): "the anchor monster must be the only monster of a given type"

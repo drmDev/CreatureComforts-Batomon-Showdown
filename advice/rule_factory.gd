@@ -35,17 +35,6 @@ func build_trainer(trainer_def: Dictionary) -> Array:
 func _build_rule(trainer_id: String, rule_def: Dictionary):
 	var rule_type: String = str(rule_def.get("type", ""))
 	match rule_type:
-		"shop_targets":
-			return TrainerRules.ShopTargetsRule.new(
-				str(rule_def.get("rule_id", "%s_targets" % trainer_id)),
-				trainer_id,
-				rule_def.get("monsters", []),
-				rule_def.get("items", []),
-				str(rule_def.get("severity", "NOTICE")),
-				str(rule_def.get("message_template", "")),
-				_formatter,
-				rule_def.get("target_types", [])
-			)
 		"day_reminder":
 			return TrainerRules.DayReminderRule.new(
 				str(rule_def.get("rule_id", "")),
@@ -91,7 +80,7 @@ func _apply_overrides(rule, rule_def: Dictionary) -> void:
 		if _is_valid_display(display):
 			rule.display_mode = display
 		else:
-			push_error("RuleFactory: invalid display mode '%s' for rule '%s' (use none/label/highlight/both)" % [display, rule.rule_id])
+			push_error("RuleFactory: invalid display mode '%s' for rule '%s' (use none/label)" % [display, rule.rule_id])
 	if rule_def.has("reminder"):
 		rule.reminder_text = str(rule_def.get("reminder"))
 	if rule_def.has("chime"):
@@ -101,7 +90,5 @@ func _apply_overrides(rule, rule_def: Dictionary) -> void:
 func _is_valid_display(display: String) -> bool:
 	return display in [
 		TrainerRules.BaseRule.DISPLAY_NONE,
-		TrainerRules.BaseRule.DISPLAY_LABEL,
-		TrainerRules.BaseRule.DISPLAY_HIGHLIGHT,
-		TrainerRules.BaseRule.DISPLAY_BOTH
+		TrainerRules.BaseRule.DISPLAY_LABEL
 	]

@@ -7,81 +7,10 @@ const TestHelpers = preload("test_helpers.gd")
 
 const BEETDOWN := "monster.name.beetdown"
 const LAMPLET := "monster.name.lamplet"
-const BASIC_BAIT := "basic_bait"
 
 
 func _formatter():
 	return TestHelpers.FakeFormatter.new()
-
-
-func test_shop_targets_matches_monster_by_name() -> void:
-	var rule = TrainerRules.ShopTargetsRule.new(
-		"r1", "musician", [LAMPLET], [], "info", "Buy %s", _formatter()
-	)
-	var ctx = TestHelpers.context("musician", 1, [
-		TestHelpers.shop_monster(0, LAMPLET),
-	])
-	var advice: Dictionary = rule.evaluate(ctx)
-	assert_not_empty(advice)
-	assert_eq(advice["rule_id"], "r1")
-	assert_eq(advice["trainer_id"], "musician")
-	assert_eq(advice["severity"], "info")
-	assert_eq(advice["display"], "highlight")
-	assert_true(str(advice["message"]).contains("Lamplet"))
-
-
-func test_shop_targets_matches_item() -> void:
-	var rule = TrainerRules.ShopTargetsRule.new(
-		"r2", "musician", [], [BASIC_BAIT], "info", "Buy %s", _formatter()
-	)
-	var ctx = TestHelpers.context("musician", 1, [
-		TestHelpers.shop_item(2, BASIC_BAIT),
-	])
-	var advice: Dictionary = rule.evaluate(ctx)
-	assert_not_empty(advice)
-	assert_true(str(advice["message"]).contains("Basic Bait"))
-
-
-func test_shop_targets_matches_monster_by_type() -> void:
-	var rule = TrainerRules.ShopTargetsRule.new(
-		"r3", "musician", [], [], "info", "Buy %s", _formatter(), ["fire"]
-	)
-	var ctx = TestHelpers.context("musician", 1, [
-		TestHelpers.shop_monster(1, LAMPLET, ["fire", "flying"]),
-	])
-	var advice: Dictionary = rule.evaluate(ctx)
-	assert_not_empty(advice)
-	assert_true(str(advice["message"]).contains("Lamplet"))
-
-
-func test_shop_targets_no_match_returns_empty() -> void:
-	var rule = TrainerRules.ShopTargetsRule.new(
-		"r4", "musician", [LAMPLET], [], "info", "Buy %s", _formatter()
-	)
-	var ctx = TestHelpers.context("musician", 1, [
-		TestHelpers.shop_monster(0, BEETDOWN),
-	])
-	assert_empty(rule.evaluate(ctx))
-
-
-func test_shop_targets_trainer_mismatch_returns_empty() -> void:
-	var rule = TrainerRules.ShopTargetsRule.new(
-		"r5", "musician", [LAMPLET], [], "info", "Buy %s", _formatter()
-	)
-	var ctx = TestHelpers.context("gentleman", 1, [
-		TestHelpers.shop_monster(0, LAMPLET),
-	])
-	assert_empty(rule.evaluate(ctx))
-
-
-func test_shop_targets_empty_trainer_applies_to_any() -> void:
-	var rule = TrainerRules.ShopTargetsRule.new(
-		"r6", "", [LAMPLET], [], "info", "Buy %s", _formatter()
-	)
-	var ctx = TestHelpers.context("gentleman", 1, [
-		TestHelpers.shop_monster(0, LAMPLET),
-	])
-	assert_not_empty(rule.evaluate(ctx))
 
 
 func test_team_anchor_flags_offender() -> void:
@@ -89,7 +18,7 @@ func test_team_anchor_flags_offender() -> void:
 		"r7", "musician", "warn", _formatter(), BEETDOWN, 3, "fighter",
 		"Offenders: %s", "Beetdown only", 1
 	)
-	var ctx = TestHelpers.context("musician", 1, [], [
+	var ctx = TestHelpers.context("musician", 1, [
 		TestHelpers.team_monster(0, BEETDOWN, 3, ["fighter"]),
 		TestHelpers.team_monster(1, LAMPLET, 2, ["fighter"]),
 	])
@@ -105,7 +34,7 @@ func test_team_anchor_missing_anchor_returns_empty() -> void:
 		"r8", "musician", "warn", _formatter(), BEETDOWN, 3, "fighter",
 		"Offenders: %s", "Beetdown only", 1
 	)
-	var ctx = TestHelpers.context("musician", 1, [], [
+	var ctx = TestHelpers.context("musician", 1, [
 		TestHelpers.team_monster(1, LAMPLET, 2, ["fighter"]),
 	])
 	assert_empty(rule.evaluate(ctx))
@@ -116,7 +45,7 @@ func test_team_anchor_below_min_level_returns_empty() -> void:
 		"r9", "musician", "warn", _formatter(), BEETDOWN, 3, "fighter",
 		"Offenders: %s", "Beetdown only", 1
 	)
-	var ctx = TestHelpers.context("musician", 1, [], [
+	var ctx = TestHelpers.context("musician", 1, [
 		TestHelpers.team_monster(0, BEETDOWN, 2, ["fighter"]),
 		TestHelpers.team_monster(1, LAMPLET, 2, ["fighter"]),
 	])
@@ -128,7 +57,7 @@ func test_team_anchor_no_offenders_returns_empty() -> void:
 		"r10", "musician", "warn", _formatter(), BEETDOWN, 3, "fighter",
 		"Offenders: %s", "Beetdown only", 1
 	)
-	var ctx = TestHelpers.context("musician", 1, [], [
+	var ctx = TestHelpers.context("musician", 1, [
 		TestHelpers.team_monster(0, BEETDOWN, 3, ["fighter"]),
 		TestHelpers.team_monster(1, LAMPLET, 2, ["water"]),
 	])
@@ -140,7 +69,7 @@ func test_team_count_mode_flags_excess() -> void:
 		"r11", "musician", "warn", _formatter(), "", 0, "electric",
 		"Too many: %s", "Electric limit", 1
 	)
-	var ctx = TestHelpers.context("musician", 1, [], [
+	var ctx = TestHelpers.context("musician", 1, [
 		TestHelpers.team_monster(0, LAMPLET, 2, ["electric"]),
 		TestHelpers.team_monster(1, LAMPLET, 2, ["electric"]),
 	])
@@ -154,7 +83,7 @@ func test_team_count_mode_within_limit_returns_empty() -> void:
 		"r12", "musician", "warn", _formatter(), "", 0, "electric",
 		"Too many: %s", "Electric limit", 1
 	)
-	var ctx = TestHelpers.context("musician", 1, [], [
+	var ctx = TestHelpers.context("musician", 1, [
 		TestHelpers.team_monster(0, LAMPLET, 2, ["electric"]),
 	])
 	assert_empty(rule.evaluate(ctx))
@@ -209,3 +138,11 @@ func test_global_rules_build_via_factory() -> void:
 		assert_true(rule.chime, "global reminders chime")
 		days.append(rule.target_day)
 	assert_eq(days, [2, 5, 8])
+
+
+func test_catalog_contains_no_shop_targets_rules() -> void:
+	for trainer_def in TrainerCatalog.TRAINER_DEFINITIONS:
+		for rule_def in trainer_def.get("rules", []):
+			assert_ne(str(rule_def.get("type", "")), "shop_targets")
+	for rule_def in TrainerCatalog.GLOBAL_RULES:
+		assert_ne(str(rule_def.get("type", "")), "shop_targets")

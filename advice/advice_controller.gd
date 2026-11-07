@@ -80,7 +80,7 @@ func evaluate(snapshot, gate) -> void:
 
 		for advice in all_active:
 			var display: String = advice.get("display", TrainerRules.BaseRule.DISPLAY_NONE)
-			if display == TrainerRules.BaseRule.DISPLAY_LABEL or display == TrainerRules.BaseRule.DISPLAY_BOTH:
+			if display == TrainerRules.BaseRule.DISPLAY_LABEL:
 				var reminder_text: String = advice.get("reminder", "")
 				if not reminder_text.is_empty():
 					reminders_to_show[advice.get("rule_id", "")] = reminder_text
