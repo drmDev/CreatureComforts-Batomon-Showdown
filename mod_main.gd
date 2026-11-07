@@ -89,7 +89,7 @@ func _initialize_mod() -> void:
 	_battle.setup(_context, _ui)
 
 	_shop = ShopController.new()
-	_shop.setup(_context, _ui, _shop_overlay_gate, _dev_tools, _on_shop_entered, _on_shop_trainer_changed)
+	_shop.setup(_context, _ui, _shop_overlay_gate, _dev_tools, _on_shop_entered, _on_shop_run_changed)
 
 	_router = PhaseRouter.new()
 	_router.setup(self, _context, _ui, _shop, _battle)
@@ -153,9 +153,9 @@ func _on_shop_entered() -> void:
 	_battle.reset_log_guard()
 
 
-## A new trainer/run starts: drop any battle trinket gains from the previous run.
-func _on_shop_trainer_changed() -> void:
-	_battle.finalize_trinket_tracking(false)
+## A new run (or trainer) starts: drop any battle trinket gains from the previous run.
+func _on_shop_run_changed() -> void:
+	_battle.on_run_changed()
 
 
 ## Apply a live settings change. Disabling a feature hides its UI immediately and

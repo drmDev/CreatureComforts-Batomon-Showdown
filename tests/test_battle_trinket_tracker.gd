@@ -139,6 +139,16 @@ func test_poll_ignores_battle_not_over() -> void:
 	assert_empty(gains)
 
 
+func test_reset_drops_tracking_without_gains() -> void:
+	var tracker := BattleTrinketTracker.new()
+	tracker.note_non_battle(_run(["a"]))
+	tracker.start(_run(["a"]))
+	tracker.poll(_state(true), _run(["a", "b"]))
+	tracker.reset()
+	var gains := tracker.finalize(_run(["a", "b"]), FakeLogger.new(), FakeFormatter.new())
+	assert_empty(gains)
+
+
 func test_presenter_summarize_counts_duplicates() -> void:
 	var entries := TrinketGainPresenter.summarize(["a", "a", "b"], FakeFormatter.new())
 	assert_eq(entries.size(), 2)

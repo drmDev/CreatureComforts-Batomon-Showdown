@@ -41,6 +41,16 @@ func note_non_battle(run) -> void:
 		_pre_battle_state = capture_state(run)
 
 
+## Drop all tracking state without reporting gains (new run / trainer change).
+func reset() -> void:
+	_pre_battle_state = null
+	_start = null
+	_end = null
+	_tracking = false
+	_over_seen = false
+	_gains_logged = false
+
+
 ## Start tracking when the battle becomes active.
 func start(run) -> void:
 	if _pre_battle_state != null:

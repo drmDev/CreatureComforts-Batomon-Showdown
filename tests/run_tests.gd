@@ -21,6 +21,7 @@ var _test_scripts := {
 	"saved_builds": preload("test_saved_builds.gd"),
 	"ui_sound": preload("test_ui_sound.gd"),
 	"run_region": preload("test_run_region.gd"),
+	"run_data": preload("test_run_data.gd"),
 	"style": preload("test_style.gd"),
 	"auto_updater": preload("test_auto_updater.gd"),
 }

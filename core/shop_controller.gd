@@ -22,24 +22,25 @@ var _ui = null
 var _shop_overlay_gate = null
 var _dev_tools = null
 var _on_shop_entered: Callable
-var _on_trainer_changed: Callable
+var _on_run_changed: Callable
 
 var _snapshot_builder = null
 var _changes_comparer = null
 var _last_snapshot = null
+var _last_run_id := ""
 
 var _advice = null
 var _trinket_reminders = null
 var _positional_trinkets = null
 
 
-func setup(context, ui, shop_overlay_gate, dev_tools, on_shop_entered: Callable, on_trainer_changed: Callable) -> void:
+func setup(context, ui, shop_overlay_gate, dev_tools, on_shop_entered: Callable, on_run_changed: Callable) -> void:
 	_context = context
 	_ui = ui
 	_shop_overlay_gate = shop_overlay_gate
 	_dev_tools = dev_tools
 	_on_shop_entered = on_shop_entered
-	_on_trainer_changed = on_trainer_changed
+	_on_run_changed = on_run_changed
 
 	_snapshot_builder = ShopSnapshot.new()
 	_changes_comparer = ShopChanges.new()
@@ -62,6 +63,12 @@ func handle(state, phase_changed: bool) -> bool:
 	var manager = state.get("manager") if NodeUtils.has_property(state, "manager") else null
 	if run == null or manager == null:
 		return false
+
+	var run_id := RunData.identity(run)
+	var run_changed := not _last_run_id.is_empty() and _last_run_id != run_id
+	if run_changed:
+		_context.logger.log_event("RUN CHANGED | %s -> %s" % [_last_run_id, run_id])
+	_last_run_id = run_id
 
 	var current_snapshot = _snapshot_builder.capture(run, manager, NodeUtils.has_property, _context.formatter.resolve_type_name)
 
@@ -92,9 +99,9 @@ func handle(state, phase_changed: bool) -> bool:
 		if comparison.has_changes():
 			_context.logger.log_lines(_context.formatter.format_snapshot_changes(comparison, run, manager, _context.logger.debug_logging))
 
-	if trainer_changed:
+	if run_changed or trainer_changed:
 		_advice.on_trainer_changed()
-		_on_trainer_changed.call()  # Prevent false gains/panel from a previous run
+		_on_run_changed.call()  # Clear run-scoped state (gains panel, tracking)
 		_trinket_reminders.on_trainer_changed()
 		_positional_trinkets.on_trainer_changed()
 
@@ -140,5 +147,6 @@ func _compute_daily_income(run, day: int) -> int:
 
 func _log_phase_entry(run, manager) -> void:
 	_context.logger.log_event(_context.formatter.format_phase_entry("SHOP", run))
+	_context.logger.log_event("RUN ID | %s" % RunData.identity(run))
 	if _context.logger.deep_inspection:
 		_context.logger.log_lines(_context.formatter.format_phase_snapshot("SHOP", run, manager))

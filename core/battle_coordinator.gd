@@ -70,6 +70,13 @@ func hide_trinket_gains() -> void:
 	_trinket_gains.hide()
 
 
+## A new run started: drop any tracked battle and clear the gains panel so the
+## previous run's trinkets never appear in the new run.
+func on_run_changed() -> void:
+	_battle_trinkets.reset()
+	_trinket_gains.hide()
+
+
 ## Handle one battle poll. Returns true when the battle phase was processed (so
 ## the caller can record the phase); false when the replay data is not ready.
 func handle(state, phase_changed: bool) -> bool:
