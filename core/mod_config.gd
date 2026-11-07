@@ -26,11 +26,12 @@ const KEY_BASE_HP_CHART := "base_hp_chart"
 const KEY_SHOP_HIGHLIGHTS := "shop_highlights"
 const KEY_AUTO_UPDATE := "auto_update"
 
-## All features default to enabled to preserve existing behavior.
+## Most features default to enabled to preserve existing behavior. The beta
+## positional trinket summary defaults to disabled.
 const DEFAULTS := {
 	KEY_DAY_REMINDERS: true,
 	KEY_TRINKET_REMINDERS: true,
-	KEY_POSITIONAL_TRINKETS: true,
+	KEY_POSITIONAL_TRINKETS: false,
 	KEY_NOTIFICATION_SOUNDS: true,
 	KEY_BATTLE_STATUS_PANEL: true,
 	KEY_TRINKETS_GAINED_PANEL: true,

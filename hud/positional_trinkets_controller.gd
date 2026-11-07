@@ -30,6 +30,11 @@ func update(run) -> void:
 	var held = run.get("trinket_ids") if NodeUtils.has_property(run, "trinket_ids") else []
 	if held == null:
 		held = []
+	# The summary is a beta feature for late runs; keep it hidden until the
+	# player holds enough trinkets for the positional breakdown to matter.
+	if not PositionalTrinkets.meets_threshold(held):
+		_panel.hide_panel()
+		return
 	_panel.show_summary(PositionalTrinkets.summarize(held))
 
 

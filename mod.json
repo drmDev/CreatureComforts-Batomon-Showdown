@@ -8,9 +8,7 @@
 		{"key": "day_reminders", "label": "Day Reminders", "type": "bool", "default": true,
 		 "description": "Show reminders before important trainer events."},
 		{"key": "trinket_reminders", "label": "Trinket Reminders", "type": "bool", "default": true,
-		 "description": "Show collapsible reminders for timing-sensitive trinkets."},
-		{"key": "positional_trinkets", "label": "Positional Trinket Summary", "type": "bool", "default": true,
-		 "description": "Show a movable summary of positional trinket bonuses in the shop."},
+		 "description": "Show collapsible reminders for timing-sensitive trinkets."},		
 		{"key": "notification_sounds", "label": "Notification Sounds", "type": "bool", "default": true,
 		 "description": "Play reminder and UI sound effects."},
 		{"key": "battle_status_panel", "label": "Battle Status Panel", "type": "bool", "default": true,
@@ -26,6 +24,8 @@
 		{"key": "shop_highlights", "label": "Watchlist and Shop Highlights", "type": "bool", "default": true,
 		 "description": "Show the Watchlist button and highlight shop cards that match it."},
 		{"key": "auto_update", "label": "Auto-update", "type": "bool", "default": true,
-		 "description": "Download and install new Creature Comforts versions from GitHub."}
+		 "description": "Download and install new Creature Comforts versions from GitHub."},
+		{"key": "positional_trinkets", "label": "Smart Trinket Summary at >= 20 trinkets (beta)", "type": "bool", "default": false,
+		"description": "Show a movable summary of positional trinket bonuses in the shop."}
 	]
 }

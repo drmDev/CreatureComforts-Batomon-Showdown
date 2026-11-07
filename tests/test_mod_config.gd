@@ -16,10 +16,19 @@ class FakeLoader:
 		return values.get(key, fallback)
 
 
-func test_defaults_are_all_enabled() -> void:
+func test_defaults_are_enabled_except_positional_trinkets() -> void:
 	var config = ModConfig.new()
 	for key in ModConfig.DEFAULTS.keys():
-		assert_true(config.is_enabled(key), "default for %s" % key)
+		if key == ModConfig.KEY_POSITIONAL_TRINKETS:
+			assert_false(config.is_enabled(key), "default for %s" % key)
+		else:
+			assert_true(config.is_enabled(key), "default for %s" % key)
+
+
+func test_positional_trinkets_defaults_to_disabled() -> void:
+	var config = ModConfig.new()
+	assert_eq(ModConfig.KEY_POSITIONAL_TRINKETS, "positional_trinkets")
+	assert_false(config.is_enabled(ModConfig.KEY_POSITIONAL_TRINKETS))
 
 
 func test_auto_update_defaults_to_enabled() -> void:

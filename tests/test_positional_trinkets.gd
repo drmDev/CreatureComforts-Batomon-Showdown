@@ -20,6 +20,19 @@ func test_unknown_ids_are_ignored() -> void:
 	assert_false(summary["has_any"])
 
 
+func test_threshold_requires_twenty_trinkets() -> void:
+	var held: Array = []
+	for i in range(PositionalTrinkets.MIN_TRINKETS - 1):
+		held.append("quick_flag")
+	assert_false(PositionalTrinkets.meets_threshold(held))
+	held.append("quick_flag")
+	assert_true(PositionalTrinkets.meets_threshold(held))
+
+
+func test_threshold_handles_null() -> void:
+	assert_false(PositionalTrinkets.meets_threshold(null))
+
+
 func test_quick_flag_passive_left_cooldown() -> void:
 	var summary := PositionalTrinkets.summarize(["quick_flag"])
 	assert_true(summary["has_any"])
