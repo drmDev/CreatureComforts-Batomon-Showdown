@@ -8,7 +8,6 @@ const DESC_LINE_H := 13.0
 const ROW_GAP := 5.0
 const NAME_FONT_SIZE := 8
 const DESC_FONT_SIZE := 7
-const HEADER_FONT_SIZE := 9  # Smaller than the shared TITLE_FONT_SIZE (11) for the gem count
 const MAX_EXPANDED_WIDTH := 320.0  # Cap for very long descriptions; the panel fits the content
 const TAB_EXTRA_WIDTH := 30.0  # Button + header insets for the collapsed tab
 const GEM_SIZE := 10.0
@@ -224,7 +223,7 @@ func _log_layout_after_settle(reason: String) -> void:
 func _tab_width() -> float:
 	if _text_font == null:
 		return MAX_EXPANDED_WIDTH
-	var title_w := _text_font.get_string_size(header_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, HEADER_FONT_SIZE).x
+	var title_w := _text_font.get_string_size(header_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, TITLE_FONT_SIZE).x
 	var icon_w := GEM_SIZE + GEM_GAP if _gem_texture != null else 0.0
 	return icon_w + title_w + BTN + TAB_EXTRA_WIDTH
 
@@ -238,7 +237,7 @@ func _draw_title(r: Rect2) -> void:
 		var icon_y := r.position.y + (HEAD_H - GEM_SIZE) * 0.5
 		draw_texture_rect(_gem_texture, Rect2(Vector2(start_x, icon_y), Vector2(GEM_SIZE, GEM_SIZE)), false)
 	var baseline := r.position.y + HEAD_H * 0.5 + 3.0
-	_draw_text_shadow(Vector2(start_x + icon_w + gap, baseline), text, VALUE_COLOR, HEADER_FONT_SIZE)
+	_draw_text_shadow(Vector2(start_x + icon_w + gap, baseline), text, VALUE_COLOR, TITLE_FONT_SIZE)
 
 
 func _draw_body(width: float) -> void:

@@ -13,7 +13,6 @@ const CONTENT_PADDING := 5.0
 const ROW_HEIGHT := 14.0
 const ROW_GAP := 1.0
 const FONT_SIZE := 8
-const HEADER_FONT_SIZE := 9  # Smaller than the shared TITLE_FONT_SIZE (11) for a compact header
 const ICON_SIZE := 10.0
 const ICON_GAP := 2.0
 const QTY_GAP := 2.0
@@ -106,27 +105,16 @@ func _content_width() -> float:
 	for entry in _entries:
 		row_w = maxf(row_w, _row_width(entry))
 	var body_min := row_w + CONTENT_PADDING * 2.0 + 2.0
-	var title_w := _text_font.get_string_size(header_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, HEADER_FONT_SIZE).x
-	# Tighter than the base header inset: the title starts 2 px inside the header and
-	# leaves a 2 px gap before the -/+ button (see _draw_title), so the panel can be
-	# narrower without ellipsizing the title.
-	var header_min := title_w + BTN + 22.0
+	var title_w := _text_font.get_string_size(header_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, TITLE_FONT_SIZE).x
+	# Base header inset: the title starts at x=12 and ends 16 px before the -/+ button
+	# (see collapsible_panel._draw), so the panel must be at least title + 39 px wide.
+	var header_min := title_w + 39.0
 	return maxf(body_min, header_min)
 
 
 func _anchor_bottom_right() -> void:
 	var viewport_size := get_viewport().get_visible_rect().size
 	position = Vector2(viewport_size.x - size.x - MARGIN_RIGHT, viewport_size.y - size.y - MARGIN_BOTTOM)
-
-
-## Tighter title rect than the base: 2 px inside the header and a 2 px gap before the
-## -/+ button, matching the header_min calculation in _content_width().
-func _draw_title(_r: Rect2) -> void:
-	var start_x := 9.0
-	var max_w := button_rect().position.x - start_x - 2.0
-	var t := _fit_text(_text_font, header_text(), HEADER_FONT_SIZE, max_w)
-	var baseline := HEAD_H * 0.5 + 2.5
-	_draw_text_shadow(Vector2(start_x, baseline), t, VALUE_COLOR, HEADER_FONT_SIZE)
 
 
 func _draw_body(_width: float) -> void:

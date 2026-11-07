@@ -5,7 +5,7 @@ const HEAD_H := 16.0
 const BTN := 12.0
 const ANIM_SEC := 0.14
 const DRAG_THRESHOLD := 3.0
-const TITLE_FONT_SIZE := 11
+const TITLE_FONT_SIZE := 8  # Shared header text size for every collapsible panel
 
 const HEADER_BG := Style.HEADER_BG      # Slightly lighter navy for the header bar
 const INK_COLOR := Style.VALUE_COLOR    # "-" / "+" glyph colour
