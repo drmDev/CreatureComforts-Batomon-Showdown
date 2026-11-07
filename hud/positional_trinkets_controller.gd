@@ -10,12 +10,12 @@ const PositionalTrinkets = preload("../core/positional_trinkets.gd")
 const ModConfig = preload("../core/mod_config.gd")
 
 var _panel = null
-var _feature_enabled: Callable
+var _context = null
 
 
-func setup(panel, feature_enabled: Callable) -> void:
+func setup(panel, context) -> void:
 	_panel = panel
-	_feature_enabled = feature_enabled
+	_context = context
 
 
 ## Refresh the panel from the player's held trinkets. Called on every shop poll;
@@ -23,7 +23,7 @@ func setup(panel, feature_enabled: Callable) -> void:
 func update(run) -> void:
 	if _panel == null:
 		return
-	if not _feature_enabled.call(ModConfig.KEY_POSITIONAL_TRINKETS):
+	if not _context.feature_enabled(ModConfig.KEY_POSITIONAL_TRINKETS):
 		_panel.hide_panel()
 		return
 

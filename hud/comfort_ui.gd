@@ -35,19 +35,13 @@ var battle_elapsed_panel = null
 var opponent_panel = null
 var shop_highlight = null
 
-var _logger = null
-var _formatter = null
-var _feature_enabled: Callable
-var _sounds_enabled: Callable
+var _context = null
 var _rank_odds_popup_open := false
 var _base_hp_popup_open := false
 
 
-func setup(formatter, logger, feature_enabled: Callable, sounds_enabled: Callable) -> void:
-	_formatter = formatter
-	_logger = logger
-	_feature_enabled = feature_enabled
-	_sounds_enabled = sounds_enabled
+func setup(context) -> void:
+	_context = context
 	_build_reminder_layer()
 	_build_shop_highlight()
 	_build_player_hud()
@@ -90,14 +84,14 @@ func _build_reminder_layer() -> void:
 
 	rank_odds_panel = RankOddsPanel.new()
 	rank_odds_panel.name = "RankOddsPanel"
-	rank_odds_panel.log_line.connect(_logger.log_event)
+	rank_odds_panel.log_line.connect(_context.logger.log_event)
 	rank_odds_panel.popup_visibility_changed.connect(_on_rank_odds_popup_visibility_changed)
 	reminder_layer.add_child(rank_odds_panel)
 
 	# Base HP by day table, 25% across the viewport.
 	base_hp_panel = BaseHpPanel.new()
 	base_hp_panel.name = "BaseHpPanel"
-	base_hp_panel.log_line.connect(_logger.log_event)
+	base_hp_panel.log_line.connect(_context.logger.log_event)
 	base_hp_panel.popup_visibility_changed.connect(_on_base_hp_popup_visibility_changed)
 	reminder_layer.add_child(base_hp_panel)
 
@@ -105,7 +99,7 @@ func _build_reminder_layer() -> void:
 	# and hidden entirely when the Shop Highlights setting is off.
 	watchlist_panel = WatchlistPanel.new()
 	watchlist_panel.name = "WatchlistPanel"
-	watchlist_panel.setup(_formatter, _sounds_enabled)
+	watchlist_panel.setup(_context.formatter, _context.sounds_enabled)
 	reminder_layer.add_child(watchlist_panel)
 
 
@@ -118,7 +112,7 @@ func _build_shop_highlight() -> void:
 	shop_highlight.name = "ShopHighlight"
 	add_child(shop_highlight)
 	shop_highlight.setup(watchlist_panel.selection)
-	var enabled: bool = _feature_enabled.call(ModConfig.KEY_SHOP_HIGHLIGHTS)
+	var enabled: bool = _context.feature_enabled(ModConfig.KEY_SHOP_HIGHLIGHTS)
 	shop_highlight.set_enabled(enabled)
 	watchlist_panel.visible = enabled
 
@@ -192,7 +186,7 @@ func reset_shop_popups_for_shop() -> void:
 func update_shop_income(income: int) -> void:
 	if shop_income_panel == null:
 		return
-	if not _feature_enabled.call(ModConfig.KEY_SHOP_INCOME):
+	if not _context.feature_enabled(ModConfig.KEY_SHOP_INCOME):
 		shop_income_panel.hide_panel()
 		return
 	shop_income_panel.set_income(income)
@@ -201,7 +195,7 @@ func update_shop_income(income: int) -> void:
 func update_rank_odds(rank: int) -> void:
 	if rank_odds_panel == null:
 		return
-	if not _feature_enabled.call(ModConfig.KEY_RANK_ODDS_PREVIEW):
+	if not _context.feature_enabled(ModConfig.KEY_RANK_ODDS_PREVIEW):
 		rank_odds_panel.hide_panel()
 		return
 	if _base_hp_popup_open:
@@ -212,7 +206,7 @@ func update_rank_odds(rank: int) -> void:
 func update_base_hp(day: int, total_hp: int) -> void:
 	if base_hp_panel == null:
 		return
-	if not _feature_enabled.call(ModConfig.KEY_BASE_HP_CHART):
+	if not _context.feature_enabled(ModConfig.KEY_BASE_HP_CHART):
 		base_hp_panel.hide_panel()
 		return
 	if _rank_odds_popup_open:
@@ -223,7 +217,7 @@ func update_base_hp(day: int, total_hp: int) -> void:
 func update_player_hud(state, is_battle: bool) -> void:
 	if player_hud == null:
 		return
-	if not _feature_enabled.call(ModConfig.KEY_BATTLE_STATUS_PANEL):
+	if not _context.feature_enabled(ModConfig.KEY_BATTLE_STATUS_PANEL):
 		player_hud.visible = false
 		return
 	if not is_battle:
@@ -257,7 +251,7 @@ func hide_player_hud() -> void:
 func show_battle_elapsed(seconds_text: String) -> void:
 	if battle_elapsed_panel == null:
 		return
-	if not _feature_enabled.call(ModConfig.KEY_BATTLE_STATUS_PANEL):
+	if not _context.feature_enabled(ModConfig.KEY_BATTLE_STATUS_PANEL):
 		battle_elapsed_panel.hide_panel()
 		return
 	battle_elapsed_panel.show_elapsed(seconds_text)
@@ -274,7 +268,7 @@ func hide_battle_elapsed() -> void:
 func show_opponent(opp_name: String, mmr: String) -> void:
 	if opponent_panel == null:
 		return
-	if not _feature_enabled.call(ModConfig.KEY_BATTLE_STATUS_PANEL):
+	if not _context.feature_enabled(ModConfig.KEY_BATTLE_STATUS_PANEL):
 		opponent_panel.hide_panel()
 		return
 	opponent_panel.show_opponent(opp_name, mmr)
@@ -374,18 +368,18 @@ func _restore_shop_buttons(watchlist_override = null) -> void:
 	if _rank_odds_popup_open or _base_hp_popup_open:
 		return
 	if rank_odds_panel != null:
-		rank_odds_panel.visible = _feature_enabled.call(ModConfig.KEY_RANK_ODDS_PREVIEW)
+		rank_odds_panel.visible = _context.feature_enabled(ModConfig.KEY_RANK_ODDS_PREVIEW)
 	if base_hp_panel != null:
-		base_hp_panel.visible = _feature_enabled.call(ModConfig.KEY_BASE_HP_CHART)
+		base_hp_panel.visible = _context.feature_enabled(ModConfig.KEY_BASE_HP_CHART)
 	if watchlist_panel == null:
 		return
 	if watchlist_override == null:
-		watchlist_override = _feature_enabled.call(ModConfig.KEY_SHOP_HIGHLIGHTS)
+		watchlist_override = _context.feature_enabled(ModConfig.KEY_SHOP_HIGHLIGHTS)
 	watchlist_panel.visible = bool(watchlist_override)
 
 
 func _on_trinket_panel_layout_debug(message: String) -> void:
-	if not _logger.debug_logging:
+	if not _context.logger.debug_logging:
 		return
 	for line in message.split("\n"):
-		_logger.log_message(line)
+		_context.logger.log_message(line)

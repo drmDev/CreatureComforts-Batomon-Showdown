@@ -12,28 +12,24 @@ const TrainerRules = preload("trainer_rules.gd")
 const ModConfig = preload("../core/mod_config.gd")
 
 var _advisor = null
-var _context_builder = null
+var _advice_context_builder = null
 var _trainer_display_names: Dictionary = {}
 var _last_reminder_rule_ids: Dictionary = {}
 var _reminder_label = null
-var _logger = null
-var _chimes = null
-var _feature_enabled: Callable
+var _context = null
 
 
-func setup(formatter, logger, chimes, feature_enabled: Callable) -> void:
-	_logger = logger
-	_chimes = chimes
-	_feature_enabled = feature_enabled
+func setup(context) -> void:
+	_context = context
 
 	_advisor = TrainerAdvisor.new()
-	_context_builder = AdviceContext.new()
+	_advice_context_builder = AdviceContext.new()
 
 	var definitions: Array = TrainerCatalog.TRAINER_DEFINITIONS
 	for trainer_def in definitions:
 		_trainer_display_names[str(trainer_def.get("id", ""))] = str(trainer_def.get("display_name", ""))
 
-	var factory = RuleFactory.new(formatter)
+	var factory = RuleFactory.new(_context.formatter)
 	for rule in factory.build_all(definitions):
 		_advisor.register_rule(rule)
 
@@ -49,11 +45,11 @@ func set_reminder_label(label) -> void:
 ## Evaluate the rules for a shop snapshot, print new notices, update the
 ## reminder label, and queue/play chimes. `gate` is the shop overlay gate.
 func evaluate(snapshot, gate) -> void:
-	if _advisor == null or _context_builder == null:
+	if _advisor == null or _advice_context_builder == null:
 		return
 
-	var context = _context_builder.from_snapshot(snapshot)
-	var result: Dictionary = _advisor.evaluate(context)
+	var advice_context = _advice_context_builder.from_snapshot(snapshot)
+	var result: Dictionary = _advisor.evaluate(advice_context)
 	var new_or_changed: Array = result.get("new_or_changed", [])
 	var all_active: Array = result.get("all_active", [])
 
@@ -68,14 +64,14 @@ func evaluate(snapshot, gate) -> void:
 			if not prefix.is_empty():
 				parts.append(prefix)
 			parts.append(message)
-			_logger.print_notice(" | ".join(parts))
+			_context.logger.print_notice(" | ".join(parts))
 
 		# Queue the chime for chime-flagged rules (day reminders); played once the overlay is showing
-		if advice.get("chime", false) and _feature_enabled.call(ModConfig.KEY_DAY_REMINDERS):
-			_chimes.queue_day(advice.get("rule_id", ""))
-			_logger.log_event("DAY REMINDER | %s | %s" % [advice.get("rule_id", ""), message])
+		if advice.get("chime", false) and _context.feature_enabled(ModConfig.KEY_DAY_REMINDERS):
+			_context.chimes.queue_day(advice.get("rule_id", ""))
+			_context.logger.log_event("DAY REMINDER | %s | %s" % [advice.get("rule_id", ""), message])
 
-	if _reminder_label != null and _feature_enabled.call(ModConfig.KEY_DAY_REMINDERS):
+	if _reminder_label != null and _context.feature_enabled(ModConfig.KEY_DAY_REMINDERS):
 		var reminders_to_show: Dictionary = {}
 
 		for advice in all_active:
@@ -89,7 +85,7 @@ func evaluate(snapshot, gate) -> void:
 		_reminder_label.set_reminders(reminders_to_show)
 		_log_reminder_changes(reminders_to_show)
 
-	_chimes.try_play(gate)
+	_context.chimes.try_play(gate)
 
 
 func reset_suppression() -> void:
@@ -120,12 +116,12 @@ func on_feature_toggled(key: String, value: bool) -> void:
 		if _reminder_label != null:
 			_reminder_label.hide_all_reminders()
 		_last_reminder_rule_ids.clear()
-		_chimes.clear_day()
+		_context.chimes.clear_day()
 
 
 func _log_reminder_changes(reminders: Dictionary) -> void:
 	var current := {}
 	for rule_id in reminders.keys():
 		current[rule_id] = "%s | %s" % [rule_id, str(reminders[rule_id])]
-	_logger.log_keyed_changes("REMINDER", _last_reminder_rule_ids, current)
+	_context.logger.log_keyed_changes("REMINDER", _last_reminder_rule_ids, current)
 	_last_reminder_rule_ids = current

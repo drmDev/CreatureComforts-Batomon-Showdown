@@ -15,16 +15,12 @@ const ModConfig = preload("../core/mod_config.gd")
 const JUNK_TRINKET_ID := LogFormatterScript.JUNK_TRINKET_ID
 
 var _panel = null
-var _formatter = null
-var _feature_enabled: Callable
-var _icon_provider = null
+var _context = null
 
 
-func setup(panel, formatter, feature_enabled: Callable, icon_provider = null) -> void:
+func setup(panel, context) -> void:
 	_panel = panel
-	_formatter = formatter
-	_feature_enabled = feature_enabled
-	_icon_provider = icon_provider
+	_context = context
 
 
 ## Apply the result of a finished battle.
@@ -50,15 +46,15 @@ func on_battle_started() -> void:
 func show_gains(gains: Dictionary) -> bool:
 	if _panel == null:
 		return false
-	if not _feature_enabled.call(ModConfig.KEY_TRINKETS_GAINED_PANEL):
+	if not _context.feature_enabled(ModConfig.KEY_TRINKETS_GAINED_PANEL):
 		hide()
 		return false
 	var shown_ids: Array = TrinketGains.displayable_ids(gains.get("ids", []), JUNK_TRINKET_ID)
 	if shown_ids.is_empty():
 		hide()
 		return false
-	var entries := summarize(shown_ids, _formatter)
-	TrinketGains.attach_icons(entries, _icon_provider)
+	var entries := summarize(shown_ids, _context.formatter)
+	TrinketGains.attach_icons(entries, _context.trinket_icons)
 	_panel.show_gains(entries)
 	return true
 
@@ -80,5 +76,3 @@ static func summarize(ids: Array, formatter) -> Array:
 	for tid in counts.keys():
 		entries.append({"id": tid, "name": formatter.format_trinket_name(tid), "count": int(counts[tid])})
 	return TrinketGains.sort_by_count_desc(entries)
-
-

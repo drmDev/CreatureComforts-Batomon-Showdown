@@ -3,6 +3,7 @@ extends "test_runner.gd"
 
 const BattleTrinketTracker = preload("../core/battle_trinket_tracker.gd")
 const TrinketGainPresenter = preload("../hud/trinket_gain_presenter.gd")
+const RuntimeContext = preload("../core/runtime_context.gd")
 
 
 class FakeRun:
@@ -159,9 +160,20 @@ func test_presenter_summarize_sorts_by_count_desc() -> void:
 	assert_eq(entries[2]["id"], "z")
 
 
+class FakeConfig:
+	extends RefCounted
+	var enabled := true
+
+	func is_enabled(_key: String) -> bool:
+		return enabled
+
+
 func _presenter(panel: FakePanel, enabled := true) -> TrinketGainPresenter:
 	var presenter := TrinketGainPresenter.new()
-	presenter.setup(panel, FakeFormatter.new(), func(_key: String) -> bool: return enabled)
+	var config := FakeConfig.new()
+	config.enabled = enabled
+	var context := RuntimeContext.new(FakeFormatter.new(), FakeLogger.new(), config, null, null)
+	presenter.setup(panel, context)
 	return presenter
 
 
