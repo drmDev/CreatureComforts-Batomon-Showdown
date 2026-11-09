@@ -152,6 +152,31 @@ func test_species_key_falls_back_to_unit_name() -> void:
 	assert_eq(captured["species_key"], "monster.name.cairnage")
 
 
+func test_capture_includes_meta() -> void:
+	var data := _data([_unit(0, 0, "Lignite", 1.0, 0.0, 0.0, 0, 0, 0, 0)])
+	var snapshot := CombatStats.capture(data, {
+		"player_trainer_id": "gentleman",
+		"opponent_trainer_id": "chef",
+	})
+	var meta: Dictionary = snapshot["meta"]
+	assert_eq(meta["player_trainer_id"], "gentleman")
+	assert_eq(meta["opponent_trainer_id"], "chef")
+
+
+func test_capture_meta_defaults_to_empty_strings() -> void:
+	var data := _data([_unit(0, 0, "Lignite", 1.0, 0.0, 0.0, 0, 0, 0, 0)])
+	var meta: Dictionary = CombatStats.capture(data)["meta"]
+	for key in CombatStats.META_KEYS:
+		assert_eq(meta[key], "")
+
+
+func test_capture_meta_keeps_only_known_keys_as_strings() -> void:
+	var data := _data([_unit(0, 0, "Lignite", 1.0, 0.0, 0.0, 0, 0, 0, 0)])
+	var meta: Dictionary = CombatStats.capture(data, {"player_trainer_id": 123, "extra": RefCounted.new()})["meta"]
+	assert_eq(meta["player_trainer_id"], "123")
+	assert_false(meta.has("extra"))
+
+
 func test_compare_operators() -> void:
 	assert_eq(CombatStats.compare(10.0, 5.0), ">")
 	assert_eq(CombatStats.compare(5.0, 10.0), "<")

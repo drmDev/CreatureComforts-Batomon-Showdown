@@ -35,6 +35,14 @@ func test_display_name_falls_back_to_trainer() -> void:
 	assert_eq(OpponentInfo.display_name({"display_name": "Ash"}, "Chef", false, false), "Chef")
 
 
+
+
+func test_trainer_id_reads_dictionary_and_missing() -> void:
+	assert_eq(OpponentInfo.trainer_id({"trainer_id": "chef"}), "chef")
+	assert_eq(OpponentInfo.trainer_id({}), "")
+	assert_eq(OpponentInfo.trainer_id(null), "")
+
+
 func test_same_opponent_matches_name_and_trainer() -> void:
 	var p2 := {"display_name": "Ash", "trainer_id": "chef"}
 	var captured := {"display_name": "Ash", "trainer_id": "chef"}

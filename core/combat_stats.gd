@@ -10,6 +10,11 @@ extends RefCounted
 ##   {
 ##     "player_team": team,
 ##     "opponent_team": team,
+##     "meta": meta,
+##   }
+##   meta (all plain Strings, "" when unknown; used for the trainer portraits):
+##   {
+##     "player_trainer_id": String, "opponent_trainer_id": String,
 ##   }
 ##   team:
 ##   {
@@ -38,6 +43,8 @@ const TEAM_OPPONENT := 1
 
 const METRIC_KEYS := ["damage", "status_damage", "healing", "shield", "casts"]
 
+const META_KEYS := ["player_trainer_id", "opponent_trainer_id"]
+
 const METRIC_LABELS := {
 	"damage": "Damage",
 	"status_damage": "Status Damage",
@@ -48,8 +55,9 @@ const METRIC_LABELS := {
 
 
 ## Capture a battle snapshot from simulation.data. Returns {} when the data is
-## unusable (null, or no battle_units array).
-static func capture(battle_data) -> Dictionary:
+## unusable (null, or no battle_units array). `meta` carries optional portrait
+## facts (see META_KEYS); only those keys are kept, as plain Strings.
+static func capture(battle_data, meta: Dictionary = {}) -> Dictionary:
 	if battle_data == null:
 		return {}
 	if not NodeUtils.has_property(battle_data, "battle_units"):
@@ -75,7 +83,18 @@ static func capture(battle_data) -> Dictionary:
 	return {
 		"player_team": _team_snapshot(player_units),
 		"opponent_team": _team_snapshot(opponent_units),
+		"meta": _clean_meta(meta),
 	}
+
+
+## Reduce `meta` to the known keys as plain Strings, so the snapshot never holds
+## a live object or an unexpected type.
+static func _clean_meta(meta: Dictionary) -> Dictionary:
+	var cleaned := {}
+	for key in META_KEYS:
+		var value = meta.get(key)
+		cleaned[key] = str(value) if value != null else ""
+	return cleaned
 
 
 ## Display label for a metric key.

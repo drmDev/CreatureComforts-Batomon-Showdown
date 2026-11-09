@@ -28,6 +28,11 @@ static func display_name(p2, trainer: String, hide_usernames: bool, user_logged_
 	return n if n != "" else trainer
 
 
+## The trainer id (e.g. "chef") of a run object or dictionary, or "".
+static func trainer_id(run) -> String:
+	return _text(run, "trainer_id")
+
+
 ## The opponent's trainer class from GameDatabase, or an empty string.
 static func trainer_name(p2) -> String:
 	var db = NodeUtils.get_autoload("GameDatabase")

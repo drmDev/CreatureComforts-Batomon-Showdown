@@ -1,10 +1,13 @@
 extends "collapsible_panel.gd"
 ## Post-battle combat statistics panel: player team vs opponent team.
 ##
-## Two columns (player left, opponent right). Team totals are shown at the top
-## with a comparison operator between them; each team's unit breakdown follows
-## underneath as a compact one-row-per-unit table. The panel is collapsible and
-## draggable (inherited) and starts centered near the bottom of the screen.
+## Two columns (player left, opponent right). Each column opens with a heading
+## row: the trainer's portrait, then "Your Team" or "Opponent Team - <name>
+## (<MMR>)". Team totals follow with a comparison operator between them, and each
+## team's unit breakdown comes underneath as a compact one-row-per-unit table.
+## The heading row belongs to the totals section, so it is hidden with it. The
+## panel is collapsible and draggable (inherited) and starts centered near the
+## bottom of the screen.
 ##
 ## Ported from BatoStats++ (hud/combat_stats_panel.gd) when that mod was merged
 ## into Creature Comforts. It uses this mod's collapsible_panel base as-is: the
@@ -13,6 +16,7 @@ extends "collapsible_panel.gd"
 
 const CombatStats = preload("../core/combat_stats.gd")
 const SpeciesIcons = preload("../core/species_icons.gd")
+const TrainerIcons = preload("../core/trainer_icons.gd")
 
 const PADDING := 4.0
 const GUTTER := 16.0
@@ -45,6 +49,16 @@ const ICON_GAP := 2.0
 const ICON_Y_OFFSET := -0.5  # nudge the sprite up so it meets the text baseline
 const NAME_W := COL_UNIT_W - ICON_SIZE - ICON_GAP
 
+# Team heading row: [trainer portrait] [heading text], centered in the column. The
+# portrait sits directly left of the label. The game's small trainer portrait is
+# 88x60, so the slot keeps roughly that ratio.
+const HEADING_H := 12.0
+const PORTRAIT_W := 17.0
+const PORTRAIT_H := 11.5
+const PORTRAIT_GAP := 3.0
+const PLAYER_HEADING := "Your Team"
+const OPPONENT_HEADING := "Opponent Team"
+
 # Each team's half of the panel is exactly as wide as its unit table, so the team
 # heading, the totals and the table all share one column of width COLUMN_WIDTH.
 const COLUMN_WIDTH := TABLE_WIDTH
@@ -59,6 +73,8 @@ const DIVIDER_COLOR := Style.DIVIDER_COLOR
 
 var _snapshot: Dictionary = {}
 var _icons: Dictionary = {}  # species_key -> Texture2D (or null for a miss)
+var _player_portrait: Texture2D = null
+var _opponent_portrait: Texture2D = null
 var _anchored := false
 var _show_totals := true
 
@@ -108,6 +124,8 @@ func hide_panel() -> void:
 		return
 	visible = false
 	_icons.clear()
+	_player_portrait = null
+	_opponent_portrait = null
 	queue_redraw()
 
 
@@ -119,7 +137,7 @@ func full_height() -> float:
 	var totals_h := 0.0
 	var divider_h := 0.0
 	if _show_totals:
-		totals_h = ROW_H + SECTION_GAP + CombatStats.METRIC_KEYS.size() * ROW_H + SECTION_GAP
+		totals_h = HEADING_H + SECTION_GAP + CombatStats.METRIC_KEYS.size() * ROW_H + SECTION_GAP
 		divider_h = 1.0 + SECTION_GAP
 	var table_h := maxf(_table_height(player.get("units", [])), _table_height(opponent.get("units", [])))
 	return HEAD_H + PADDING + totals_h + divider_h + table_h + PADDING
@@ -172,9 +190,9 @@ func _draw_body(_width: float) -> void:
 	var opponent: Dictionary = _snapshot.get("opponent_team", {})
 	var y := HEAD_H + PADDING
 	if _show_totals:
-		_draw_text_shadow(Vector2(_left_col_x(), y + ROW_H - 2.0), "Player Team", LABEL_COLOR, ROW_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER, COLUMN_WIDTH)
-		_draw_text_shadow(Vector2(_right_col_x(), y + ROW_H - 2.0), "Opponent Team", LABEL_COLOR, ROW_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER, COLUMN_WIDTH)
-		y += ROW_H + SECTION_GAP
+		_draw_heading(_left_col_x(), y, _player_portrait, PLAYER_HEADING)
+		_draw_heading(_right_col_x(), y, _opponent_portrait, OPPONENT_HEADING)
+		y += HEADING_H + SECTION_GAP
 
 		var player_totals: Dictionary = player.get("totals", {})
 		var opponent_totals: Dictionary = opponent.get("totals", {})
@@ -200,6 +218,20 @@ func _draw_body(_width: float) -> void:
 	_draw_table(opponent.get("units", []), _right_col_x(), y)
 
 
+## One team heading: [trainer portrait] [heading text], centered in the column.
+## The portrait sits directly left of the label, so it stays beside its text.
+func _draw_heading(x: float, y: float, portrait: Texture2D, text: String) -> void:
+	var shown := _fit_text(_text_font, text, ROW_FONT_SIZE, COLUMN_WIDTH)
+	var text_w := _text_font.get_string_size(shown, HORIZONTAL_ALIGNMENT_LEFT, -1, ROW_FONT_SIZE).x
+	var text_x := x + (COLUMN_WIDTH - text_w) * 0.5
+	if portrait != null:
+		var portrait_x := maxf(x, text_x - PORTRAIT_GAP - PORTRAIT_W)
+		var portrait_y := y + (HEADING_H - PORTRAIT_H) * 0.5
+		_draw_texture_fit(portrait, Rect2(Vector2(portrait_x, portrait_y), Vector2(PORTRAIT_W, PORTRAIT_H)))
+	var baseline := y + HEADING_H * 0.5 + 2.5
+	_draw_text_shadow(Vector2(x, baseline), shown, LABEL_COLOR, ROW_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER, COLUMN_WIDTH)
+
+
 ## X offset of a column within a table whose left edge is x. One source of truth
 ## for the header row and every unit row, so both teams share identical spacing.
 func _column_x(x: float, index: int) -> float:
@@ -209,10 +241,14 @@ func _column_x(x: float, index: int) -> float:
 	return x + offset
 
 
-## Resolve every unit's species icon once per snapshot, so _draw never touches
-## GameDatabase. Misses are stored as null and not retried for this snapshot.
+## Resolve every unit's species icon and both trainer portraits once per
+## snapshot, so _draw never touches GameDatabase. Misses are stored as null and
+## not retried for this snapshot.
 func _resolve_icons() -> void:
 	_icons.clear()
+	var meta: Dictionary = _snapshot.get("meta", {})
+	_player_portrait = TrainerIcons.icon_for(str(meta.get("player_trainer_id", "")))
+	_opponent_portrait = TrainerIcons.icon_for(str(meta.get("opponent_trainer_id", "")))
 	for team_key in ["player_team", "opponent_team"]:
 		var team: Dictionary = _snapshot.get(team_key, {})
 		for unit in team.get("units", []):

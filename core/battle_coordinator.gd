@@ -147,16 +147,32 @@ func _update_opponent_panel(state, is_active: bool) -> void:
 	if p2 == null:
 		_ui.hide_opponent_panel()
 		return
-	var battle_id: int = state.get_instance_id()
-	if battle_id != _opponent_battle_id or _opponent_info.is_empty():
-		_opponent_battle_id = battle_id
-		_opponent_info = OpponentInfo.info(p2, _captured_opponent, _captured_at)
+	_refresh_opponent_info(state, p2)
 	# Keep the card up through the results screen, matching the elapsed readout;
 	# both are hidden when the battle state is left (PhaseRouter).
 	if is_active or BattleMonitor.is_over(state):
 		_ui.show_opponent(str(_opponent_info.get("name", "?")), str(_opponent_info.get("mmr", "-")))
 	else:
 		_ui.hide_opponent_panel()
+
+
+## Resolve the opponent's name and MMR once per battle state.
+func _refresh_opponent_info(state, p2) -> void:
+	var battle_id: int = state.get_instance_id()
+	if battle_id != _opponent_battle_id or _opponent_info.is_empty():
+		_opponent_battle_id = battle_id
+		_opponent_info = OpponentInfo.info(p2, _captured_opponent, _captured_at)
+
+
+## Facts the combat stats panel needs for its trainer portraits. Plain Strings
+## only, so the snapshot retains no live game object.
+func _snapshot_meta(state) -> Dictionary:
+	var p1 = state.get("_replay_p1_data") if NodeUtils.has_property(state, "_replay_p1_data") else null
+	var p2 = state.get("_replay_p2_data") if NodeUtils.has_property(state, "_replay_p2_data") else null
+	return {
+		"player_trainer_id": OpponentInfo.trainer_id(p1),
+		"opponent_trainer_id": OpponentInfo.trainer_id(p2),
+	}
 
 
 func _check_battle_completion(state) -> void:
@@ -172,7 +188,7 @@ func _check_battle_completion(state) -> void:
 	_ui.hide_player_hud()
 	# Post-battle combat statistics (merged from BatoStats++). Captured from the
 	# same battle_data, so the panel and the result log always agree.
-	var snapshot: Dictionary = CombatStats.capture(battle_data)
+	var snapshot: Dictionary = CombatStats.capture(battle_data, _snapshot_meta(state))
 	_log_combat_stats(snapshot)
 	_ui.show_combat_stats(snapshot)
 
