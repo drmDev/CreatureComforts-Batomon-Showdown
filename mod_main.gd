@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "3.318"
+const VERSION := "3.319"
 
 const LogFormatterScript = preload("core/log_formatter.gd")
 const UiSound = preload("core/ui_sound.gd")
@@ -52,8 +52,6 @@ const SLIDER_STEP := 5
 ## Labels added by a mod do not inherit it, which makes them invisible there.
 const SETTINGS_TEXT_THEME := "res://assets/ui/themes/text/description_text.tres"
 var _settings_preview = null
-var _settings_volume_slider: HSlider = null
-var _settings_volume_label: Label = null
 
 
 func mod_ready() -> void:
@@ -177,15 +175,7 @@ func _on_shop_run_changed() -> void:
 ## Apply a live settings change. Disabling a feature hides its UI immediately and
 ## drops any queued sound; enabling lets the next poll re-show it. Panels are
 ## created once at startup, so toggling never duplicates UI or subscriptions.
-##
-## Numeric settings (Mod Volume) carry an int; nothing here has to act on them
-## because UiSound reads the volume on every play. The open slider is synced so
-## it always shows the stored value.
-func _on_feature_toggled(key: String, value) -> void:
-	if not (value is bool):
-		if key == ModConfig.KEY_MOD_VOLUME:
-			_sync_mod_volume_slider(int(value))
-		return
+func _on_feature_toggled(key: String, value: bool) -> void:
 	_ui.on_feature_toggled(key, value)
 	_shop.on_feature_toggled(key, value)
 	if key == ModConfig.KEY_NOTIFICATION_SOUNDS:
@@ -206,35 +196,34 @@ func _on_feature_toggled(key: String, value) -> void:
 ## blank; both controls are styled here (the same text theme the loader's menu
 ## uses, plus explicit track/grabber colours).
 func make_custom_settings_menu_entries() -> Array:
+	var volume := _read_mod_volume()
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
 
-	_settings_volume_label = Label.new()
-	_settings_volume_label.name = "ModVolumeLabel"
-	_settings_volume_label.theme = load(SETTINGS_TEXT_THEME)
-	_settings_volume_label.text = _mod_volume_text(_read_mod_volume())
-	box.add_child(_settings_volume_label)
+	var label := Label.new()
+	label.name = "ModVolumeLabel"
+	label.theme = load(SETTINGS_TEXT_THEME)
+	label.text = _mod_volume_text(volume)
+	box.add_child(label)
 
-	_settings_volume_slider = HSlider.new()
-	_settings_volume_slider.name = "ModVolumeSlider"
-	_settings_volume_slider.min_value = float(ModConfig.MOD_VOLUME_MIN)
-	_settings_volume_slider.max_value = float(ModConfig.MOD_VOLUME_MAX)
-	_settings_volume_slider.step = float(SLIDER_STEP)
-	_settings_volume_slider.value = float(_read_mod_volume())
+	var slider := HSlider.new()
+	slider.name = "ModVolumeSlider"
+	slider.min_value = float(ModConfig.MOD_VOLUME_MIN)
+	slider.max_value = float(ModConfig.MOD_VOLUME_MAX)
+	slider.step = float(SLIDER_STEP)
+	slider.value = float(volume)
 	# The menu treats a VBox row's second child as the navigable control, so the
 	# label must stay first and the slider second.
-	_settings_volume_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_settings_volume_slider.custom_minimum_size = Vector2(160, 22)
-	_settings_volume_slider.tooltip_text = "Volume of the sounds Creature Comforts plays (reminders and UI clicks)."
-	Style.apply_slider(_settings_volume_slider)
-	box.add_child(_settings_volume_slider)
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.custom_minimum_size = Vector2(160, 22)
+	slider.tooltip_text = "Volume of the sounds Creature Comforts plays (reminders and UI clicks)."
+	Style.apply_slider(slider)
+	box.add_child(slider)
 
-	_log_settings("mod volume slider row built (volume %d)" % _read_mod_volume())
+	_log_settings("mod volume slider row built (volume %d)" % volume)
 
 	# Text follows the drag; the file is written once on release (or when focus
 	# leaves the slider, which covers gamepad/keyboard changes).
-	var slider: HSlider = _settings_volume_slider
-	var label: Label = _settings_volume_label
 	slider.value_changed.connect(func(value: float):
 		label.text = _mod_volume_text(int(value)))
 	slider.drag_ended.connect(func(_value_changed: bool):
@@ -261,20 +250,12 @@ func _log_settings(message: String) -> void:
 		_context.logger.log_event("SETTINGS %s" % message)
 
 
-## Released, focus-out, and tree-exit all commit; ModConfig.set_number() skips
-## the file write when the value did not change, so only the first one counts.
+## Released, focus-out, and tree-exit all commit; set_mod_volume() clamps and
+## skips the file write when the value did not change, so only the first counts.
 func _commit_mod_volume(value: int) -> void:
 	if _context == null or _context.config == null:
 		return
-	_context.config.set_number(ModConfig.KEY_MOD_VOLUME, value)
-
-
-## Keep the open slider on the stored value (set_number() clamps it).
-func _sync_mod_volume_slider(value: int) -> void:
-	if _settings_volume_label != null and is_instance_valid(_settings_volume_label):
-		_settings_volume_label.text = _mod_volume_text(value)
-	if _settings_volume_slider != null and is_instance_valid(_settings_volume_slider):
-		_settings_volume_slider.set_value_no_signal(float(value))
+	_context.config.set_mod_volume(value)
 
 
 func _mod_volume_text(value: int) -> String:

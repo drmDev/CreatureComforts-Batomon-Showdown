@@ -10,13 +10,13 @@ extends RefCounted
 ## defaults below are used, so every feature stays enabled.
 ##
 ## Feature toggles are booleans (DEFAULTS) declared in mod.json and persisted by
-## the loader. Sliders such as Mod Volume are integers (NUMERIC_DEFAULTS): the
-## loader can only draw a declared setting as a left/right stepper, so these are
-## deliberately NOT declared in mod.json. They are drawn by mod_main's custom
-## settings row and persisted here, in the mod's own file (STORE_PATH).
+## the loader. Mod Volume is the one numeric setting: the loader can only draw a
+## declared setting as a left/right stepper, so it is deliberately NOT declared
+## in mod.json. mod_main draws it as a slider and this module persists it in the
+## mod's own file (STORE_PATH).
 
 const MOD_ID := "creature_comforts"
-## The mod's own store for numeric settings; absent keys use NUMERIC_DEFAULTS.
+## The mod's own store for Mod Volume; a missing key uses DEFAULT_MOD_VOLUME.
 const STORE_PATH := "user://creature_comforts/settings.cfg"
 const STORE_SECTION := "settings"
 
@@ -62,25 +62,13 @@ const DEFAULTS := {
 	KEY_AUTO_UPDATE: true,
 }
 
-## Numeric settings (rendered as sliders). Kept apart from DEFAULTS so
-## is_enabled() only ever sees boolean toggles.
-const NUMERIC_DEFAULTS := {
-	KEY_MOD_VOLUME: DEFAULT_MOD_VOLUME,
-}
-
-## Inclusive (min, max) for each numeric setting.
-const NUMERIC_RANGES := {
-	KEY_MOD_VOLUME: Vector2i(MOD_VOLUME_MIN, MOD_VOLUME_MAX),
-}
-
-## Emitted when a known setting changes. Only our own keys are re-emitted; the
-## value is a bool for toggles (from the loader) and an int for sliders (from
-## set_number()).
-signal changed(key: String, value)
+## Emitted when a feature toggle changes (loader-driven). Mod Volume is read on
+## demand by the sound players, so it is not announced here.
+signal changed(key: String, value: bool)
 
 var _loader = null
 var _store_path := ""
-var _numbers: Dictionary = {}
+var _mod_volume := DEFAULT_MOD_VOLUME
 
 
 ## Bind to the Mod Loader (may be null when running standalone). Subscribes to
@@ -95,21 +83,20 @@ func setup(loader) -> void:
 		_loader.config_changed.connect(_on_loader_config_changed)
 
 
-## Bind the mod's own file for numeric settings and read it. Without this call
-## (tests, standalone) numbers live in memory only and nothing touches the disk.
-## A missing, unreadable, or malformed file leaves the defaults in place.
+## Bind the mod's own file for Mod Volume and read it. Without this call (tests,
+## standalone) the volume lives in memory only and nothing touches the disk. A
+## missing, unreadable, or malformed file leaves the default in place.
 func use_store(path: String) -> void:
 	_store_path = path
-	_numbers.clear()
+	_mod_volume = DEFAULT_MOD_VOLUME
 	if path.is_empty():
 		return
 	var file := ConfigFile.new()
 	if file.load(path) != OK:
 		return
-	for key in NUMERIC_DEFAULTS.keys():
-		var value = file.get_value(STORE_SECTION, key, null)
-		if value is int or value is float:
-			_numbers[key] = _clamp_number(key, int(value))
+	var value = file.get_value(STORE_SECTION, KEY_MOD_VOLUME, null)
+	if value is int or value is float:
+		_mod_volume = _clamp_volume(int(value))
 
 
 ## Disconnect from the Mod Loader. Called when the mod node leaves the tree so a
@@ -132,47 +119,33 @@ func is_enabled(key: String) -> bool:
 	return DEFAULTS[key]
 
 
-## The current value of a numeric setting, always inside its range. Unknown keys
-## return 0; a key never set returns its default.
-func get_number(key: String) -> int:
-	if not NUMERIC_DEFAULTS.has(key):
-		return 0
-	return int(_numbers.get(key, _clamp_number(key, int(NUMERIC_DEFAULTS[key]))))
-
-
-## Set a numeric setting: clamp it, remember it, write the store file (when one
-## is bound), and emit changed(key, value). Setting the current value again is a
-## no-op, so release/focus-out/exit commits never rewrite the file.
-func set_number(key: String, value: int) -> void:
-	if not NUMERIC_DEFAULTS.has(key):
-		return
-	var clamped := _clamp_number(key, value)
-	if clamped == get_number(key):
-		return
-	_numbers[key] = clamped
-	_save_store()
-	changed.emit(key, clamped)
-
-
 ## Volume for every reminder/UI sound this mod plays, 0-100.
 func mod_volume() -> int:
-	return get_number(KEY_MOD_VOLUME)
+	return _mod_volume
 
 
-func _clamp_number(key: String, value: int) -> int:
-	var range: Vector2i = NUMERIC_RANGES.get(key, Vector2i(0, 100))
-	return clampi(value, range.x, range.y)
+## Store a new Mod Volume (clamped to 0-100). Setting the current value is a
+## no-op, so the slider's release/focus-out/exit commits write the file once.
+func set_mod_volume(value: int) -> void:
+	var clamped := _clamp_volume(value)
+	if clamped == _mod_volume:
+		return
+	_mod_volume = clamped
+	_save_store()
 
 
-## Write every numeric setting to the store, keeping any other keys already in
-## the file. Failures only warn: the in-memory value still applies this session.
+func _clamp_volume(value: int) -> int:
+	return clampi(value, MOD_VOLUME_MIN, MOD_VOLUME_MAX)
+
+
+## Write Mod Volume to the store, keeping any unrelated keys already in the file.
+## Failures only warn: the in-memory value still applies this session.
 func _save_store() -> void:
 	if _store_path.is_empty():
 		return
 	var file := ConfigFile.new()
 	file.load(_store_path)
-	for key in _numbers.keys():
-		file.set_value(STORE_SECTION, key, _numbers[key])
+	file.set_value(STORE_SECTION, KEY_MOD_VOLUME, _mod_volume)
 	DirAccess.make_dir_recursive_absolute(_store_path.get_base_dir())
 	var error := file.save(_store_path)
 	if error != OK:

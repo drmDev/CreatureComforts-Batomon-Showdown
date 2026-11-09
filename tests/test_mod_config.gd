@@ -15,11 +15,6 @@ class FakeLoader:
 	func get_config(mod_id: String, key: String, fallback = null):
 		return values.get(key, fallback)
 
-	func set_config(mod_id: String, key: String, value) -> int:
-		values[key] = value
-		config_changed.emit(mod_id, key, value)
-		return OK
-
 
 const DEFAULT_OFF_KEYS := [
 	ModConfig.KEY_POSITIONAL_TRINKETS,
@@ -135,7 +130,6 @@ func test_mod_volume_defaults_to_full() -> void:
 ## Volume must stay out of the loader-facing toggle table (and mod.json).
 func test_mod_volume_is_not_a_feature_toggle() -> void:
 	assert_false(ModConfig.DEFAULTS.has(ModConfig.KEY_MOD_VOLUME))
-	assert_true(ModConfig.NUMERIC_DEFAULTS.has(ModConfig.KEY_MOD_VOLUME))
 	var config = ModConfig.new()
 	assert_true(config.is_enabled(ModConfig.KEY_MOD_VOLUME))
 
@@ -155,29 +149,14 @@ func test_mod_volume_is_not_declared_in_mod_json() -> void:
 	assert_eq(keys.back(), ModConfig.KEY_NOTIFICATION_SOUNDS, "notification_sounds is the last setting")
 
 
-func test_set_number_clamps_emits_and_dedupes() -> void:
+func test_set_mod_volume_clamps() -> void:
 	var config = ModConfig.new()
-	var received: Array = []
-	config.changed.connect(func(key, value): received.append([key, value]))
-	config.set_number(ModConfig.KEY_MOD_VOLUME, 40)
+	config.set_mod_volume(40)
 	assert_eq(config.mod_volume(), 40)
-	assert_eq(received, [[ModConfig.KEY_MOD_VOLUME, 40]])
-	config.set_number(ModConfig.KEY_MOD_VOLUME, 40)
-	assert_eq(received.size(), 1, "same value is a no-op")
-	config.set_number(ModConfig.KEY_MOD_VOLUME, 500)
+	config.set_mod_volume(500)
 	assert_eq(config.mod_volume(), ModConfig.MOD_VOLUME_MAX, "clamped to max")
-	config.set_number(ModConfig.KEY_MOD_VOLUME, -20)
+	config.set_mod_volume(-20)
 	assert_eq(config.mod_volume(), ModConfig.MOD_VOLUME_MIN, "clamped to min")
-	assert_eq(received.size(), 3)
-
-
-func test_set_number_ignores_unknown_key() -> void:
-	var config = ModConfig.new()
-	var received: Array = []
-	config.changed.connect(func(key, value): received.append([key, value]))
-	config.set_number("unknown_key", 50)
-	assert_eq(config.get_number("unknown_key"), 0)
-	assert_empty(received)
 
 
 func test_loader_numeric_changes_are_ignored() -> void:
@@ -197,7 +176,7 @@ func test_store_round_trip() -> void:
 	_remove_test_store()
 	var writer = ModConfig.new()
 	writer.use_store(TEST_STORE)
-	writer.set_number(ModConfig.KEY_MOD_VOLUME, 65)
+	writer.set_mod_volume(65)
 	assert_true(FileAccess.file_exists(TEST_STORE), "store written")
 	var reader = ModConfig.new()
 	reader.use_store(TEST_STORE)

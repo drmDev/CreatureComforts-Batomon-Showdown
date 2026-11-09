@@ -5,8 +5,7 @@ extends "collapsible_panel.gd"
 ## row: the trainer's portrait, then "Your Team" or "Opponent Team - <name>
 ## (<MMR>)". Team totals follow with a comparison operator between them, and each
 ## team's unit breakdown comes underneath as a compact one-row-per-unit table.
-## The heading row belongs to the totals section, so it is hidden with it. The
-## panel is collapsible and draggable (inherited) and starts centered near the
+## The panel is collapsible and draggable (inherited) and starts centered near the
 ## bottom of the screen.
 ##
 ## Ported from BatoStats++ (hud/combat_stats_panel.gd) when that mod was merged

@@ -59,7 +59,6 @@ func play() -> void:
 		if not (_player is AudioStreamPlayer):
 			_player = AudioStreamPlayer.new()
 			_player.name = _player_name
-			_player.volume_db = VOLUME_DB
 			_host.add_child(_player)
 	_apply_volume()
 	if _player.stream == null:
