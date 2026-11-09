@@ -16,10 +16,15 @@ class FakeLoader:
 		return values.get(key, fallback)
 
 
-func test_defaults_are_enabled_except_positional_trinkets() -> void:
+const DEFAULT_OFF_KEYS := [
+	ModConfig.KEY_POSITIONAL_TRINKETS,
+]
+
+
+func test_defaults_are_enabled_except_beta_features() -> void:
 	var config = ModConfig.new()
 	for key in ModConfig.DEFAULTS.keys():
-		if key == ModConfig.KEY_POSITIONAL_TRINKETS:
+		if DEFAULT_OFF_KEYS.has(key):
 			assert_false(config.is_enabled(key), "default for %s" % key)
 		else:
 			assert_true(config.is_enabled(key), "default for %s" % key)
