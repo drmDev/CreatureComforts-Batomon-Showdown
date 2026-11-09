@@ -1,7 +1,7 @@
 {
 	"id": "creature_comforts",
 	"name": "Creature Comforts",
-	"version": "3.307",
+	"version": "3.308",
 	"author": "NescapePlan",
 	"description": "Creature Comforts - QoL improvements.",
 	"settings": [
@@ -13,6 +13,10 @@
 		 "description": "Play reminder and UI sound effects."},
 		{"key": "battle_status_panel", "label": "Battle Status Panel", "type": "bool", "default": true,
 		 "description": "Show remaining lives, wins, and current day during battles."},
+		{"key": "combat_stats_panel", "label": "Combat Stats Panel", "type": "bool", "default": true,
+		 "description": "Show the post-battle combat statistics comparison panel."},
+		{"key": "show_team_totals", "label": "Team Comparison Totals", "type": "bool", "default": true,
+		 "description": "Show the summed team comparison at the top of the combat stats panel."},
 		{"key": "trinkets_gained_panel", "label": "Trinkets Gained Panel", "type": "bool", "default": true,
 		 "description": "Show trinkets acquired during battle."},
 		{"key": "shop_income", "label": "Shop Income", "type": "bool", "default": true,

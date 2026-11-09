@@ -24,6 +24,10 @@ const KEY_BASE_HP_CHART := "base_hp_chart"
 ## together: highlighting is only useful with the watchlist, so one setting
 ## controls both. The key keeps its original name so saved values carry over.
 const KEY_SHOP_HIGHLIGHTS := "shop_highlights"
+## Post-battle combat statistics panel (merged from BatoStats++). The second key
+## only controls the summed team comparison at the top of that panel.
+const KEY_COMBAT_STATS_PANEL := "combat_stats_panel"
+const KEY_SHOW_TEAM_TOTALS := "show_team_totals"
 const KEY_AUTO_UPDATE := "auto_update"
 
 ## Most features default to enabled to preserve existing behavior. The beta
@@ -39,6 +43,8 @@ const DEFAULTS := {
 	KEY_RANK_ODDS_PREVIEW: true,
 	KEY_BASE_HP_CHART: true,
 	KEY_SHOP_HIGHLIGHTS: true,
+	KEY_COMBAT_STATS_PANEL: true,
+	KEY_SHOW_TEAM_TOTALS: true,
 	KEY_AUTO_UPDATE: true,
 }
 

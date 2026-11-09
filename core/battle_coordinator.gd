@@ -12,6 +12,7 @@ const BattleMonitor = preload("battle_monitor.gd")
 const OpponentInfo = preload("opponent_info.gd")
 const BattleCompletionReporter = preload("battle_completion_reporter.gd")
 const BattleTrinketTracker = preload("battle_trinket_tracker.gd")
+const CombatStats = preload("combat_stats.gd")
 const TrinketGainPresenter = preload("../hud/trinket_gain_presenter.gd")
 
 var _context = null
@@ -75,6 +76,7 @@ func hide_trinket_gains() -> void:
 func on_run_changed() -> void:
 	_battle_trinkets.reset()
 	_trinket_gains.hide()
+	_ui.hide_combat_stats()
 
 
 ## Handle one battle poll. Returns true when the battle phase was processed (so
@@ -86,10 +88,11 @@ func handle(state, phase_changed: bool) -> bool:
 		_ui.hide_battle_elapsed()
 
 	# A replay restarts the simulation inside the same battle state. Hide the
-	# previous readout while the replay runs; _check_battle_completion shows it
-	# again when the replay finishes.
+	# previous readouts while the replay runs; _check_battle_completion shows
+	# them again when the replay finishes.
 	if not BattleMonitor.is_over(state):
 		_ui.hide_battle_elapsed()
+		_ui.hide_combat_stats()
 
 	# The opponent card follows the exact same visibility as the lives/wins/day HUD.
 	var is_active: bool = state.get("is_battle_active") if NodeUtils.has_property(state, "is_battle_active") else false
@@ -167,6 +170,21 @@ func _check_battle_completion(state) -> void:
 	_ui.show_battle_elapsed(BattleMonitor.format_seconds(BattleMonitor.time_elapsed(battle_data)))
 	# The elapsed readout sits over the lives/wins/day HUD; show only one of them.
 	_ui.hide_player_hud()
+	# Post-battle combat statistics (merged from BatoStats++). Captured from the
+	# same battle_data, so the panel and the result log always agree.
+	var snapshot: Dictionary = CombatStats.capture(battle_data)
+	_log_combat_stats(snapshot)
+	_ui.show_combat_stats(snapshot)
+
+
+func _log_combat_stats(snapshot: Dictionary) -> void:
+	if snapshot.is_empty():
+		_context.logger.log_event("BATTLE STATS | capture failed (no battle data)")
+		return
+	var player: Dictionary = snapshot.get("player_team", {})
+	var opponent: Dictionary = snapshot.get("opponent_team", {})
+	_context.logger.log_event("BATTLE STATS | player units=%d opponent units=%d" % [
+		player.get("units", []).size(), opponent.get("units", []).size()])
 
 
 func _log_battle_result(battle_data) -> void:

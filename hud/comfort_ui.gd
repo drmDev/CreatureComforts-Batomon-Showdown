@@ -18,6 +18,7 @@ const PlayerHud = preload("player_hud.gd")
 const TrinketPanel = preload("trinket_panel.gd")
 const BattleElapsedPanel = preload("battle_elapsed_panel.gd")
 const OpponentPanel = preload("opponent_panel.gd")
+const CombatStatsPanel = preload("combat_stats_panel.gd")
 
 var reminder_layer: CanvasLayer = null
 var player_hud_layer: CanvasLayer = null
@@ -33,6 +34,7 @@ var trinket_panel = null
 var player_hud = null
 var battle_elapsed_panel = null
 var opponent_panel = null
+var combat_stats_panel = null
 var shop_highlight = null
 
 var _context = null
@@ -137,6 +139,14 @@ func _build_player_hud() -> void:
 	opponent_panel = OpponentPanel.new()
 	opponent_panel.name = "OpponentPanel"
 	player_hud_layer.add_child(opponent_panel)
+
+	# Post-battle combat statistics (merged from BatoStats++). Lives on the battle
+	# HUD layer so it can appear on the results screen; the battle coordinator
+	# shows it when a battle finishes and hides it while a replay runs.
+	combat_stats_panel = CombatStatsPanel.new()
+	combat_stats_panel.name = "CombatStatsPanel"
+	combat_stats_panel.set_show_totals(_context.feature_enabled(ModConfig.KEY_SHOW_TEAM_TOTALS))
+	player_hud_layer.add_child(combat_stats_panel)
 
 
 ## Apply the shop overlay gate to the reminder layer. Returns true when the
@@ -280,6 +290,22 @@ func hide_opponent_panel() -> void:
 	opponent_panel.hide_panel()
 
 
+## Show the post-battle combat statistics panel. An empty snapshot (the capture
+## failed) hides it instead of showing an empty panel.
+func show_combat_stats(snapshot: Dictionary) -> void:
+	if combat_stats_panel == null:
+		return
+	if not _context.feature_enabled(ModConfig.KEY_COMBAT_STATS_PANEL):
+		combat_stats_panel.hide_panel()
+		return
+	combat_stats_panel.show_snapshot(snapshot)
+
+
+func hide_combat_stats() -> void:
+	if combat_stats_panel != null:
+		combat_stats_panel.hide_panel()
+
+
 func _build_player_stats(player_run) -> Dictionary:
 	var stats := {
 		"hp": "?",
@@ -317,6 +343,12 @@ func on_feature_toggled(key: String, value: bool) -> void:
 		# Restore the button row, which also respects an open Base HP popup.
 		_restore_shop_buttons(value)
 		return
+	# The totals toggle applies live in both directions; the panel itself is
+	# re-shown by the next battle poll when it is enabled again.
+	if key == ModConfig.KEY_SHOW_TEAM_TOTALS:
+		if combat_stats_panel != null:
+			combat_stats_panel.set_show_totals(value)
+		return
 	if value:
 		return
 	if key == ModConfig.KEY_BATTLE_STATUS_PANEL:
@@ -326,6 +358,8 @@ func on_feature_toggled(key: String, value: bool) -> void:
 			battle_elapsed_panel.hide_panel()
 		if opponent_panel != null:
 			opponent_panel.hide_panel()
+	elif key == ModConfig.KEY_COMBAT_STATS_PANEL:
+		hide_combat_stats()
 	elif key == ModConfig.KEY_SHOP_INCOME:
 		if shop_income_panel != null:
 			shop_income_panel.hide_panel()

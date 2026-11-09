@@ -1,4 +1,4 @@
-Creature Comforts v3.307 - Quality of Life Mod for Batomon Showdown
+Creature Comforts v3.308 - Quality of Life Mod for Batomon Showdown
 =================================================================
 Creature Comforts adds helpful reminders, shop planning tools, and quality-of-life improvements to Batomon Showdown.
 
@@ -48,6 +48,21 @@ OPPONENT INFO
 During battle, a small bottom-right panel shows the opponent's name and MMR
 (ranked, casual, or Bot). It shares the Battle Status Panel toggle and hides
 together with the lives/wins/day HUD.
+
+COMBAT STATS
+After a battle finishes, a collapsible panel compares your team's combat
+statistics with the opponent's. It shows team totals for damage, status damage,
+healing, shield, and casts with a comparison operator (>, <, or =) between the
+two sides, then a compact one-row-per-unit table for each team. Each unit row
+shows the monster's icon beside its name, the top value for each metric is
+highlighted in green, and zero or missing values are muted. The panel can be
+collapsed and dragged, and it remembers where you put it. It is hidden while a
+replay runs and when you leave the battle.
+
+The Combat Stats Panel setting shows or hides the whole panel. Team Comparison
+Totals controls the summed comparison at the top; turn it off to show only the
+per-unit tables. This panel was merged from the BatoStats++ mod, so BatoStats++
+is no longer needed alongside Creature Comforts.
 
 SHOP INCOME
 Displays your current income directly in the shop.
@@ -159,6 +174,8 @@ Leave feedback on Nexus Mods or submit an issue on GitHub.
 CREDITS
 -------
 Creature Comforts is an unofficial fan-made mod.
+
+The combat statistics panel was merged from BatoStats++, also by NescapePlan.
 
 Not affiliated with or endorsed by the developers of Batomon Showdown.
 

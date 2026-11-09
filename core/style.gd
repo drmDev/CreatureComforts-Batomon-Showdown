@@ -74,6 +74,15 @@ const SAVE_BG_HOVER := Color("#427B58")
 const SAVE_BORDER := Color("#65A77A")
 const SAVE_BG_DISABLED := Color("#2A4A38")
 
+# Combat stats comparison (hud/combat_stats_panel.gd). The green/red pair only
+# ever appears beside a ">" / "<" glyph, so the meaning never relies on colour
+# alone. The green reuses the Uncommon rarity colour instead of a new hex value.
+const COMPARE_GOOD := RARITY_UNCOMMON
+const COMPARE_BAD := Color("#e05a5a")
+const MUTED_COLOR := Color("#6b7686")          # zero / unavailable values
+const ROW_ALT_COLOR := Color(1, 1, 1, 0.05)    # alternating unit row tint
+const DIVIDER_COLOR := Color(1, 1, 1, 0.12)    # totals / table divider
+
 
 ## Text colour for a type filter. Unknown types return TRANSPARENT so callers fall
 ## back to their neutral text colour.

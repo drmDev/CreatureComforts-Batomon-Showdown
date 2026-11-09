@@ -48,9 +48,11 @@ func _inspect_current_phase() -> void:
 		_ui.hide_shop_panels()
 	if not is_battle:
 		_ui.hide_opponent_panel()
-		# The elapsed readout belongs to the battle screen; drop it as soon as the
-		# battle state is left (shop, event, or trinket select).
+		# The elapsed readout and the combat stats panel belong to the battle
+		# screen; drop them as soon as the battle state is left (shop, event, or
+		# trinket select).
 		_ui.hide_battle_elapsed()
+		_ui.hide_combat_stats()
 		# Reset battle-scoped tracking only when actually leaving the battle phase.
 		if _last_phase == "battle":
 			_battle.reset_completion()
