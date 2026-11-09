@@ -8,7 +8,6 @@ const DRAG_THRESHOLD := 3.0
 const TITLE_FONT_SIZE := 8  # Shared header text size for every collapsible panel
 
 const HEADER_BG := Style.HEADER_BG      # Slightly lighter navy for the header bar
-const INK_COLOR := Style.VALUE_COLOR    # "-" / "+" glyph colour
 
 var _entries: Array = []  # Array of subclass-defined row Dictionaries
 var _content_key := ""    # Cheap change detection for subclass show_*() callers
@@ -18,7 +17,8 @@ var reveal := 1.0  # 1 = expanded, 0 = minimized (animated)
 
 var _panel_style: StyleBoxFlat
 var _header_style: StyleBoxFlat
-var _button_style: StyleBoxFlat
+var _minimize_texture: Texture2D
+var _maximize_texture: Texture2D
 
 var _pressing := false
 var _dragged := false
@@ -37,6 +37,8 @@ func _init() -> void:
 	visible = false
 	_setup_styles()
 	_text_font = _build_panel_font()
+	_minimize_texture = _load_icon(PanelIcons.MINIMIZE)
+	_maximize_texture = _load_icon(PanelIcons.MAXIMIZE)
 
 
 func _setup_styles() -> void:
@@ -53,11 +55,6 @@ func _setup_styles() -> void:
 	_header_style.set_border_width_all(1)
 	_header_style.set_corner_radius_all(3)
 	_header_style.set_content_margin_all(3)
-
-	_button_style = StyleBoxFlat.new()
-	_button_style.bg_color = BORDER_COLOR
-	_button_style.set_corner_radius_all(2)
-	_button_style.set_content_margin_all(2)
 
 
 func header_text() -> String:
@@ -132,11 +129,9 @@ func _draw() -> void:
 	_draw_title(Rect2(Vector2(12, 0), Vector2(button_rect().position.x - 16, HEAD_H)))
 
 	var b := button_rect()
-	_button_style.draw(ci, b)
-	var c := b.get_center().floor()
-	draw_rect(Rect2(c.x - 3, c.y, 6, 1), INK_COLOR)
-	if minimized:
-		draw_rect(Rect2(c.x, c.y - 3, 1, 7), INK_COLOR)
+	var icon := _maximize_texture if minimized else _minimize_texture
+	if icon != null:
+		_draw_texture_fit(icon, b)
 
 
 func _draw_title(r: Rect2) -> void:

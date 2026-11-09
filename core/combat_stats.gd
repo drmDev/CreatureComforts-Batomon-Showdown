@@ -14,7 +14,7 @@ extends RefCounted
 ##   team:
 ##   {
 ##     "units": [unit, ...],
-##     "totals": {metric: float or null, ..., "additional_metrics": {...}},
+##     "totals": {metric: float or null, ...},
 ##   }
 ##   unit:
 ##   {
@@ -22,8 +22,6 @@ extends RefCounted
 ##     "species_key": String, "damage": float or null,
 ##     "status_damage": float or null,
 ##     "healing": float or null, "shield": float or null, "casts": int or null,
-##     "additional_metrics": {"burn_inflicted": ..., "poison_inflicted": ...,
-##                            "shock_inflicted": ...},
 ##   }
 ##
 ## A missing metric is null, never 0: an unavailable value and a real zero are
@@ -39,7 +37,6 @@ const TEAM_PLAYER := 0
 const TEAM_OPPONENT := 1
 
 const METRIC_KEYS := ["damage", "status_damage", "healing", "shield", "casts"]
-const ADDITIONAL_METRIC_KEYS := ["burn_inflicted", "poison_inflicted", "shock_inflicted"]
 
 const METRIC_LABELS := {
 	"damage": "Damage",
@@ -124,11 +121,6 @@ static func _read_unit(unit) -> Dictionary:
 		"healing": _read_float(unit, "healing_done"),
 		"shield": _read_float(unit, "shield_granted"),
 		"casts": _read_int(unit, "cast_count"),
-		"additional_metrics": {
-			"burn_inflicted": burn,
-			"poison_inflicted": poison,
-			"shock_inflicted": shock,
-		},
 	}
 
 
@@ -210,10 +202,6 @@ static func _totals(units: Array) -> Dictionary:
 	var totals := {}
 	for key in METRIC_KEYS:
 		totals[key] = _sum_metric(units, key)
-	var additional := {}
-	for key in ADDITIONAL_METRIC_KEYS:
-		additional[key] = _sum_additional(units, key)
-	totals["additional_metrics"] = additional
 	return totals
 
 
@@ -223,17 +211,6 @@ static func _sum_metric(units: Array, key: String):
 	var total = null
 	for unit in units:
 		var value = unit.get(key)
-		if value == null:
-			continue
-		total = (0.0 if total == null else float(total)) + float(value)
-	return total
-
-
-static func _sum_additional(units: Array, key: String):
-	var total = null
-	for unit in units:
-		var additional: Dictionary = unit.get("additional_metrics", {})
-		var value = additional.get(key)
 		if value == null:
 			continue
 		total = (0.0 if total == null else float(total)) + float(value)

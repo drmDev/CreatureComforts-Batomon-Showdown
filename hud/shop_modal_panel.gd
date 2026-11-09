@@ -26,10 +26,10 @@ var _popup_open := false
 var _button_screen_pos := Vector2.ZERO
 
 var _button_texture: Texture2D = null
+var _close_texture: Texture2D = null
 var _button_style: StyleBoxFlat
 var _popup_style: StyleBoxFlat
 var _header_style: StyleBoxFlat
-var _close_style: StyleBoxFlat
 
 
 func _init() -> void:
@@ -39,6 +39,7 @@ func _init() -> void:
 	_setup_styles()
 	_text_font = _build_panel_font()
 	_button_texture = _load_texture(_button_texture_path())
+	_close_texture = _load_icon(PanelIcons.CLOSE)
 	size = Vector2(_button_size(), _button_size())
 
 
@@ -131,10 +132,6 @@ func _setup_styles() -> void:
 	_header_style.border_color = BORDER_COLOR
 	_header_style.set_border_width_all(1)
 	_header_style.set_corner_radius_all(4)
-
-	_close_style = StyleBoxFlat.new()
-	_close_style.bg_color = BORDER_COLOR
-	_close_style.set_corner_radius_all(2)
 
 
 func _anchor() -> void:
@@ -239,10 +236,8 @@ func _draw_popup() -> void:
 	_draw_text_shadow(r.position + Vector2(POPUP_PADDING, TITLE_H - 6.0), _popup_title(), VALUE_COLOR, TITLE_FONT_SIZE)
 
 	var close := _close_rect()
-	_close_style.draw(get_canvas_item(), close)
-	var c := close.get_center()
-	draw_line(c + Vector2(-3, -3), c + Vector2(3, 3), BG_COLOR, 1.5)
-	draw_line(c + Vector2(-3, 3), c + Vector2(3, -3), BG_COLOR, 1.5)
+	if _close_texture != null:
+		_draw_texture_fit(_close_texture, close)
 
 	_draw_content(r)
 

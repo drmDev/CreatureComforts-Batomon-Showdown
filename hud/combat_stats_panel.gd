@@ -244,11 +244,11 @@ func _draw_table(units: Array, x: float, y: float) -> void:
 		if icon is Texture2D:
 			var icon_y := y + (TABLE_ROW_H - ICON_SIZE) * 0.5 + ICON_Y_OFFSET
 			_draw_texture_fit(icon, Rect2(Vector2(x, icon_y), Vector2(ICON_SIZE, ICON_SIZE)))
-		var name := _display_name(str(unit.get("unit_name", "")))
-		if name.is_empty():
-			name = str(unit.get("unit_id", "?"))
-		name = _fit_text(_text_font, name, TABLE_FONT_SIZE, NAME_W)
-		_draw_table_cell(x + ICON_SIZE + ICON_GAP, y, NAME_W, name, VALUE_COLOR, HORIZONTAL_ALIGNMENT_LEFT)
+		var unit_name := _display_name(str(unit.get("unit_name", "")))
+		if unit_name.is_empty():
+			unit_name = str(unit.get("unit_id", "?"))
+		unit_name = _fit_text(_text_font, unit_name, TABLE_FONT_SIZE, NAME_W)
+		_draw_table_cell(x + ICON_SIZE + ICON_GAP, y, NAME_W, unit_name, VALUE_COLOR, HORIZONTAL_ALIGNMENT_LEFT)
 		for col in range(CombatStats.METRIC_KEYS.size()):
 			var key: String = CombatStats.METRIC_KEYS[col]
 			var cell := col + 1
@@ -305,16 +305,16 @@ func _operator_color(op: String) -> Color:
 
 
 ## Show only the species segment of a name such as "monster.name.leafleap".
-func _short_name(name: String) -> String:
-	var dot := name.rfind(".")
-	if dot >= 0 and dot + 1 < name.length():
-		return name.substr(dot + 1)
-	return name
+func _short_name(raw_name: String) -> String:
+	var dot := raw_name.rfind(".")
+	if dot >= 0 and dot + 1 < raw_name.length():
+		return raw_name.substr(dot + 1)
+	return raw_name
 
 
 ## Short name with its first character capitalised (e.g. "leafleap" -> "Leafleap").
-func _display_name(name: String) -> String:
-	var short := _short_name(name)
+func _display_name(raw_name: String) -> String:
+	var short := _short_name(raw_name)
 	if short.is_empty():
 		return short
 	return short.substr(0, 1).to_upper() + short.substr(1)
