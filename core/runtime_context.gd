@@ -34,3 +34,11 @@ func feature_enabled(key: String) -> bool:
 ## setting, so one toggle mutes all of them.
 func sounds_enabled() -> bool:
 	return feature_enabled(ModConfig.KEY_NOTIFICATION_SOUNDS)
+
+
+## Shared 0-100 volume for the same sounds; the one Mod Volume slider sets how
+## loud they are.
+func mod_volume() -> int:
+	if config == null:
+		return ModConfig.DEFAULT_MOD_VOLUME
+	return config.mod_volume()

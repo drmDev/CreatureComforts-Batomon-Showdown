@@ -76,7 +76,6 @@ var _icons: Dictionary = {}  # species_key -> Texture2D (or null for a miss)
 var _player_portrait: Texture2D = null
 var _opponent_portrait: Texture2D = null
 var _anchored := false
-var _show_totals := true
 
 
 func _ready() -> void:
@@ -90,17 +89,6 @@ func _ready() -> void:
 
 func header_text() -> String:
 	return "Combat Stats"
-
-
-## Show or hide the summed team comparison at the top of the panel. The per-unit
-## tables are always shown.
-func set_show_totals(on: bool) -> void:
-	if _show_totals == on:
-		return
-	_show_totals = on
-	_apply_size()
-	_reposition()
-	queue_redraw()
 
 
 ## Show the panel with a captured snapshot. An empty snapshot hides it.
@@ -134,11 +122,9 @@ func full_height() -> float:
 		return HEAD_H + PADDING * 2.0
 	var player: Dictionary = _snapshot.get("player_team", {})
 	var opponent: Dictionary = _snapshot.get("opponent_team", {})
-	var totals_h := 0.0
-	var divider_h := 0.0
-	if _show_totals:
-		totals_h = HEADING_H + SECTION_GAP + CombatStats.METRIC_KEYS.size() * ROW_H + SECTION_GAP
-		divider_h = 1.0 + SECTION_GAP
+	# Team headings + summed comparison, then the divider, then the unit tables.
+	var totals_h := HEADING_H + SECTION_GAP + CombatStats.METRIC_KEYS.size() * ROW_H + SECTION_GAP
+	var divider_h := 1.0 + SECTION_GAP
 	var table_h := maxf(_table_height(player.get("units", [])), _table_height(opponent.get("units", [])))
 	return HEAD_H + PADDING + totals_h + divider_h + table_h + PADDING
 
@@ -189,30 +175,29 @@ func _draw_body(_width: float) -> void:
 	var player: Dictionary = _snapshot.get("player_team", {})
 	var opponent: Dictionary = _snapshot.get("opponent_team", {})
 	var y := HEAD_H + PADDING
-	if _show_totals:
-		_draw_heading(_left_col_x(), y, _player_portrait, PLAYER_HEADING)
-		_draw_heading(_right_col_x(), y, _opponent_portrait, OPPONENT_HEADING)
-		y += HEADING_H + SECTION_GAP
+	_draw_heading(_left_col_x(), y, _player_portrait, PLAYER_HEADING)
+	_draw_heading(_right_col_x(), y, _opponent_portrait, OPPONENT_HEADING)
+	y += HEADING_H + SECTION_GAP
 
-		var player_totals: Dictionary = player.get("totals", {})
-		var opponent_totals: Dictionary = opponent.get("totals", {})
-		for key in CombatStats.METRIC_KEYS:
-			var label := CombatStats.metric_label(key)
-			var pv = player_totals.get(key)
-			var ov = opponent_totals.get(key)
-			var op := CombatStats.compare(pv, ov)
-			var left_text := "%s: %s" % [label, CombatStats.format_value(pv)]
-			var right_text := "%s: %s" % [label, CombatStats.format_value(ov)]
-			var baseline := y + ROW_H - 2.0
-			_draw_text_shadow(Vector2(_left_col_x(), baseline), left_text, VALUE_COLOR, ROW_FONT_SIZE, HORIZONTAL_ALIGNMENT_RIGHT, COLUMN_WIDTH)
-			_draw_text_shadow(Vector2(_gutter_x(), baseline), op, _operator_color(op), ROW_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER, GUTTER)
-			_draw_text_shadow(Vector2(_right_col_x(), baseline), right_text, VALUE_COLOR, ROW_FONT_SIZE)
-			y += ROW_H
-		y += SECTION_GAP
+	var player_totals: Dictionary = player.get("totals", {})
+	var opponent_totals: Dictionary = opponent.get("totals", {})
+	for key in CombatStats.METRIC_KEYS:
+		var label := CombatStats.metric_label(key)
+		var pv = player_totals.get(key)
+		var ov = opponent_totals.get(key)
+		var op := CombatStats.compare(pv, ov)
+		var left_text := "%s: %s" % [label, CombatStats.format_value(pv)]
+		var right_text := "%s: %s" % [label, CombatStats.format_value(ov)]
+		var baseline := y + ROW_H - 2.0
+		_draw_text_shadow(Vector2(_left_col_x(), baseline), left_text, VALUE_COLOR, ROW_FONT_SIZE, HORIZONTAL_ALIGNMENT_RIGHT, COLUMN_WIDTH)
+		_draw_text_shadow(Vector2(_gutter_x(), baseline), op, _operator_color(op), ROW_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER, GUTTER)
+		_draw_text_shadow(Vector2(_right_col_x(), baseline), right_text, VALUE_COLOR, ROW_FONT_SIZE)
+		y += ROW_H
+	y += SECTION_GAP
 
-		# Subtle divider between the team totals and the unit tables.
-		draw_rect(Rect2(_left_col_x(), y, _content_width() - PADDING * 2.0, 1.0), DIVIDER_COLOR)
-		y += 1.0 + SECTION_GAP
+	# Subtle divider between the team totals and the unit tables.
+	draw_rect(Rect2(_left_col_x(), y, _content_width() - PADDING * 2.0, 1.0), DIVIDER_COLOR)
+	y += 1.0 + SECTION_GAP
 
 	_draw_table(player.get("units", []), _left_col_x(), y)
 	_draw_table(opponent.get("units", []), _right_col_x(), y)

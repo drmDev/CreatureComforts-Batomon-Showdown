@@ -9,29 +9,42 @@ extends RefCounted
 ## `enabled` is an optional gate (e.g. the Notification Sounds setting); when it
 ## returns false, play() is a no-op.
 ##
+## `volume` is an optional 0-100 provider (e.g. the Mod Volume slider). It is
+## read again on every play(), so moving the slider affects the next sound
+## without rebuilding any player. 100 maps to VOLUME_DB, so the default keeps
+## the level the mod has always used.
+##
 ## Usage:
 ##   var click := UiSound.new()
-##   click.setup(self, "click.ogg")
+##   click.setup(self, "click.ogg", enabled, volume)
 ##   click.play()
 
 const SOUND_DIR := "../assets/sounds/"
 const PLAYER_PREFIX := "CreatureComfortsSound_"
+## Level at 100% volume. Kept moderate so sounds sit under the game's music.
 const VOLUME_DB := -6.0
+const MAX_PERCENT := 100.0
+## Muted players still get a finite dB value; linear_to_db(0) is -inf.
+const SILENT_DB := -80.0
 
 var _host: Node
 var _path := ""
 var _player_name := ""
 var _enabled: Callable
+var _volume: Callable
 var _stream: AudioStream
 var _player: AudioStreamPlayer
 var _load_attempted := false
 
 
-func setup(host: Node, file_name: String, enabled: Callable = Callable()) -> void:
+## `enabled` gates playback; `volume` returns 0-100. Both may be empty
+## callables, in which case the sound is always allowed and plays at 100%.
+func setup(host: Node, file_name: String, enabled: Callable = Callable(), volume: Callable = Callable()) -> void:
 	_host = host
 	_path = _resolve_path(file_name)
 	_player_name = PLAYER_PREFIX + file_name.get_basename()
 	_enabled = enabled
+	_volume = volume
 
 
 func play() -> void:
@@ -48,11 +61,32 @@ func play() -> void:
 			_player.name = _player_name
 			_player.volume_db = VOLUME_DB
 			_host.add_child(_player)
+	_apply_volume()
 	if _player.stream == null:
 		_player.stream = _load_stream()
 	if _player.stream == null:
 		return
 	_player.play()
+
+
+## Map a 0-100 percentage onto dB relative to the module's ceiling. Exposed so
+## tests can check the curve without a live tree or an audio device.
+static func volume_db_for(percent: float) -> float:
+	var clamped := clampf(percent, 0.0, MAX_PERCENT)
+	if clamped <= 0.0:
+		return SILENT_DB
+	return VOLUME_DB + linear_to_db(clamped / MAX_PERCENT)
+
+
+func _apply_volume() -> void:
+	if _player == null or not is_instance_valid(_player):
+		return
+	var percent := MAX_PERCENT
+	if _volume.is_valid():
+		var value = _volume.call()
+		if value is int or value is float:
+			percent = float(value)
+	_player.volume_db = volume_db_for(percent)
 
 
 ## Resolve a sound file against this script's own directory, so callers only

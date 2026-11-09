@@ -101,7 +101,7 @@ func _build_reminder_layer() -> void:
 	# and hidden entirely when the Shop Highlights setting is off.
 	watchlist_panel = WatchlistPanel.new()
 	watchlist_panel.name = "WatchlistPanel"
-	watchlist_panel.setup(_context.formatter, _context.sounds_enabled)
+	watchlist_panel.setup(_context.formatter, _context.sounds_enabled, _context.mod_volume)
 	reminder_layer.add_child(watchlist_panel)
 
 
@@ -145,7 +145,6 @@ func _build_player_hud() -> void:
 	# shows it when a battle finishes and hides it while a replay runs.
 	combat_stats_panel = CombatStatsPanel.new()
 	combat_stats_panel.name = "CombatStatsPanel"
-	combat_stats_panel.set_show_totals(_context.feature_enabled(ModConfig.KEY_SHOW_TEAM_TOTALS))
 	player_hud_layer.add_child(combat_stats_panel)
 
 
@@ -342,12 +341,6 @@ func on_feature_toggled(key: String, value: bool) -> void:
 			watchlist_panel.close_popup()
 		# Restore the button row, which also respects an open Base HP popup.
 		_restore_shop_buttons(value)
-		return
-	# The totals toggle applies live in both directions; the panel itself is
-	# re-shown by the next battle poll when it is enabled again.
-	if key == ModConfig.KEY_SHOW_TEAM_TOTALS:
-		if combat_stats_panel != null:
-			combat_stats_panel.set_show_totals(value)
 		return
 	if value:
 		return

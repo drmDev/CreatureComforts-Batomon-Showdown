@@ -140,3 +140,33 @@ static func action_button(b: Button, bg: Color, bg_hover: Color, border: Color, 
 		b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.45))
 	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color"]:
 		b.add_theme_color_override(state, text_color)
+
+
+## Style an HSlider so it is visible outside the mod's own HUD. The game's
+## settings panel themes its own controls, so a bare slider can draw blank
+## there; this sets an explicit navy track, gold filled area, and grabber.
+static func apply_slider(slider: HSlider) -> void:
+	var track := StyleBoxFlat.new()
+	track.bg_color = BG_COLOR
+	track.border_color = BORDER_COLOR
+	track.set_border_width_all(1)
+	track.set_corner_radius_all(2)
+	track.content_margin_top = 5
+	track.content_margin_bottom = 5
+	var filled: StyleBoxFlat = track.duplicate()
+	filled.bg_color = BORDER_COLOR
+	filled.border_color = BORDER_COLOR
+	slider.add_theme_stylebox_override("slider", track)
+	slider.add_theme_stylebox_override("grabber_area", filled)
+	slider.add_theme_stylebox_override("grabber_area_highlight", filled)
+	var grabber := solid_texture(10, 18, VALUE_COLOR)
+	slider.add_theme_icon_override("grabber", grabber)
+	slider.add_theme_icon_override("grabber_highlight", grabber)
+	slider.add_theme_icon_override("grabber_disabled", solid_texture(10, 18, LABEL_COLOR))
+
+
+## A flat one-colour texture, used for themed icons such as slider grabbers.
+static func solid_texture(width: int, height: int, color: Color) -> ImageTexture:
+	var image := Image.create(width, height, false, Image.FORMAT_RGBA8)
+	image.fill(color)
+	return ImageTexture.create_from_image(image)

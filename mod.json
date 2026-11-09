@@ -1,7 +1,7 @@
 {
 	"id": "creature_comforts",
 	"name": "Creature Comforts",
-	"version": "3.313",
+	"version": "3.318",
 	"author": "NescapePlan",
 	"description": "Creature Comforts - QoL improvements.",
 	"settings": [
@@ -9,14 +9,8 @@
 		 "description": "Show reminders before important trainer events."},
 		{"key": "trinket_reminders", "label": "Trinket Reminders", "type": "bool", "default": true,
 		 "description": "Show collapsible reminders for timing-sensitive trinkets."},		
-		{"key": "notification_sounds", "label": "Notification Sounds", "type": "bool", "default": true,
-		 "description": "Play reminder and UI sound effects."},
-		{"key": "battle_status_panel", "label": "Battle Status Panel", "type": "bool", "default": true,
+		{"key": "battle_status_panel", "label": "Battle HUD", "type": "bool", "default": true,
 		 "description": "Show remaining lives, wins, and current day during battles."},
-		{"key": "combat_stats_panel", "label": "Combat Stats Panel", "type": "bool", "default": true,
-		 "description": "Show the post-battle combat statistics comparison panel."},
-		{"key": "show_team_totals", "label": "Team Comparison Totals", "type": "bool", "default": true,
-		 "description": "Show the summed team comparison at the top of the combat stats panel."},
 		{"key": "trinkets_gained_panel", "label": "Trinkets Gained Panel", "type": "bool", "default": true,
 		 "description": "Show trinkets acquired during battle."},
 		{"key": "shop_income", "label": "Shop Income", "type": "bool", "default": true,
@@ -29,7 +23,11 @@
 		 "description": "Show the Watchlist button and highlight shop cards that match it."},
 		{"key": "auto_update", "label": "Auto-update", "type": "bool", "default": true,
 		 "description": "Download and install new Creature Comforts versions from GitHub."},
-		{"key": "positional_trinkets", "label": "Smart Trinket Summary at >= 20 trinkets (beta)", "type": "bool", "default": false,
-		"description": "Show a movable summary of positional trinket bonuses in the shop."}
+		{"key": "positional_trinkets", "label": "Trinket Summary (beta)", "type": "bool", "default": false,
+		"description": "Show a movable summary of positional trinket bonuses in the shop."},
+		{"key": "combat_stats_panel", "label": "Combat Stats++ Panel", "type": "bool", "default": true,
+		 "description": "Show the post-battle combat statistics comparison panel."},
+		{"key": "notification_sounds", "label": "Notification Sounds", "type": "bool", "default": true,
+		 "description": "Play reminder and UI sound effects. The Mod Volume slider below sets how loud they are."}
 	]
 }

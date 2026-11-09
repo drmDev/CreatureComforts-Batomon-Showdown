@@ -1,4 +1,4 @@
-Creature Comforts v3.313 - Quality of Life Mod for Batomon Showdown
+Creature Comforts v3.318 - Quality of Life Mod for Batomon Showdown
 =================================================================
 Creature Comforts adds helpful reminders, shop planning tools, and quality-of-life improvements to Batomon Showdown.
 
@@ -61,16 +61,22 @@ highlighted in green, and zero or missing values are muted. The panel can be
 collapsed and dragged, and it remembers where you put it. It is hidden while a
 replay runs and when you leave the battle.
 
-The Combat Stats Panel setting shows or hides the whole panel. Team Comparison
-Totals controls the headings and the summed comparison at the top; turn it off to
-show only the per-unit tables. This panel was merged from the BatoStats++ mod, so BatoStats++
-is no longer needed alongside Creature Comforts.
+The Combat Stats Panel setting shows or hides the whole panel, including the
+team headings and the summed comparison at the top. This panel was merged from
+the BatoStats++ mod, so BatoStats++ is no longer needed alongside Creature
+Comforts.
 
 SHOP INCOME
 Displays your current income directly in the shop.
 
 DAY REMINDERS
 Receive reminders for important trainer-specific events and global events on Days 3, 6, and 9.
+
+NOTIFICATION SOUNDS & VOLUME
+Reminder chimes and UI clicks can be muted with Notification Sounds. The
+Mod Volume slider (0-100, default 100) directly under it sets how loud they
+are, and plays a click at the new level when you let go. Both are at the
+bottom of Settings > Mods > Creature Comforts.
 
 SHOP RANK ODDS
 View shop rarity probabilities for ranks 1 through 14+ using the chart icon near the shop rank display.
@@ -85,6 +91,10 @@ SETTINGS
 Features can be enabled or disabled individually under:
 
 Settings > Mods > Creature Comforts
+
+Mod Volume is a single slider (mouse drag, or focus it and use left/right) at
+the bottom of the list, under Notification Sounds. Scroll down to reach it.
+It is saved by the mod itself in user://creature_comforts/settings.cfg.
 
 Settings are saved automatically and persist between sessions.
 

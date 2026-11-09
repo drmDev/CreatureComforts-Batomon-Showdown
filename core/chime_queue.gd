@@ -13,12 +13,13 @@ var _pending_trinket := false
 
 
 ## `host` is the Node the AudioStreamPlayers are added to; `sounds_enabled` is
-## the Notification Sounds gate passed to every UiSound.
-func setup(host: Node, sounds_enabled: Callable) -> void:
+## the Notification Sounds gate and `sound_volume` the shared 0-100 volume
+## provider, both passed to every UiSound.
+func setup(host: Node, sounds_enabled: Callable, sound_volume: Callable = Callable()) -> void:
 	_pika = UiSound.new()
-	_pika.setup(host, "pika.ogg", sounds_enabled)
+	_pika.setup(host, "pika.ogg", sounds_enabled, sound_volume)
 	_poke = UiSound.new()
-	_poke.setup(host, "poke_item_found.ogg", sounds_enabled)
+	_poke.setup(host, "poke_item_found.ogg", sounds_enabled, sound_volume)
 
 
 func queue_day(rule_id: String) -> void:

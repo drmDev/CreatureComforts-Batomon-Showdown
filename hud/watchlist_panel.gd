@@ -87,6 +87,7 @@ var _builds_button: Button
 var _save_button: Button
 var _builds_panel: SavedBuildsPanel
 var _sounds_enabled: Callable
+var _sound_volume: Callable
 var _click_sound = null
 var _save_sound = null
 var _tracked_only := false
@@ -108,9 +109,10 @@ func _init() -> void:
 	_text_font = _build_panel_font()
 
 
-func setup(formatter, sounds_enabled: Callable = Callable()) -> void:
+func setup(formatter, sounds_enabled: Callable = Callable(), sound_volume: Callable = Callable()) -> void:
 	_formatter = formatter
 	_sounds_enabled = sounds_enabled
+	_sound_volume = sound_volume
 	_load_selection()
 	_build_ui()
 
@@ -199,9 +201,9 @@ func _style_option(option: OptionButton) -> void:
 func _build_ui() -> void:
 	_ensure_row_styles()
 	_click_sound = UiSound.new()
-	_click_sound.setup(self, "click.ogg", _sounds_enabled)
+	_click_sound.setup(self, "click.ogg", _sounds_enabled, _sound_volume)
 	_save_sound = UiSound.new()
-	_save_sound.setup(self, "save.ogg", _sounds_enabled)
+	_save_sound.setup(self, "save.ogg", _sounds_enabled, _sound_volume)
 	# Custom-drawn control (not a Button) so BTN_SIZE fully controls the size;
 	# a Button clamps to its text + theme padding minimum.
 	_button = WatchlistButton.new()

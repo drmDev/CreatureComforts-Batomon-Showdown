@@ -62,3 +62,27 @@ func test_save_palette_is_muted_green_and_distinct() -> void:
 	assert_ne(Style.SAVE_BG, Style.BG_COLOR)
 	assert_ne(Style.SAVE_BG_HOVER, Style.SAVE_BG)
 	assert_ne(Style.SAVE_BG_DISABLED, Style.SAVE_BG)
+
+
+## The settings panel does not theme generic controls, so the volume slider
+## must carry its own visible track and grabber instead of drawing blank.
+func test_apply_slider_sets_visible_theme_items() -> void:
+	var slider := HSlider.new()
+	Style.apply_slider(slider)
+	var track = slider.get_theme_stylebox("slider")
+	assert_true(track is StyleBoxFlat, "track stylebox")
+	assert_true(track is StyleBoxFlat and track.bg_color == Style.BG_COLOR, "track uses panel navy")
+	assert_true(track is StyleBoxFlat and track.border_color == Style.BORDER_COLOR, "track uses the gold border")
+	var filled = slider.get_theme_stylebox("grabber_area")
+	assert_true(filled is StyleBoxFlat and filled.bg_color == Style.BORDER_COLOR, "filled area is gold")
+	assert_true(slider.get_theme_icon("grabber") is Texture2D, "grabber icon")
+	slider.free()
+
+
+func test_solid_texture_size_and_color() -> void:
+	var texture: ImageTexture = Style.solid_texture(6, 9, Style.VALUE_COLOR)
+	assert_eq(texture.get_width(), 6)
+	assert_eq(texture.get_height(), 9)
+	var image := texture.get_image()
+	assert_eq(image.get_pixel(0, 0), Style.VALUE_COLOR)
+	assert_eq(image.get_pixel(5, 8), Style.VALUE_COLOR)
