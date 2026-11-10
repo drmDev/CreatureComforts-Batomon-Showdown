@@ -138,9 +138,10 @@ If you encounter a bug, please include a description, reproduction steps, and sc
 
 FEEDBACK
 --------
-Suggestions, bug reports, and feature requests are welcome!
+Suggestions, bug reports, and feature requests are welcome! Submit them through my Github repo:
+https://github.com/drmDev/CreatureComforts-Batomon-Showdown
 
-Leave feedback on Nexus Mods or submit an issue on GitHub.
+Or ping me on Discord @NescapePlan
 
 
 CREDITS
