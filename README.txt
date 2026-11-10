@@ -41,7 +41,7 @@ Compare your team's performance against your opponent after each battle.
 Displays your current income directly in the shop.
 
 ### Sell Value Indicators
-See each unit's sell value in the bottom-right corner of its team and bench slot. Bonus sell values are highlighted in blue with a + prefix.
+When an item or trinket raises a unit's sell value above its base, a gold coin icon appears in the top-right corner of its team or bench slot. Hover the unit to see the exact sell value.
 
 ### Day Reminders
 Receive reminders for important trainer-specific and global events on Days 3, 6, and 9.

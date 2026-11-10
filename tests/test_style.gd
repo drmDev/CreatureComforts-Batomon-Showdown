@@ -40,12 +40,6 @@ func test_action_palette_differs_from_filter_palette() -> void:
 	assert_ne(Style.ACTION_BORDER, Style.BORDER_COLOR)
 
 
-func test_sell_value_boosted_color_matches_shop_highlight() -> void:
-	assert_eq(Style.SELL_VALUE_BOOSTED, Style.WATCHLIST_HIGHLIGHT_BORDER)
-	assert_ne(Style.SELL_VALUE_BOOSTED, Style.VALUE_COLOR)
-	assert_ne(Style.SELL_VALUE_BOOSTED, Style.BORDER_COLOR)
-
-
 func test_watchlist_highlight_is_cyan_and_distinct() -> void:
 	# Colour-blind friendly cyan, not the gold panel accent or a rarity colour.
 	assert_eq(Style.WATCHLIST_HIGHLIGHT_BORDER, Color("#00d9ff"))

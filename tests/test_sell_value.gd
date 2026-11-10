@@ -20,17 +20,6 @@ func test_value_of_rejects_null_and_unsellable() -> void:
 	assert_eq(SellValue.value_of(plain), 0)
 
 
-func test_text_for_clamps_negative_values() -> void:
-	assert_eq(SellValue.text_for(12), "12")
-	assert_eq(SellValue.text_for(0), "0")
-	assert_eq(SellValue.text_for(-3), "0")
-
-
-func test_text_for_prefixes_boosted_values() -> void:
-	assert_eq(SellValue.text_for(12, true), "+12")
-	assert_eq(SellValue.text_for(0, true), "+0")
-
-
 func test_is_boosted_compares_to_base_sell_value() -> void:
 	assert_true(SellValue.is_boosted(FakeBaseMonster.new(10, 7)))
 	assert_false(SellValue.is_boosted(FakeBaseMonster.new(7, 7)))
@@ -48,58 +37,31 @@ func test_is_boosted_requires_a_sellable_monster() -> void:
 	assert_false(SellValue.is_boosted(FakeMonster.new(7)))
 
 
-func test_badge_reads_the_slot_monster() -> void:
-	var slot = FakeSlot.new()
-	var badge = SellValueBadge.new()
-	badge.slot = slot
-	slot.add_child(badge)
-	slot.current_monster = FakeMonster.new(7)
-	badge._refresh()
-	assert_true(badge.visible)
-	assert_eq(badge._text, "7")
-	slot.current_monster = null
-	badge._refresh()
-	assert_false(badge.visible)
-	slot.free()
-
-
-func test_badge_shows_zero_for_a_zero_value_monster() -> void:
-	var slot = FakeSlot.new()
-	var badge = SellValueBadge.new()
-	badge.slot = slot
-	slot.add_child(badge)
-	slot.current_monster = FakeMonster.new(0)
-	badge._refresh()
-	assert_true(badge.visible)
-	assert_eq(badge._text, "0")
-	slot.free()
-
-
-func test_badge_shows_zero_for_a_monster_without_sell_value() -> void:
-	var slot = FakeSlot.new()
-	var badge = SellValueBadge.new()
-	badge.slot = slot
-	slot.add_child(badge)
-	slot.current_monster = FakePlain.new()
-	badge._refresh()
-	assert_true(badge.visible)
-	assert_eq(badge._text, "0")
-	slot.free()
-
-
-func test_badge_tracks_boosted_state() -> void:
+func test_badge_shows_only_for_a_boosted_monster() -> void:
 	var slot = FakeSlot.new()
 	var badge = SellValueBadge.new()
 	badge.slot = slot
 	slot.add_child(badge)
 	slot.current_monster = FakeBaseMonster.new(10, 7)
 	badge._refresh()
-	assert_true(badge._boosted)
-	assert_eq(badge._text, "+10")
+	assert_true(badge.visible)
+	slot.current_monster = null
+	badge._refresh()
+	assert_false(badge.visible)
+	slot.free()
+
+
+func test_badge_hides_unboosted_values() -> void:
+	var slot = FakeSlot.new()
+	var badge = SellValueBadge.new()
+	badge.slot = slot
+	slot.add_child(badge)
+	slot.current_monster = FakeMonster.new(7)
+	badge._refresh()
+	assert_false(badge.visible)
 	slot.current_monster = FakeBaseMonster.new(7, 7)
 	badge._refresh()
-	assert_false(badge._boosted)
-	assert_eq(badge._text, "7")
+	assert_false(badge.visible)
 	slot.free()
 
 
@@ -108,7 +70,7 @@ func test_badge_hides_when_disabled() -> void:
 	var badge = SellValueBadge.new()
 	badge.slot = slot
 	slot.add_child(badge)
-	slot.current_monster = FakeMonster.new(4)
+	slot.current_monster = FakeBaseMonster.new(10, 7)
 	badge._refresh()
 	assert_true(badge.visible)
 	badge.set_enabled(false)
