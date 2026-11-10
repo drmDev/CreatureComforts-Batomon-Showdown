@@ -1,7 +1,7 @@
 {
 	"id": "creature_comforts",
 	"name": "Creature Comforts",
-	"version": "4.001",
+	"version": "4.006",
 	"author": "NescapePlan",
 	"description": "Creature Comforts - QoL improvements.",
 	"settings": [
@@ -27,6 +27,8 @@
 		"description": "Show a movable summary of positional trinket bonuses in the shop."},
 		{"key": "combat_stats_panel", "label": "Combat Stats++ Panel", "type": "bool", "default": true,
 		 "description": "Show the post-battle combat statistics comparison panel."},
+		{"key": "sell_value_indicators", "label": "Sell Value Indicators", "type": "bool", "default": true,
+		 "description": "Show each fielded and bench unit's sell value in the top-right corner of its slot."},
 		{"key": "notification_sounds", "label": "Notification Sounds", "type": "bool", "default": true,
 		 "description": "Play reminder and UI sound effects. The Mod Volume slider below sets how loud they are."}
 	]

@@ -112,6 +112,9 @@ func handle(state, phase_changed: bool) -> bool:
 	_ui.update_rank_odds(int(run.get("shop_rank")) if NodeUtils.has_property(run, "shop_rank") else 1)
 	var total_hp := int(run.get("player_hp")) if NodeUtils.has_property(run, "player_hp") else 0
 	_ui.update_base_hp(current_day, total_hp)
+	var view = state.get("view") if NodeUtils.has_property(state, "view") else null
+	var gate_allowed: bool = _shop_overlay_gate == null or _shop_overlay_gate.is_allowed()
+	_ui.update_sell_values(view, gate_allowed)
 
 	_last_snapshot = current_snapshot
 	return true

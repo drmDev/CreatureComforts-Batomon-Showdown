@@ -7,6 +7,7 @@ extends Node
 const NodeUtils = preload("../core/node_utils.gd")
 const ModConfig = preload("../core/mod_config.gd")
 const ShopHighlight = preload("shop_highlight.gd")
+const SellValueIndicators = preload("sell_value_indicators.gd")
 const ReminderLabel = preload("reminder_label.gd")
 const ShopIncomePanel = preload("shop_income_panel.gd")
 const TrinketRemindersPanel = preload("trinket_reminders_panel.gd")
@@ -36,6 +37,7 @@ var battle_elapsed_panel = null
 var opponent_panel = null
 var combat_stats_panel = null
 var shop_highlight = null
+var sell_value_indicators = null
 
 var _context = null
 var _rank_odds_popup_open := false
@@ -46,6 +48,7 @@ func setup(context) -> void:
 	_context = context
 	_build_reminder_layer()
 	_build_shop_highlight()
+	_build_sell_value_indicators()
 	_build_player_hud()
 
 
@@ -119,6 +122,16 @@ func _build_shop_highlight() -> void:
 	watchlist_panel.visible = enabled
 
 
+## Sell-value badges on the fielded and bench slots. The controller attaches to
+## the game's My Team grid on each shop poll; this node only owns its lifecycle
+## and the feature toggle.
+func _build_sell_value_indicators() -> void:
+	sell_value_indicators = SellValueIndicators.new()
+	sell_value_indicators.name = "SellValueIndicators"
+	add_child(sell_value_indicators)
+	sell_value_indicators.setup(_context)
+
+
 func _build_player_hud() -> void:
 	player_hud_layer = CanvasLayer.new()
 	player_hud_layer.layer = 110  # Above game UI, matching NP_QoL's HUD layer
@@ -163,6 +176,8 @@ func apply_gate(allowed: bool) -> bool:
 			rank_odds_panel.reset_for_shop()
 		if base_hp_panel != null:
 			base_hp_panel.reset_for_shop()
+		if sell_value_indicators != null:
+			sell_value_indicators.hide_all()
 	return allowed
 
 
@@ -170,6 +185,8 @@ func apply_gate(allowed: bool) -> bool:
 ## The trinket gains panel is deliberately NOT hidden here: it lives on the gated reminder
 ## layer and its content must survive the results/event screens until the shop returns.
 func hide_shop_panels() -> void:
+	if sell_value_indicators != null:
+		sell_value_indicators.hide_all()
 	if shop_income_panel != null:
 		shop_income_panel.hide_panel()
 	if trinket_reminders_panel != null:
@@ -199,6 +216,18 @@ func update_shop_income(income: int) -> void:
 		shop_income_panel.hide_panel()
 		return
 	shop_income_panel.set_income(income)
+
+
+## Attach/refresh the sell-value badges for the current shop view. Called on
+## every shop poll; the controller reuses existing badges. `allowed` mirrors the
+## shop overlay gate so badges stay hidden through the shop fade-in and modals.
+func update_sell_values(view, allowed: bool = true) -> void:
+	if sell_value_indicators == null:
+		return
+	if not allowed:
+		sell_value_indicators.hide_all()
+		return
+	sell_value_indicators.update_team(view)
 
 
 func update_rank_odds(rank: int) -> void:
@@ -341,6 +370,11 @@ func on_feature_toggled(key: String, value: bool) -> void:
 			watchlist_panel.close_popup()
 		# Restore the button row, which also respects an open Base HP popup.
 		_restore_shop_buttons(value)
+		return
+	# Sell-value badges are re-shown by the next shop poll when enabled.
+	if key == ModConfig.KEY_SELL_VALUE_INDICATORS:
+		if sell_value_indicators != null:
+			sell_value_indicators.set_enabled(value)
 		return
 	if value:
 		return

@@ -26,6 +26,7 @@ var _test_scripts := {
 	"run_region": preload("test_run_region.gd"),
 	"run_data": preload("test_run_data.gd"),
 	"style": preload("test_style.gd"),
+	"sell_value": preload("test_sell_value.gd"),
 	"auto_updater": preload("test_auto_updater.gd"),
 }
 

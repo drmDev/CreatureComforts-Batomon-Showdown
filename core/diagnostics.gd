@@ -128,6 +128,7 @@ func log_shop_structure(state) -> void:
 	_logger.log_message("SHOP DIAG | shop_slot_ui cards found: %d" % cards.size())
 	for card in cards:
 		_logger.log_message("SHOP DIAG |   card %s" % _describe_shop_card(card))
+	log_team_ui(view)
 	_logger.log_message("SHOP DIAG | === end ===")
 
 
@@ -194,5 +195,60 @@ func _describe_shop_card(card) -> String:
 	if card is Control:
 		rect = " rect=%s" % card.get_global_rect()
 	return "%s (%s)%s content=[%s]" % [card.name, card.get_class(), rect, content_desc]
+
+
+## Dump the My Team grid contract used by hud/sell_value_indicators.gd: the team
+## UI node, its slot arrays, and each slot's live current_monster sell value.
+## This is how the live build's node names are confirmed without the pck.
+func log_team_ui(view) -> void:
+	_logger.log_message("SELL DIAG | === begin ===")
+	if view == null or not is_instance_valid(view):
+		_logger.log_message("SELL DIAG | view not found")
+		_logger.log_message("SELL DIAG | === end ===")
+		return
+	var team_ui = view.get("monster_team_ui") if NodeUtils.has_property(view, "monster_team_ui") else null
+	if team_ui == null or not is_instance_valid(team_ui) or not (team_ui is Node):
+		_logger.log_message("SELL DIAG | view.monster_team_ui NOT found")
+		_logger.log_message("SELL DIAG | === end ===")
+		return
+	var team_script: Script = team_ui.get_script()
+	_logger.log_message("SELL DIAG | team_ui=%s class=%s script=%s path=%s" % [
+		team_ui.name, team_ui.get_class(),
+		str(team_script.resource_path) if team_script != null else "(none)",
+		team_ui.get_path()])
+	for key in ["team_slots", "bench_slots"]:
+		if not NodeUtils.has_property(team_ui, key):
+			_logger.log_message("SELL DIAG | team_ui.%s NOT found" % key)
+			continue
+		var slots = team_ui.get(key)
+		if not (slots is Array):
+			_logger.log_message("SELL DIAG | team_ui.%s type=%s (not Array)" % [
+				key, type_string(typeof(slots))])
+			continue
+		_logger.log_message("SELL DIAG | team_ui.%s size=%d" % [key, slots.size()])
+		for i in range(slots.size()):
+			_logger.log_message("SELL DIAG |   %s[%d] %s" % [key, i, _describe_team_slot(slots[i])])
+	_logger.log_message("SELL DIAG | === end ===")
+
+
+func _describe_team_slot(slot) -> String:
+	if slot == null or not is_instance_valid(slot) or not (slot is Node):
+		return "(invalid)"
+	var script: Script = slot.get_script()
+	var script_name := str(script.resource_path.get_file().get_basename()) if script != null else ""
+	var rect := ""
+	if slot is Control:
+		rect = " rect=%s" % slot.get_global_rect()
+	var monster = slot.get("current_monster") if NodeUtils.has_property(slot, "current_monster") else null
+	var monster_desc := "none"
+	if monster != null and is_instance_valid(monster):
+		var monster_script: Script = monster.get_script()
+		var sell := "n/a"
+		if monster.has_method("get_sell_value"):
+			sell = str(int(monster.get_sell_value()))
+		monster_desc = "script=%s sell=%s" % [
+			str(monster_script.resource_path) if monster_script != null else "(none)", sell]
+	return "%s (%s) script=%s%s monster=[%s]" % [
+		slot.name, slot.get_class(), script_name, rect, monster_desc]
 
 

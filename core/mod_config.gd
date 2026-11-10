@@ -33,6 +33,9 @@ const MOD_VOLUME_MAX := 100
 const DEFAULT_MOD_VOLUME := 100
 const KEY_BATTLE_STATUS_PANEL := "battle_status_panel"
 const KEY_TRINKETS_GAINED_PANEL := "trinkets_gained_panel"
+## Gold sell-value badges on the fielded and bench slots of the shop's My Team
+## grid. Shop-phase only; the shop controller drives the attach/hide lifecycle.
+const KEY_SELL_VALUE_INDICATORS := "sell_value_indicators"
 const KEY_SHOP_INCOME := "shop_income"
 const KEY_RANK_ODDS_PREVIEW := "rank_odds_preview"
 const KEY_BASE_HP_CHART := "base_hp_chart"
@@ -54,6 +57,7 @@ const DEFAULTS := {
 	KEY_NOTIFICATION_SOUNDS: true,
 	KEY_BATTLE_STATUS_PANEL: true,
 	KEY_TRINKETS_GAINED_PANEL: true,
+	KEY_SELL_VALUE_INDICATORS: true,
 	KEY_SHOP_INCOME: true,
 	KEY_RANK_ODDS_PREVIEW: true,
 	KEY_BASE_HP_CHART: true,
