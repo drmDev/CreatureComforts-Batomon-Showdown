@@ -1,4 +1,4 @@
-# Creature Comforts v4.009
+# Creature Comforts v4.011
 ### Quality of Life Mod for Batomon Showdown
 
 Creature Comforts adds helpful reminders, shop planning tools, combat statistics, and quality-of-life improvements to Batomon Showdown.
@@ -41,7 +41,7 @@ Compare your team's performance against your opponent after each battle.
 Displays your current income directly in the shop.
 
 ### Sell Value Indicators
-See each unit's sell value directly on your team and bench. Bonus sell values are highlighted in blue.
+See each unit's sell value in the bottom-right corner of its team and bench slot. Bonus sell values are highlighted in blue with a + prefix.
 
 ### Day Reminders
 Receive reminders for important trainer-specific and global events on Days 3, 6, and 9.
@@ -53,7 +53,7 @@ Optional reminder sounds and UI feedback, with adjustable volume.
 View shop rarity probabilities for ranks 1 through 14+.
 
 ### Base HP by Day
-View base HP progression for days 1–17, including bonuses from your trainer and trinkets.
+View base HP progression for days 1-17, including bonuses from your trainer and trinkets.
 
 ## SETTINGS
 

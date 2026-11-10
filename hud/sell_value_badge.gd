@@ -1,5 +1,5 @@
 extends "comfort_panel.gd"
-## Top-right sell-value badge attached to a fielded or bench slot.
+## Bottom-right sell-value badge attached to a fielded or bench slot.
 ##
 ## Reads the slot's live `current_monster` at 10 Hz and draws the game's own
 ## sell value (MonsterInstance.get_sell_value()) as a compact gold-coin pill.
@@ -13,12 +13,13 @@ const BADGE_NAME := "CreatureComfortsSellValue"
 const BADGE_GROUP := "cc_sell_value_badge"
 const ICON_PATH := "../assets/icons/gold.png"
 
-const FONT_SIZE := 8
-const ICON_SIZE := 7.0
-const GAP := 1.0
-const PAD_X := 2.0
-const PAD_Y := 1.0
-const MARGIN := 2.0
+# 25% smaller than the original 8/7/1/2/1/2 values.
+const FONT_SIZE := 6
+const ICON_SIZE := 5.25
+const GAP := 0.75
+const PAD_X := 1.5
+const PAD_Y := 0.75
+const MARGIN := 1.5
 const PROCESS_INTERVAL := 0.1
 
 ## The slot this badge reports on. Set by hud/sell_value_indicators.gd.
@@ -43,7 +44,7 @@ func _init() -> void:
 	z_index = 3
 	visible = false
 	_text_font = _build_panel_font()
-	_box = _build_hud_box(2, 1)
+	_box = _build_hud_box(1, 1)
 	add_to_group(BADGE_GROUP)
 
 
@@ -123,29 +124,29 @@ func _resize_to_text() -> void:
 	if follow_slot:
 		_place_at_slot()
 	else:
-		_anchor_top_right()
+		_anchor_bottom_right()
 
 
-func _anchor_top_right() -> void:
+func _anchor_bottom_right() -> void:
 	anchor_left = 1.0
 	anchor_right = 1.0
-	anchor_top = 0.0
-	anchor_bottom = 0.0
+	anchor_top = 1.0
+	anchor_bottom = 1.0
 	offset_left = -size.x - MARGIN
 	offset_right = -MARGIN
-	offset_top = MARGIN
-	offset_bottom = MARGIN + size.y
+	offset_top = -size.y - MARGIN
+	offset_bottom = -MARGIN
 
 
 ## Container fallback: the badge is hosted outside the slot, so place it at the
-## slot's top-right corner in the shared canvas space.
+## slot's bottom-right corner in the shared canvas space.
 func _place_at_slot() -> void:
 	if slot == null or not is_instance_valid(slot) or not (slot is Control):
 		return
 	var rect: Rect2 = slot.get_global_rect()
 	global_position = Vector2(
 		rect.position.x + rect.size.x - size.x - MARGIN,
-		rect.position.y + MARGIN
+		rect.position.y + rect.size.y - size.y - MARGIN
 	)
 
 
