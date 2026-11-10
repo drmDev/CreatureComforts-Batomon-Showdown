@@ -79,6 +79,10 @@ const SAVE_BG_DISABLED := Color("#2A4A38")
 # alone. The green reuses the Uncommon rarity colour instead of a new hex value.
 const COMPARE_GOOD := RARITY_UNCOMMON
 const COMPARE_BAD := Color("#e05a5a")
+## Sell-value badge number when an item/trinket has raised the unit's sell
+## value above its base. Reuses the watchlist highlight blue so the boost cue
+## matches the shop highlight.
+const SELL_VALUE_BOOSTED := WATCHLIST_HIGHLIGHT_BORDER
 const MUTED_COLOR := Color("#6b7686")          # zero / unavailable values
 const ROW_ALT_COLOR := Color(1, 1, 1, 0.05)    # alternating unit row tint
 const DIVIDER_COLOR := Color(1, 1, 1, 0.12)    # totals / table divider

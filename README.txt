@@ -1,124 +1,78 @@
-Creature Comforts v4.006 - Quality of Life Mod for Batomon Showdown
-=================================================================
-Creature Comforts adds helpful reminders, shop planning tools, and quality-of-life improvements to Batomon Showdown.
+# Creature Comforts v4.009
+### Quality of Life Mod for Batomon Showdown
 
-FEATURES
---------
+Creature Comforts adds helpful reminders, shop planning tools, combat statistics, and quality-of-life improvements to Batomon Showdown.
 
-WATCHLIST & SHOP HIGHLIGHTING
-Track Batomon and items you want to find in the shop. Matching shop entries are automatically highlighted.
-The Watchlist and Shop Highlights setting shows the Watchlist button and enables these highlights; turning it off hides both.
+## FEATURES
 
-- Browse and select Batomon and items.
-- Filter Batomon by rarity, type, and region. A specific region shows the Batomon in that region's dex; use All for special circumstances.
-- Sort the list by name (alphabetical) or by rarity (lowest to highest).
-- Snapshot your active team into the Watchlist.
-- Use Tracked Only to quickly review and adjust selections.
-- Clear every tracked entry at once with the clear button.
-- Save, load, and delete builds to reuse your favorite setups.
+### Watchlist & Shop Highlighting
+Track Batomon and items you're looking for, with automatic highlighting in the shop.
+- Filter by rarity, type, and region.
+- Sort by name or rarity.
+- Add your current team to the Watchlist.
+- Save, load, and manage builds.
 - Watchlist selections persist between sessions.
 
-TRINKET REMINDERS
-Get reminders for timing-sensitive trinkets such as Duplicators, Treasure Map, Upgrade Disc, and Greedy Gloves. Each row shows the trinket's icon and stack count; expand the reminder panel to view their effects.
+### Trinket Reminders
+Get reminders for timing-sensitive trinkets, including Duplicators, Treasure Map, Upgrade Disc, and Greedy Gloves.
 
-POSITIONAL TRINKET SUMMARY
-A movable, collapsible panel in the shop summarizes the bonuses from your positional trinkets
-(left column, top middle, right column). Passive effects and permanent battle-start effects are
-listed separately, and duplicate copies are added together. The panel starts collapsed and can be
-dragged anywhere on screen.
+### Positional Trinket Summary
+A movable panel summarizes positional trinket bonuses, helping you optimize unit placement.
 
-BATTLE TRINKET REWARDS
-See which trinkets you gained during battle in a collapsible panel, with each trinket's icon and
-stack count, sorted by quantity (highest first). The panel waits for you to be back in the shop,
-so event or gift screens cannot hide it. It stays until you collapse it or start the next battle.
+### Battle Trinket Rewards
+See which trinkets you earned during combat, including their quantities.
 
-BATTLE STATUS DISPLAY
-View your current day, remaining lives, and wins during combat. Once the Second
-Chance has been used, the heart icon is shown upside down to mark your last life.
+### Battle Status Display
+View your current day, remaining lives, and wins during combat.
 
-BATTLE ELAPSED TIME
-After a battle finishes, a small panel shows the simulation's total elapsed time.
-This is the battle simulation clock, so fast-forwarding and replaying steps make
-it different from real time. It is shown with the battle status HUD and is hidden
-when Battle Status Panel is turned off. The panel appears when a battle or replay
-finishes, hides while a replay is running, and hides when you leave the battle.
-While it is visible, the lives/wins/day HUD is hidden so the two never overlap.
+### Battle Elapsed Time
+See how long each battle lasted in simulated combat time.
 
-OPPONENT INFO
-During battle, a small bottom-right panel shows the opponent's name and MMR
-(ranked, casual, or Bot). It shares the Battle Status Panel toggle and hides
-together with the lives/wins/day HUD.
+### Opponent Info
+View your opponent's name and MMR during battle.
 
-COMBAT STATS
-After a battle finishes, a collapsible panel compares your team's combat
-statistics with the opponent's. Each side opens with its trainer's portrait and
-a centered heading: "Your Team" and "Opponent Team". It shows team
-totals for damage, status damage, healing, shield, and casts with a comparison
-operator (>, <, or =) between the two sides, then a compact one-row-per-unit
-table for each team. Each unit row
-shows the monster's icon beside its name, the top value for each metric is
-highlighted in green, and zero or missing values are muted. The panel can be
-collapsed and dragged, and it remembers where you put it. It is hidden while a
-replay runs and when you leave the battle.
+### Combat Stats
+Compare your team's performance against your opponent after each battle.
+- Team totals for damage, status damage, healing, shields, and casts.
+- Side-by-side comparisons of both teams.
+- Individual unit statistics with highlighted top performers.
 
-The Combat Stats Panel setting shows or hides the whole panel, including the
-team headings and the summed comparison at the top. This panel was merged from
-the BatoStats++ mod, so BatoStats++ is no longer needed alongside Creature
-Comforts.
-
-SHOP INCOME
+### Shop Income
 Displays your current income directly in the shop.
 
-SELL VALUE INDICATORS
-Each fielded and bench unit shows its sell value in the top-right corner of its
-slot, so you can compare what a unit is worth before selling it. The value comes
-from the game's own sell calculation, so level, shiny, and sell-value bonuses are
-included. The Sell Value Indicators setting shows or hides these badges.
+### Sell Value Indicators
+See each unit's sell value directly on your team and bench. Bonus sell values are highlighted in blue.
 
-DAY REMINDERS
-Receive reminders for important trainer-specific events and global events on Days 3, 6, and 9.
+### Day Reminders
+Receive reminders for important trainer-specific and global events on Days 3, 6, and 9.
 
-NOTIFICATION SOUNDS & VOLUME
-Reminder chimes and UI clicks can be muted with Notification Sounds. The
-Mod Volume slider (0-100, default 100) directly under it sets how loud they
-are, and plays a click at the new level when you let go. Both are at the
-bottom of Settings > Mods > Creature Comforts.
+### Notification Sounds & Volume
+Optional reminder sounds and UI feedback, with adjustable volume.
 
-SHOP RANK ODDS
-View shop rarity probabilities for ranks 1 through 14+ using the chart icon near the shop rank display.
+### Shop Rank Odds
+View shop rarity probabilities for ranks 1 through 14+.
 
-BASE HP BY DAY
-View a day-by-day base HP table for days 1 through 17 using the heart chart icon in the shop HUD.
-The current day is highlighted, and the Total column adds the HP bonus from your current trinkets and trainer.
+### Base HP by Day
+View base HP progression for days 1–17, including bonuses from your trainer and trinkets.
 
+## SETTINGS
 
-SETTINGS
---------
-Features can be enabled or disabled individually under:
+Customize individual features under:
 
-Settings > Mods > Creature Comforts
+**Settings > Mods > Creature Comforts**
 
-Mod Volume is a single slider (mouse drag, or focus it and use left/right) at
-the bottom of the list, under Notification Sounds. Scroll down to reach it.
-It is saved by the mod itself in user://creature_comforts/settings.cfg.
+Settings are saved automatically between sessions.
 
-Settings are saved automatically and persist between sessions.
+## AUTO-UPDATE
 
+Creature Comforts automatically checks for updates when the game starts.
 
-AUTO-UPDATE
------------
-Creature Comforts keeps itself current. On game start it checks for a newer version. 
-When a new version is out, Auto-update (Settings > Mods > Creature Comforts,
-on by default) downloads it and checks it before anything is replaced: the
-download must match the release's checksum, contain only Creature Comforts
-files, and every script must load on your game build. If a check fails or the
-download fails, nothing on disk changes.
+- **Auto-update enabled (default):** Downloads and verifies new versions automatically. Restart the game to apply updates.
+- **Auto-update disabled:** Notifies you when a new version is available so you can install it manually.
 
-After a successful update a small notice says to restart. The new version takes
-effect the next time Batomon Showdown starts.
+Updates are verified before installation. If verification fails, existing files remain unchanged.
 
-Turn Auto-update off to get a notice only and install new versions yourself
-(e.g. from Nexus Mods or GitHub) by replacing the Mods\CreatureComforts folder.
+You can also download updates manually from Nexus Mods or GitHub.
 
 REQUIREMENTS
 ------------

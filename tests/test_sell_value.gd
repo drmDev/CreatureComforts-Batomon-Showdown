@@ -26,6 +26,28 @@ func test_text_for_clamps_negative_values() -> void:
 	assert_eq(SellValue.text_for(-3), "0")
 
 
+func test_text_for_prefixes_boosted_values() -> void:
+	assert_eq(SellValue.text_for(12, true), "+12")
+	assert_eq(SellValue.text_for(0, true), "+0")
+
+
+func test_is_boosted_compares_to_base_sell_value() -> void:
+	assert_true(SellValue.is_boosted(FakeBaseMonster.new(10, 7)))
+	assert_false(SellValue.is_boosted(FakeBaseMonster.new(7, 7)))
+	assert_false(SellValue.is_boosted(FakeBaseMonster.new(0, 0)))
+
+
+func test_is_boosted_reads_the_bonus_stat() -> void:
+	assert_true(SellValue.is_boosted(FakeBonusMonster.new(10, 8.0)))
+	assert_false(SellValue.is_boosted(FakeBonusMonster.new(10, 0.0)))
+
+
+func test_is_boosted_requires_a_sellable_monster() -> void:
+	assert_false(SellValue.is_boosted(null))
+	assert_false(SellValue.is_boosted(FakePlain.new()))
+	assert_false(SellValue.is_boosted(FakeMonster.new(7)))
+
+
 func test_badge_reads_the_slot_monster() -> void:
 	var slot = FakeSlot.new()
 	var badge = SellValueBadge.new()
@@ -62,6 +84,22 @@ func test_badge_shows_zero_for_a_monster_without_sell_value() -> void:
 	badge._refresh()
 	assert_true(badge.visible)
 	assert_eq(badge._text, "0")
+	slot.free()
+
+
+func test_badge_tracks_boosted_state() -> void:
+	var slot = FakeSlot.new()
+	var badge = SellValueBadge.new()
+	badge.slot = slot
+	slot.add_child(badge)
+	slot.current_monster = FakeBaseMonster.new(10, 7)
+	badge._refresh()
+	assert_true(badge._boosted)
+	assert_eq(badge._text, "+10")
+	slot.current_monster = FakeBaseMonster.new(7, 7)
+	badge._refresh()
+	assert_false(badge._boosted)
+	assert_eq(badge._text, "7")
 	slot.free()
 
 
@@ -194,6 +232,36 @@ class FakeMonster extends RefCounted:
 
 	func get_sell_value() -> int:
 		return value
+
+
+class FakeBaseMonster extends RefCounted:
+	var value := 0
+	var base := 0
+
+	func _init(p_value: int, p_base: int) -> void:
+		value = p_value
+		base = p_base
+
+	func get_sell_value() -> int:
+		return value
+
+	func get_base_sell_value() -> int:
+		return base
+
+
+class FakeBonusMonster extends RefCounted:
+	var value := 0
+	var bonus := 0.0
+
+	func _init(p_value: int, p_bonus: float) -> void:
+		value = p_value
+		bonus = p_bonus
+
+	func get_sell_value() -> int:
+		return value
+
+	func get_base_permanent_stat(stat) -> float:
+		return bonus if str(stat) == "bonus_sell_value" else 0.0
 
 
 class FakePlain extends RefCounted:

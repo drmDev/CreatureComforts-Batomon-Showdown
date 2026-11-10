@@ -30,6 +30,7 @@ var enabled := true
 
 var _phase_visible := true
 var _text := ""
+var _boosted := false
 var _icon: Texture2D = null
 var _box: StyleBoxFlat = null
 var _accum := 0.0
@@ -87,10 +88,15 @@ func _refresh() -> void:
 		return
 	# A monster with no sell value (or a 0 value) still shows the coin and 0;
 	# only an empty slot hides the badge.
-	var text := SellValue.text_for(SellValue.value_of(monster))
+	var value := SellValue.value_of(monster)
+	var boosted := SellValue.is_boosted(monster, value)
+	var text := SellValue.text_for(value, boosted)
 	if text != _text:
 		_text = text
 		_resize_to_text()
+		queue_redraw()
+	if boosted != _boosted:
+		_boosted = boosted
 		queue_redraw()
 	if not visible:
 		visible = true
@@ -153,4 +159,5 @@ func _draw() -> void:
 		draw_texture_rect(_icon, Rect2(Vector2(x, icon_y), Vector2(ICON_SIZE, ICON_SIZE)), false)
 		x += ICON_SIZE + GAP
 	var baseline := (size.y + float(FONT_SIZE)) * 0.5 - 1.0
-	_draw_text_shadow(Vector2(x, baseline), _text, VALUE_COLOR, FONT_SIZE)
+	var color := Style.SELL_VALUE_BOOSTED if _boosted else VALUE_COLOR
+	_draw_text_shadow(Vector2(x, baseline), _text, color, FONT_SIZE)

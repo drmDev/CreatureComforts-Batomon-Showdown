@@ -246,8 +246,19 @@ func _describe_team_slot(slot) -> String:
 		var sell := "n/a"
 		if monster.has_method("get_sell_value"):
 			sell = str(int(monster.get_sell_value()))
-		monster_desc = "script=%s sell=%s" % [
-			str(monster_script.resource_path) if monster_script != null else "(none)", sell]
+		var base := "n/a"
+		if monster.has_method("get_base_sell_value"):
+			var base_value = monster.get_base_sell_value()
+			if base_value != null:
+				base = str(int(base_value))
+		var bonus := "n/a"
+		if monster.has_method("get_base_permanent_stat"):
+			var bonus_value = monster.get_base_permanent_stat("bonus_sell_value")
+			if bonus_value != null:
+				bonus = str(bonus_value)
+		monster_desc = "script=%s sell=%s base=%s bonus=%s" % [
+			str(monster_script.resource_path) if monster_script != null else "(none)",
+			sell, base, bonus]
 	return "%s (%s) script=%s%s monster=[%s]" % [
 		slot.name, slot.get_class(), script_name, rect, monster_desc]
 
