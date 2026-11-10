@@ -40,10 +40,10 @@ const TRAINER_DEFINITIONS := [
 		"rules": [
 			{
 				"type": "day_reminder",
-				"rule_id": "gamer_day8",
-				"day": 8,
+				"rule_id": "gamer_day7",
+				"day": 7,
 				"severity": "NOTICE",
-				"message": "GAMER: A Mythical monster arrives on Day 9!",
+				"message": "GAMER: A Mythical monster arrives on Day 8!",
 				"reminder": "Tomorrow: Mythical monster!"
 			}
 		]
