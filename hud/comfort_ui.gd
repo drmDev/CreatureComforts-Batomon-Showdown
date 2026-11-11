@@ -263,9 +263,6 @@ func update_replay_button(available: bool) -> void:
 	_replay_available = available
 	if replay_button == null:
 		return
-	if not _context.feature_enabled(ModConfig.KEY_REPLAY_BUTTON):
-		replay_button.hide_panel()
-		return
 	if _rank_odds_popup_open or _base_hp_popup_open:
 		replay_button.hide_panel()
 		return
@@ -440,13 +437,6 @@ func on_feature_toggled(key: String, value: bool) -> void:
 		if sell_value_indicators != null:
 			sell_value_indicators.set_enabled(value)
 		return
-	if key == ModConfig.KEY_REPLAY_BUTTON:
-		if replay_button != null:
-			if value:
-				_restore_shop_buttons()
-			else:
-				replay_button.hide_panel()
-		return
 	if value:
 		return
 	if key == ModConfig.KEY_BATTLE_STATUS_PANEL:
@@ -508,11 +498,8 @@ func _restore_shop_buttons(watchlist_override = null) -> void:
 			watchlist_override = _context.feature_enabled(ModConfig.KEY_SHOP_HIGHLIGHTS)
 		watchlist_panel.visible = bool(watchlist_override)
 	if replay_button != null:
-		if _context.feature_enabled(ModConfig.KEY_REPLAY_BUTTON):
-			replay_button.set_available(_replay_available)
-			replay_button.show_button()
-		else:
-			replay_button.hide_panel()
+		replay_button.set_available(_replay_available)
+		replay_button.show_button()
 
 
 func _on_trinket_panel_layout_debug(message: String) -> void:

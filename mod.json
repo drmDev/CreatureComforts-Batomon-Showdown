@@ -1,7 +1,7 @@
 {
 	"id": "creature_comforts",
 	"name": "Creature Comforts",
-	"version": "4.1",
+	"version": "5.0",
 	"author": "NescapePlan",
 	"description": "Creature Comforts - QoL improvements.",
 	"settings": [
@@ -27,8 +27,6 @@
 		"description": "Show a movable summary of positional trinket bonuses in the shop."},
 		{"key": "combat_stats_panel", "label": "Combat Stats++ Panel", "type": "bool", "default": true,
 		 "description": "Show the post-battle combat statistics comparison panel."},
-		{"key": "replay_button", "label": "Replay Last Battle", "type": "bool", "default": true,
-		 "description": "Show a shop button that replays the previous battle without changing your run."},
 		{"key": "sell_value_indicators", "label": "Sell Value Indicators", "type": "bool", "default": true,
 		 "description": "Show a gold coin icon in the top-right corner when an item or trinket raises a unit's sell value above its base."},
 		{"key": "notification_sounds", "label": "Notification Sounds", "type": "bool", "default": true,

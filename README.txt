@@ -1,4 +1,4 @@
-# Creature Comforts v4.1
+# Creature Comforts v5.0
 ### Quality of Life Mod for Batomon Showdown
 
 Creature Comforts adds helpful reminders, shop planning tools, combat statistics, and quality-of-life improvements to Batomon Showdown.
@@ -57,6 +57,9 @@ View shop rarity probabilities for ranks 1 through 14+.
 
 ### Base HP by Day
 View base HP progression for days 1-17, including bonuses from your trainer and trinkets.
+
+### Replay Last Battle
+Added an icon to the shop allowing replaying the last battle.
 
 ## SETTINGS
 
