@@ -46,6 +46,8 @@ const KEY_SHOP_HIGHLIGHTS := "shop_highlights"
 ## Post-battle combat statistics panel (merged from BatoStats++). It is the only
 ## control for that panel: the team headings and summed comparison are part of it.
 const KEY_COMBAT_STATS_PANEL := "combat_stats_panel"
+## Shop button that replays the previous battle in a read-only overlay.
+const KEY_REPLAY_BUTTON := "replay_button"
 const KEY_AUTO_UPDATE := "auto_update"
 
 ## Most features default to enabled to preserve existing behavior. The beta
@@ -63,6 +65,7 @@ const DEFAULTS := {
 	KEY_BASE_HP_CHART: true,
 	KEY_SHOP_HIGHLIGHTS: true,
 	KEY_COMBAT_STATS_PANEL: true,
+	KEY_REPLAY_BUTTON: true,
 	KEY_AUTO_UPDATE: true,
 }
 

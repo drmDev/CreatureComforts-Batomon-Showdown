@@ -23,6 +23,7 @@ var _shop_overlay_gate = null
 var _dev_tools = null
 var _on_shop_entered: Callable
 var _on_run_changed: Callable
+var _has_replay: Callable
 
 var _snapshot_builder = null
 var _changes_comparer = null
@@ -34,13 +35,14 @@ var _trinket_reminders = null
 var _positional_trinkets = null
 
 
-func setup(context, ui, shop_overlay_gate, dev_tools, on_shop_entered: Callable, on_run_changed: Callable) -> void:
+func setup(context, ui, shop_overlay_gate, dev_tools, on_shop_entered: Callable, on_run_changed: Callable, has_replay: Callable = Callable()) -> void:
 	_context = context
 	_ui = ui
 	_shop_overlay_gate = shop_overlay_gate
 	_dev_tools = dev_tools
 	_on_shop_entered = on_shop_entered
 	_on_run_changed = on_run_changed
+	_has_replay = has_replay
 
 	_snapshot_builder = ShopSnapshot.new()
 	_changes_comparer = ShopChanges.new()
@@ -115,6 +117,8 @@ func handle(state, phase_changed: bool) -> bool:
 	var view = state.get("view") if NodeUtils.has_property(state, "view") else null
 	var gate_allowed: bool = _shop_overlay_gate == null or _shop_overlay_gate.is_allowed()
 	_ui.update_sell_values(view, gate_allowed)
+	if _has_replay.is_valid():
+		_ui.update_replay_button(bool(_has_replay.call()))
 
 	_last_snapshot = current_snapshot
 	return true

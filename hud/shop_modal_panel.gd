@@ -91,6 +91,12 @@ func _on_popup_closed() -> void:
 	pass
 
 
+## Called when the icon button is pressed. Subclasses that are actions rather
+## than modals override this instead of opening a popup.
+func _on_button_pressed() -> void:
+	_open_popup()
+
+
 # --- Lifecycle ----------------------------------------------------------------------------------
 
 ## Called by subclass setters after updating their state.
@@ -253,7 +259,7 @@ func _gui_input(event) -> void:
 				_close_popup()  # Clicking the icon again or outside closes
 			accept_event()
 		elif _button_rect().has_point(event.position):
-			_open_popup()
+			_on_button_pressed()
 			accept_event()
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE and _popup_open:
 		_close_popup()

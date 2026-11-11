@@ -9,6 +9,7 @@ const ShopOverlayGate = preload("hud/shop_overlay_gate.gd")
 const ChimeQueue = preload("core/chime_queue.gd")
 const TrinketIcons = preload("core/trinket_icons.gd")
 const ComfortUi = preload("hud/comfort_ui.gd")
+const BattleReplayController = preload("hud/battle_replay_controller.gd")
 const NodeUtils = preload("core/node_utils.gd")
 const ModLogger = preload("core/mod_logger.gd")
 const ModConfig = preload("core/mod_config.gd")
@@ -33,6 +34,9 @@ var _shop = null
 
 # Battle-phase orchestration (core/battle_coordinator.gd).
 var _battle = null
+
+# Read-only shop replay overlay (hud/battle_replay_controller.gd).
+var _replay = null
 
 # Phase detection and dispatch (core/phase_router.gd).
 var _router = null
@@ -96,14 +100,21 @@ func _initialize_mod() -> void:
 	_ui.name = "ComfortUi"
 	add_child(_ui)
 	_ui.setup(_context)
+	_ui.replay_requested.connect(_on_replay_requested)
 
 	_setup_shop_overlay_gate()
 
 	_battle = BattleCoordinator.new()
 	_battle.setup(_context, _ui)
 
+	_replay = BattleReplayController.new()
+	_replay.name = "BattleReplayController"
+	add_child(_replay)
+	_replay.setup(_context)
+	_replay.finished.connect(_on_replay_finished)
+
 	_shop = ShopController.new()
-	_shop.setup(_context, _ui, _shop_overlay_gate, _dev_tools, _on_shop_entered, _on_shop_run_changed)
+	_shop.setup(_context, _ui, _shop_overlay_gate, _dev_tools, _on_shop_entered, _on_shop_run_changed, _battle.has_replay)
 
 	_router = PhaseRouter.new()
 	_router.setup(self, _context, _ui, _shop, _battle)
@@ -170,6 +181,20 @@ func _on_shop_entered() -> void:
 ## A new run (or trainer) starts: drop any battle trinket gains from the previous run.
 func _on_shop_run_changed() -> void:
 	_battle.on_run_changed()
+
+
+## The shop's Replay Last Battle button: start the read-only overlay.
+func _on_replay_requested() -> void:
+	if _replay == null or _battle == null:
+		return
+	if _replay.start(_battle.replay_payload()):
+		_ui.set_replay_active(true)
+
+
+## The replay overlay closed: let the mod's shop HUD come back.
+func _on_replay_finished() -> void:
+	if _ui != null:
+		_ui.set_replay_active(false)
 
 
 ## Apply a live settings change. Disabling a feature hides its UI immediately and
@@ -277,6 +302,10 @@ func _process(_delta: float) -> void:
 		return
 	if _shop_overlay_gate != null:
 		_shop_overlay_gate.update()
+	# The replay overlay hides the shop view and owns the screen; do not let the
+	# shop poll update or queue reminders underneath it.
+	if _replay != null and _replay.is_active():
+		return
 
 	_dev_tools.poll(_context.logger)
 	_router.poll()

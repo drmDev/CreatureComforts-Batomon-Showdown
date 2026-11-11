@@ -12,6 +12,7 @@ const BattleMonitor = preload("battle_monitor.gd")
 const OpponentInfo = preload("opponent_info.gd")
 const BattleCompletionReporter = preload("battle_completion_reporter.gd")
 const BattleTrinketTracker = preload("battle_trinket_tracker.gd")
+const BattleReplayStore = preload("battle_replay_store.gd")
 const CombatStats = preload("combat_stats.gd")
 const TrinketGainPresenter = preload("../hud/trinket_gain_presenter.gd")
 
@@ -21,6 +22,7 @@ var _ui = null
 var _battle_trinkets = null
 var _trinket_gains = null
 var _battle_completion = null
+var _replay_store = null
 var _battle_logged := false
 
 var _captured_opponent = null
@@ -35,6 +37,7 @@ func setup(context, ui) -> void:
 
 	_battle_trinkets = BattleTrinketTracker.new()
 	_battle_completion = BattleCompletionReporter.new()
+	_replay_store = BattleReplayStore.new()
 	_trinket_gains = TrinketGainPresenter.new()
 	_trinket_gains.setup(_ui.trinket_panel, _context)
 
@@ -77,6 +80,8 @@ func on_run_changed() -> void:
 	_battle_trinkets.reset()
 	_trinket_gains.hide()
 	_ui.hide_combat_stats()
+	if _replay_store != null:
+		_replay_store.clear()
 
 
 ## Handle one battle poll. Returns true when the battle phase was processed (so
@@ -97,12 +102,14 @@ func handle(state, phase_changed: bool) -> bool:
 	# The opponent card follows the exact same visibility as the lives/wins/day HUD.
 	var is_active: bool = state.get("is_battle_active") if NodeUtils.has_property(state, "is_battle_active") else false
 
+	var player = state.get("_replay_p1_data") if NodeUtils.has_property(state, "_replay_p1_data") else null
+	var opponent = state.get("_replay_p2_data") if NodeUtils.has_property(state, "_replay_p2_data") else null
+	if player != null and opponent != null:
+		_capture_replay(state, player, opponent)
+
 	# Battle completion detection (win/loss/draw) - independent of replay logging
 	_check_battle_completion(state)
 	_update_opponent_panel(state, is_active)
-
-	var player = state.get("_replay_p1_data") if NodeUtils.has_property(state, "_replay_p1_data") else null
-	var opponent = state.get("_replay_p2_data") if NodeUtils.has_property(state, "_replay_p2_data") else null
 
 	if player == null or opponent == null:
 		return false
@@ -180,9 +187,10 @@ func _check_battle_completion(state) -> void:
 		return
 	var sim = state.get("simulation") if NodeUtils.has_property(state, "simulation") else null
 	var battle_data = sim.get("data") if sim != null and NodeUtils.has_property(sim, "data") else null
+	var info := BattleMonitor.classify(battle_data)
 	# Log the result once per battle; a replay only refreshes the elapsed readout.
 	if _battle_completion.is_first_completion():
-		_log_battle_result(battle_data)
+		_log_battle_result(info)
 	_ui.show_battle_elapsed(BattleMonitor.format_seconds(BattleMonitor.time_elapsed(battle_data)))
 	# The elapsed readout sits over the lives/wins/day HUD; show only one of them.
 	_ui.hide_player_hud()
@@ -191,6 +199,45 @@ func _check_battle_completion(state) -> void:
 	var snapshot: Dictionary = CombatStats.capture(battle_data, _snapshot_meta(state))
 	_log_combat_stats(snapshot)
 	_ui.show_combat_stats(snapshot)
+	if _replay_store != null:
+		_replay_store.set_result(str(info["result"]))
+
+
+## Keep the last battle's replay inputs for the shop's Replay button.
+func _capture_replay(state, player, opponent) -> void:
+	if _replay_store == null:
+		return
+	var round := _int_prop(player, "current_round", 0)
+	var loss_cost := 1
+	if state.has_method("_calculate_lives_loss"):
+		loss_cost = int(state.call("_calculate_lives_loss", round))
+	_replay_store.capture(player, opponent, {
+		"battle_id": state.get_instance_id(),
+		"wins": _int_prop(player, "current_wins", 0),
+		"lives": _int_prop(player, "lives", 0),
+		"loss_cost": loss_cost,
+	})
+
+
+func _int_prop(obj, property: String, fallback: int) -> int:
+	if not NodeUtils.has_property(obj, property):
+		return fallback
+	var value = obj.get(property)
+	if value == null:
+		return fallback
+	return int(value)
+
+
+## True when a previous battle can be replayed from the shop.
+func has_replay() -> bool:
+	return _replay_store != null and _replay_store.has_replay()
+
+
+## The captured replay payload, or an empty dictionary.
+func replay_payload() -> Dictionary:
+	if _replay_store == null:
+		return {}
+	return _replay_store.payload()
 
 
 func _log_combat_stats(snapshot: Dictionary) -> void:
@@ -203,8 +250,7 @@ func _log_combat_stats(snapshot: Dictionary) -> void:
 		player.get("units", []).size(), opponent.get("units", []).size()])
 
 
-func _log_battle_result(battle_data) -> void:
-	var info := BattleMonitor.classify(battle_data)
+func _log_battle_result(info: Dictionary) -> void:
 	if info["hp"] == null:
 		if str(info["detail"]).is_empty():
 			_context.logger.log_event("BATTLE COMPLETE | %s" % info["result"])

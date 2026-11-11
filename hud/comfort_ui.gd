@@ -4,6 +4,9 @@ extends Node
 ## Extracted from mod_main.gd. Panels are created once at startup; feature
 ## toggles only change visibility, so no UI or signal subscriptions duplicate.
 
+## Emitted when the shop's Replay Last Battle button is pressed.
+signal replay_requested
+
 const NodeUtils = preload("../core/node_utils.gd")
 const ModConfig = preload("../core/mod_config.gd")
 const ShopHighlight = preload("shop_highlight.gd")
@@ -20,6 +23,7 @@ const TrinketPanel = preload("trinket_panel.gd")
 const BattleElapsedPanel = preload("battle_elapsed_panel.gd")
 const OpponentPanel = preload("opponent_panel.gd")
 const CombatStatsPanel = preload("combat_stats_panel.gd")
+const ReplayButton = preload("replay_button.gd")
 
 var reminder_layer: CanvasLayer = null
 var player_hud_layer: CanvasLayer = null
@@ -31,6 +35,7 @@ var positional_trinkets_panel = null
 var rank_odds_panel = null
 var base_hp_panel = null
 var watchlist_panel = null
+var replay_button = null
 var trinket_panel = null
 var player_hud = null
 var battle_elapsed_panel = null
@@ -42,6 +47,8 @@ var sell_value_indicators = null
 var _context = null
 var _rank_odds_popup_open := false
 var _base_hp_popup_open := false
+var _replay_available := false
+var _replay_active := false
 
 
 func setup(context) -> void:
@@ -107,6 +114,15 @@ func _build_reminder_layer() -> void:
 	watchlist_panel.setup(_context.formatter, _context.sounds_enabled, _context.mod_volume)
 	reminder_layer.add_child(watchlist_panel)
 
+	# Replay Last Battle: shop-gated like the other HUD buttons. The controller
+	# owns the read-only battle overlay; this button only asks for it.
+	replay_button = ReplayButton.new()
+	replay_button.name = "ReplayButton"
+	replay_button.setup_sound(_context.sounds_enabled, _context.mod_volume)
+	replay_button.log_line.connect(_context.logger.log_event)
+	replay_button.pressed.connect(func(): replay_requested.emit())
+	reminder_layer.add_child(replay_button)
+
 
 ## Shop highlighting and the watchlist button share one setting: highlights are
 ## only useful with the watchlist, so disabling the feature hides both. The
@@ -166,19 +182,47 @@ func _build_player_hud() -> void:
 func apply_gate(allowed: bool) -> bool:
 	if reminder_layer == null:
 		return false
+	# The replay overlay owns the screen; the gate must not re-show the mod's
+	# shop HUD over it.
+	if _replay_active:
+		reminder_layer.visible = false
+		return false
 	reminder_layer.visible = allowed
 	if not allowed:
 		# The layer is hidden, so a still-open popup would reappear on the next
 		# shop visit. Close every shop popup with the rest of the shop UI.
-		if watchlist_panel != null:
-			watchlist_panel.close_popup()
-		if rank_odds_panel != null:
-			rank_odds_panel.reset_for_shop()
-		if base_hp_panel != null:
-			base_hp_panel.reset_for_shop()
-		if sell_value_indicators != null:
-			sell_value_indicators.hide_all()
+		_close_shop_popups()
 	return allowed
+
+
+## Close the shop's modals and hide the sell-value badges. Used when the shop
+## HUD is hidden, either by the overlay gate or by the replay overlay.
+func _close_shop_popups() -> void:
+	if watchlist_panel != null:
+		watchlist_panel.close_popup()
+	if rank_odds_panel != null:
+		rank_odds_panel.reset_for_shop()
+	if base_hp_panel != null:
+		base_hp_panel.reset_for_shop()
+	if sell_value_indicators != null:
+		sell_value_indicators.hide_all()
+
+
+## Hide every mod-owned shop panel while the replay overlay is up. The game's
+## own battle UI is part of the replay; the mod's HUD would otherwise float
+## over it.
+func set_replay_active(active: bool) -> void:
+	_replay_active = active
+	if reminder_layer != null:
+		reminder_layer.visible = not active
+	if player_hud_layer != null:
+		player_hud_layer.visible = not active
+	if active:
+		_close_shop_popups()
+		if shop_highlight != null:
+			shop_highlight.set_enabled(false)
+	elif shop_highlight != null:
+		shop_highlight.set_enabled(_context.feature_enabled(ModConfig.KEY_SHOP_HIGHLIGHTS))
 
 
 ## Defensive fallback: hide shop-only panels whenever the shop is not current.
@@ -199,6 +243,8 @@ func hide_shop_panels() -> void:
 		base_hp_panel.hide_panel()
 	if watchlist_panel != null:
 		watchlist_panel.close_popup()
+	if replay_button != null:
+		replay_button.hide_panel()
 
 
 ## Close any open shop modal when the shop becomes interactive again.
@@ -207,6 +253,24 @@ func reset_shop_popups_for_shop() -> void:
 		rank_odds_panel.reset_for_shop()
 	if base_hp_panel != null:
 		base_hp_panel.reset_for_shop()
+
+
+## Update the Replay Last Battle button. The shop controller calls this on every
+## shop poll. The button is always shown in the shop while the feature is on
+## (dimmed until a battle has been captured), and is hidden by the shop overlay
+## gate and by an open modal.
+func update_replay_button(available: bool) -> void:
+	_replay_available = available
+	if replay_button == null:
+		return
+	if not _context.feature_enabled(ModConfig.KEY_REPLAY_BUTTON):
+		replay_button.hide_panel()
+		return
+	if _rank_odds_popup_open or _base_hp_popup_open:
+		replay_button.hide_panel()
+		return
+	replay_button.set_available(available)
+	replay_button.show_button()
 
 
 func update_shop_income(income: int) -> void:
@@ -376,6 +440,13 @@ func on_feature_toggled(key: String, value: bool) -> void:
 		if sell_value_indicators != null:
 			sell_value_indicators.set_enabled(value)
 		return
+	if key == ModConfig.KEY_REPLAY_BUTTON:
+		if replay_button != null:
+			if value:
+				_restore_shop_buttons()
+			else:
+				replay_button.hide_panel()
+		return
 	if value:
 		return
 	if key == ModConfig.KEY_BATTLE_STATUS_PANEL:
@@ -417,7 +488,7 @@ func _on_shop_modal_visibility_changed(open: bool, modal) -> void:
 	if not open:
 		_restore_shop_buttons()
 		return
-	for panel in [rank_odds_panel, base_hp_panel, watchlist_panel]:
+	for panel in [rank_odds_panel, base_hp_panel, watchlist_panel, replay_button]:
 		if panel != null and panel != modal:
 			panel.visible = false
 
@@ -432,11 +503,16 @@ func _restore_shop_buttons(watchlist_override = null) -> void:
 		rank_odds_panel.visible = _context.feature_enabled(ModConfig.KEY_RANK_ODDS_PREVIEW)
 	if base_hp_panel != null:
 		base_hp_panel.visible = _context.feature_enabled(ModConfig.KEY_BASE_HP_CHART)
-	if watchlist_panel == null:
-		return
-	if watchlist_override == null:
-		watchlist_override = _context.feature_enabled(ModConfig.KEY_SHOP_HIGHLIGHTS)
-	watchlist_panel.visible = bool(watchlist_override)
+	if watchlist_panel != null:
+		if watchlist_override == null:
+			watchlist_override = _context.feature_enabled(ModConfig.KEY_SHOP_HIGHLIGHTS)
+		watchlist_panel.visible = bool(watchlist_override)
+	if replay_button != null:
+		if _context.feature_enabled(ModConfig.KEY_REPLAY_BUTTON):
+			replay_button.set_available(_replay_available)
+			replay_button.show_button()
+		else:
+			replay_button.hide_panel()
 
 
 func _on_trinket_panel_layout_debug(message: String) -> void:

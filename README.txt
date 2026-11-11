@@ -28,6 +28,9 @@ View your current day, remaining lives, and wins during combat.
 ### Battle Elapsed Time
 See how long each battle lasted in simulated combat time.
 
+### Replay Last Battle
+Replay the previous battle from the shop without changing your run, gold, HP, or wins.
+
 ### Opponent Info
 View your opponent's name and MMR during battle.
 
