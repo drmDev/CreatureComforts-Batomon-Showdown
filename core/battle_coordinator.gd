@@ -7,6 +7,7 @@ extends RefCounted
 ## and passes the phase-change flag in.
 
 const NodeUtils = preload("node_utils.gd")
+const TeamAdjacency = preload("team_adjacency.gd")
 const RunData = preload("run_data.gd")
 const BattleMonitor = preload("battle_monitor.gd")
 const OpponentInfo = preload("opponent_info.gd")
@@ -117,6 +118,7 @@ func handle(state, phase_changed: bool) -> bool:
 	# Only log once per battle when battle is actually active (is_active is above)
 	if not _battle_logged and is_active:
 		_log_phase_entry(player)
+		_log_team_slots(player)
 
 		if _context.logger.deep_inspection:
 			_context.logger.log_lines(_context.formatter.format_deep_inspect_battle(state, player, opponent))
@@ -258,6 +260,47 @@ func _log_battle_result(info: Dictionary) -> void:
 			_context.logger.log_event("BATTLE COMPLETE | %s | %s" % [info["result"], info["detail"]])
 		return
 	_context.logger.log_event("BATTLE COMPLETE | %s | HP %d" % [info["result"], info["hp"]])
+
+
+## Log the fielded team in the exact slot terms the Petrirex/Shikitsune warning
+## uses: the storage index (game order, bottom-right to top-left) and the 1-based
+## visual slot, plus each monster's species name. Logged once per battle so the
+## grid mapping can be verified against the battle UI in the session log.
+func _log_team_slots(run) -> void:
+	var team = run.get("team") if NodeUtils.has_property(run, "team") else null
+	if not (team is Array):
+		_context.logger.log_event("BATTLE SLOTS | team not available on battle run data")
+		return
+	var team_size: int = team.size()
+	_context.logger.log_event(
+		"BATTLE SLOTS | team_size=%d | storage order is bottom-right to top-left" % team_size)
+	var petrirex_slots: Array = []
+	var shikitsune_slots: Array = []
+	for i in range(team_size):
+		var visual_slot: int = TeamAdjacency.visual_slot_for(team_size, i)
+		var monster = team[i]
+		if monster == null:
+			_context.logger.log_event("BATTLE SLOTS | storage[%d] visual[%d] empty" % [i, visual_slot])
+			continue
+		var name_key: String = _species_key(monster)
+		var shown_key := name_key if not name_key.is_empty() else "(unknown)"
+		_context.logger.log_event("BATTLE SLOTS | storage[%d] visual[%d] %s | key=%s" % [
+			i, visual_slot, _context.formatter.format_species_name(name_key), shown_key])
+		if name_key == TeamAdjacency.PETRIREX_KEY:
+			petrirex_slots.append(visual_slot)
+		elif name_key == TeamAdjacency.SHIKITSUNE_KEY:
+			shikitsune_slots.append(visual_slot)
+	_context.logger.log_event("BATTLE SLOTS | petrirex=%s | shikitsune=%s | adjacent=%s" % [
+		str(petrirex_slots), str(shikitsune_slots),
+		str(TeamAdjacency.has_unsafe_pair(petrirex_slots, shikitsune_slots))])
+
+
+## data.name_key of a fielded MonsterInstance, or "" when the shape differs.
+func _species_key(monster) -> String:
+	var data = monster.get("data") if NodeUtils.has_property(monster, "data") else null
+	if data != null and NodeUtils.has_property(data, "name_key"):
+		return str(data.get("name_key"))
+	return ""
 
 
 func _log_phase_entry(run) -> void:

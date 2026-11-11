@@ -59,6 +59,16 @@ func _build_rule(trainer_id: String, rule_def: Dictionary):
 				str(rule_def.get("reminder", "")),
 				int(rule_def.get("max_count", 1))
 			)
+		"petrirex_adjacency":
+			# Grid-position rule: warns when a fielded Shikitsune is orthogonally
+			# adjacent to a fielded Petrirex (see core/team_adjacency.gd).
+			return TrainerRules.PetrirexAdjacencyRule.new(
+				str(rule_def.get("rule_id", "")),
+				trainer_id,
+				str(rule_def.get("severity", "WARNING")),
+				str(rule_def.get("message", "")),
+				str(rule_def.get("reminder", rule_def.get("message", "")))
+			)
 		"custom":
 			var script_path: String = str(rule_def.get("script", ""))
 			if script_path.is_empty():

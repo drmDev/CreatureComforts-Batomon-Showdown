@@ -9,7 +9,6 @@ signal pressed
 
 const UiSound = preload("../core/ui_sound.gd")
 
-const BTN_SIZE := 20.0
 const RIGHT_RATIO := 0.80
 const TOP_RATIO := 0.05
 
@@ -68,18 +67,19 @@ func show_button() -> void:
 	_ensure_visible()
 
 
-func _button_size() -> float:
-	return BTN_SIZE
-
-
 func _button_texture_path() -> String:
 	return "../assets/icons/replay.png"
 
 
 func _button_position(viewport_size: Vector2) -> Vector2:
+	var half := _button_size() * 0.5
 	return Vector2(
-		roundf(viewport_size.x * RIGHT_RATIO - BTN_SIZE * 0.5),
-		roundf(viewport_size.y * TOP_RATIO - BTN_SIZE * 0.5))
+		roundf(viewport_size.x * RIGHT_RATIO - half),
+		roundf(viewport_size.y * TOP_RATIO - half))
+
+
+func _log_label() -> String:
+	return "REPLAY"
 
 
 func _on_button_pressed() -> void:
@@ -87,13 +87,5 @@ func _on_button_pressed() -> void:
 		return
 	if _click != null:
 		_click.play()
-	log_line.emit("REPLAY | button pressed")
+	_emit_log("button pressed")
 	pressed.emit()
-
-
-func _on_button_created() -> void:
-	log_line.emit("REPLAY | button created")
-
-
-func _on_button_hidden() -> void:
-	log_line.emit("REPLAY | button hidden")

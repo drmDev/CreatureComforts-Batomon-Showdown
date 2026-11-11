@@ -16,6 +16,10 @@ class Monster:
 var trainer_id: String = ""
 var day: int = 0
 var team_monsters: Array = []
+## Number of My Team slots in the captured team (including empty slots). Needed
+## to turn a storage index into the visual slot the player sees, because the
+## game stores the team bottom-right to top-left.
+var team_size: int = 0
 
 
 func from_snapshot(snapshot):
@@ -23,6 +27,7 @@ func from_snapshot(snapshot):
 
 	context.trainer_id = snapshot.trainer_id
 	context.day = snapshot.day
+	context.team_size = snapshot.team_monsters.size()
 
 	for i in range(snapshot.team_monsters.size()):
 		var monster_data = snapshot.team_monsters[i]

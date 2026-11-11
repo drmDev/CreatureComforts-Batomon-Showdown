@@ -74,21 +74,28 @@ func _draw_content(_rect: Rect2) -> void:
 	pass
 
 
-## Optional hooks so subclasses keep their own log wording.
-func _on_button_created() -> void:
-	pass
+## Log label used by the shared lifecycle lines (e.g. "RANK ODDS"). Empty
+## disables lifecycle logging for this panel.
+func _log_label() -> String:
+	return ""
 
 
-func _on_button_hidden() -> void:
-	pass
+## Optional state appended to every lifecycle line, e.g. "rank=4".
+func _log_detail() -> String:
+	return ""
 
 
-func _on_popup_opened() -> void:
-	pass
-
-
-func _on_popup_closed() -> void:
-	pass
+## Emit one lifecycle log line. The HUD connects `log_line` to a consumer that
+## drops these unless Debug Logging is on, so no panel needs to know the setting.
+func _emit_log(detail: String) -> void:
+	var label := _log_label()
+	if label.is_empty():
+		return
+	var message := "%s | %s" % [label, detail]
+	var extra := _log_detail()
+	if not extra.is_empty():
+		message += " | %s" % extra
+	log_line.emit(message)
 
 
 ## Called when the icon button is pressed. Subclasses that are actions rather
@@ -104,7 +111,7 @@ func _ensure_visible() -> void:
 	if not visible:
 		visible = true
 		_anchor()
-		_on_button_created()
+		_emit_log("button created")
 	queue_redraw()
 
 
@@ -114,7 +121,7 @@ func hide_panel() -> void:
 	if not visible:
 		return
 	visible = false
-	_on_button_hidden()
+	_emit_log("button hidden")
 	queue_redraw()
 
 
@@ -167,7 +174,7 @@ func _open_popup() -> void:
 	_popup_open = true
 	_anchor()
 	grab_focus()
-	_on_popup_opened()
+	_emit_log("popup opened")
 	popup_visibility_changed.emit(true)
 	queue_redraw()
 
@@ -177,7 +184,7 @@ func _close_popup() -> void:
 		return
 	_popup_open = false
 	_anchor()
-	_on_popup_closed()
+	_emit_log("popup closed")
 	popup_visibility_changed.emit(false)
 	queue_redraw()
 

@@ -131,12 +131,14 @@ func test_day_reminder_empty_trainer_applies_to_any() -> void:
 func test_global_rules_build_via_factory() -> void:
 	var factory = RuleFactory.new(_formatter())
 	var rules: Array = factory.build_trainer({"id": "", "rules": TrainerCatalog.GLOBAL_RULES})
-	assert_eq(rules.size(), 3)
+	# 3 trainer-independent day reminders plus the Petrirex adjacency warning.
+	assert_eq(rules.size(), 4)
 	var days: Array = []
 	for rule in rules:
 		assert_eq(rule.trainer_id, "", "global rule must apply to any trainer")
-		assert_true(rule.chime, "global reminders chime")
-		days.append(rule.target_day)
+		if rule is TrainerRules.DayReminderRule:
+			assert_true(rule.chime, "global reminders chime")
+			days.append(rule.target_day)
 	assert_eq(days, [2, 5, 8])
 
 

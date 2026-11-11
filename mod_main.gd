@@ -245,8 +245,6 @@ func make_custom_settings_menu_entries() -> Array:
 	Style.apply_slider(slider)
 	box.add_child(slider)
 
-	_log_settings("mod volume slider row built (volume %d)" % volume)
-
 	# Text follows the drag; the file is written once on release (or when focus
 	# leaves the slider, which covers gamepad/keyboard changes).
 	slider.value_changed.connect(func(value: float):

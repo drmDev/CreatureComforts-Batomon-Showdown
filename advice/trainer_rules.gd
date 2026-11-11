@@ -4,6 +4,7 @@ extends RefCounted
 ##   rule_id, trainer_id, severity, message, display, reminder, chime, plus rule-specific extras.
 
 const AdviceContext = preload("advice_context.gd")
+const TeamAdjacency = preload("../core/team_adjacency.gd")
 
 
 class BaseRule:
@@ -124,3 +125,44 @@ class DayReminderRule extends BaseRule:
 			return {}
 
 		return _make_advice(severity, message)
+
+
+## Warns when a fielded Shikitsune is orthogonally adjacent to a fielded
+## Petrirex. Petrirex knocks out adjacent units, so the pair is unsafe.
+##
+## Only the captured active team is inspected (bench units never reach the
+## advice context). The game stores the team bottom-right to top-left, so each
+## storage index is converted to the 1-based visual slot before comparing.
+class PetrirexAdjacencyRule extends BaseRule:
+	const PETRIREX_KEY := TeamAdjacency.PETRIREX_KEY
+	const SHIKITSUNE_KEY := TeamAdjacency.SHIKITSUNE_KEY
+
+	var severity: String
+	var message: String
+
+	func _init(p_rule_id: String, p_trainer_id: String, p_severity: String, p_message: String, p_reminder_text: String) -> void:
+		super._init(p_rule_id, p_trainer_id, DISPLAY_LABEL, p_reminder_text, false)
+		severity = p_severity
+		message = p_message
+
+	func evaluate(context: AdviceContext) -> Dictionary:
+		if not _matches_trainer(context):
+			return {}
+
+		var petrirex_slots: Array = []
+		var shikitsune_slots: Array = []
+		for monster in context.team_monsters:
+			var visual_slot := visual_slot_for(context.team_size, monster.slot)
+			if monster.name_key == PETRIREX_KEY:
+				petrirex_slots.append(visual_slot)
+			elif monster.name_key == SHIKITSUNE_KEY:
+				shikitsune_slots.append(visual_slot)
+
+		if not TeamAdjacency.has_unsafe_pair(petrirex_slots, shikitsune_slots):
+			return {}
+
+		return _make_advice(severity, message)
+
+	## Convert a storage index to the 1-based visual slot of the 3x2 grid.
+	static func visual_slot_for(team_size: int, storage_slot: int) -> int:
+		return TeamAdjacency.visual_slot_for(team_size, storage_slot)

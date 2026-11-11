@@ -96,14 +96,14 @@ func _build_reminder_layer() -> void:
 
 	rank_odds_panel = RankOddsPanel.new()
 	rank_odds_panel.name = "RankOddsPanel"
-	rank_odds_panel.log_line.connect(_context.logger.log_event)
+	rank_odds_panel.log_line.connect(_on_panel_log_line)
 	rank_odds_panel.popup_visibility_changed.connect(_on_rank_odds_popup_visibility_changed)
 	reminder_layer.add_child(rank_odds_panel)
 
 	# Base HP by day table, 25% across the viewport.
 	base_hp_panel = BaseHpPanel.new()
 	base_hp_panel.name = "BaseHpPanel"
-	base_hp_panel.log_line.connect(_context.logger.log_event)
+	base_hp_panel.log_line.connect(_on_panel_log_line)
 	base_hp_panel.popup_visibility_changed.connect(_on_base_hp_popup_visibility_changed)
 	reminder_layer.add_child(base_hp_panel)
 
@@ -119,7 +119,7 @@ func _build_reminder_layer() -> void:
 	replay_button = ReplayButton.new()
 	replay_button.name = "ReplayButton"
 	replay_button.setup_sound(_context.sounds_enabled, _context.mod_volume)
-	replay_button.log_line.connect(_context.logger.log_event)
+	replay_button.log_line.connect(_on_panel_log_line)
 	replay_button.pressed.connect(func(): replay_requested.emit())
 	reminder_layer.add_child(replay_button)
 
@@ -460,6 +460,13 @@ func on_feature_toggled(key: String, value: bool) -> void:
 	elif key == ModConfig.KEY_BASE_HP_CHART:
 		if base_hp_panel != null:
 			base_hp_panel.hide_panel()
+
+
+## Panel lifecycle lines are debug detail, not events: drop them unless Debug
+## Logging is on. The panels emit unconditionally, so the live toggle applies.
+func _on_panel_log_line(message: String) -> void:
+	if _context != null and _context.logger != null and _context.logger.debug_logging:
+		_context.logger.log_event(message)
 
 
 ## The shop popups are full-screen modals drawn by sibling panels. Hide the other

@@ -105,5 +105,15 @@ const GLOBAL_RULES := [
 		"severity": "NOTICE",
 		"message": "GLOBAL: Day 9 event tomorrow!",
 		"reminder": "Tomorrow: Day 9 event!"
+	},
+	# Positional safety: Petrirex knocks out adjacent units, so a fielded
+	# Shikitsune next to it is always unsafe. Evaluated on every shop poll, so the
+	# reminder appears and disappears as the player rearranges the team.
+	{
+		"type": "petrirex_adjacency",
+		"rule_id": "petrirex_skikitsune_adjacency",
+		"severity": "WARNING",
+		"message": "Shikitsune is adjacent to Petrirex! Move it to avoid being knocked out.",
+		"reminder": "Shikitsune is adjacent to Petrirex! Move it to avoid being knocked out."
 	}
 ]
