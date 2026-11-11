@@ -111,7 +111,7 @@ const GLOBAL_RULES := [
 	# reminder appears and disappears as the player rearranges the team.
 	{
 		"type": "petrirex_adjacency",
-		"rule_id": "petrirex_skikitsune_adjacency",
+		"rule_id": "petrirex_shikitsune_adjacency",
 		"severity": "WARNING",
 		"message": "Shikitsune is adjacent to Petrirex! Move it to avoid being knocked out.",
 		"reminder": "Shikitsune is adjacent to Petrirex! Move it to avoid being knocked out."

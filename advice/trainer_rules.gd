@@ -134,9 +134,6 @@ class DayReminderRule extends BaseRule:
 ## advice context). The game stores the team bottom-right to top-left, so each
 ## storage index is converted to the 1-based visual slot before comparing.
 class PetrirexAdjacencyRule extends BaseRule:
-	const PETRIREX_KEY := TeamAdjacency.PETRIREX_KEY
-	const SHIKITSUNE_KEY := TeamAdjacency.SHIKITSUNE_KEY
-
 	var severity: String
 	var message: String
 
@@ -152,17 +149,13 @@ class PetrirexAdjacencyRule extends BaseRule:
 		var petrirex_slots: Array = []
 		var shikitsune_slots: Array = []
 		for monster in context.team_monsters:
-			var visual_slot := visual_slot_for(context.team_size, monster.slot)
-			if monster.name_key == PETRIREX_KEY:
+			var visual_slot := TeamAdjacency.visual_slot_for(context.team_size, monster.slot)
+			if monster.name_key == TeamAdjacency.PETRIREX_KEY:
 				petrirex_slots.append(visual_slot)
-			elif monster.name_key == SHIKITSUNE_KEY:
+			elif monster.name_key == TeamAdjacency.SHIKITSUNE_KEY:
 				shikitsune_slots.append(visual_slot)
 
 		if not TeamAdjacency.has_unsafe_pair(petrirex_slots, shikitsune_slots):
 			return {}
 
 		return _make_advice(severity, message)
-
-	## Convert a storage index to the 1-based visual slot of the 3x2 grid.
-	static func visual_slot_for(team_size: int, storage_slot: int) -> int:
-		return TeamAdjacency.visual_slot_for(team_size, storage_slot)

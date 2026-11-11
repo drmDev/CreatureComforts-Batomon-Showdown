@@ -23,7 +23,7 @@ const SHIKITSUNE_KEY := "monster.name.shikitsune"
 ## Convert a storage index (game order, bottom-right to top-left) into the
 ## 1-based visual slot of the 3x2 grid the player sees.
 static func visual_slot_for(team_size: int, storage_slot: int) -> int:
-	return (team_size - 1 - storage_slot) + 1
+	return team_size - storage_slot
 
 
 ## True for the six fielded slot numbers (1..6). Benched entries never reach

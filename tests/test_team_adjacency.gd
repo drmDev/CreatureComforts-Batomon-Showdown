@@ -17,7 +17,7 @@ const TestHelpers = preload("test_helpers.gd")
 const TEAM_SIZE := 6
 const PETRIREX := "monster.name.petrirex"
 const SHIKITSUNE := "monster.name.shikitsune"
-const RULE_ID := "petrirex_skikitsune_adjacency"
+const RULE_ID := "petrirex_shikitsune_adjacency"
 const REMINDER := "Shikitsune is adjacent to Petrirex! Move it to avoid being knocked out."
 const MESSAGE := "Shikitsune is adjacent to Petrirex! Move it to avoid being knocked out."
 
@@ -107,27 +107,13 @@ func test_has_unsafe_pair_requires_an_adjacent_pair() -> void:
 # ---------------------------------------------------------------------------
 
 func test_visual_slot_conversion_from_storage_order() -> void:
-	assert_eq(TrainerRules.PetrirexAdjacencyRule.visual_slot_for(6, 5), 1, "top-left")
-	assert_eq(TrainerRules.PetrirexAdjacencyRule.visual_slot_for(6, 3), 3, "top-right")
-	assert_eq(TrainerRules.PetrirexAdjacencyRule.visual_slot_for(6, 2), 4, "bottom-left")
-	assert_eq(TrainerRules.PetrirexAdjacencyRule.visual_slot_for(6, 0), 6, "bottom-right")
+	assert_eq(TeamAdjacency.visual_slot_for(6, 5), 1, "top-left")
+	assert_eq(TeamAdjacency.visual_slot_for(6, 3), 3, "top-right")
+	assert_eq(TeamAdjacency.visual_slot_for(6, 2), 4, "bottom-left")
+	assert_eq(TeamAdjacency.visual_slot_for(6, 0), 6, "bottom-right")
 
 
-func test_helper_is_the_shared_slot_source() -> void:
-	# The battle slot log and the rule must use the same conversion, including
-	# for a smaller team array.
-	for team_size in [6, 5, 4]:
-		for storage in range(team_size):
-			assert_eq(
-				TrainerRules.PetrirexAdjacencyRule.visual_slot_for(team_size, storage),
-				TeamAdjacency.visual_slot_for(team_size, storage),
-				"team_size %d storage %d" % [team_size, storage]
-			)
-
-
-func test_species_keys_shared_between_helper_and_rule() -> void:
-	assert_eq(TrainerRules.PetrirexAdjacencyRule.PETRIREX_KEY, TeamAdjacency.PETRIREX_KEY)
-	assert_eq(TrainerRules.PetrirexAdjacencyRule.SHIKITSUNE_KEY, TeamAdjacency.SHIKITSUNE_KEY)
+func test_species_keys_are_verified_literals() -> void:
 	assert_eq(TeamAdjacency.PETRIREX_KEY, PETRIREX)
 	assert_eq(TeamAdjacency.SHIKITSUNE_KEY, SHIKITSUNE)
 
@@ -142,7 +128,6 @@ func test_rule_matches_verified_game_species_keys() -> void:
 	])
 	context.team_size = TEAM_SIZE
 	assert_not_empty(_rule().evaluate(context))
-	assert_eq(SHIKITSUNE, "monster.name.shikitsune")
 
 
 # ---------------------------------------------------------------------------
