@@ -13,6 +13,7 @@ extends Node
 
 const NodeUtils = preload("../core/node_utils.gd")
 const Style = preload("../core/style.gd")
+const BattleBackground = preload("../core/battle_background.gd")
 
 const BATTLE_SCENE := "res://game/states/battle_state.tscn"
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
@@ -35,6 +36,11 @@ const SIM_WAIT_FRAMES := 60
 const AUDIO_RESTORE_DELAYS := [0.1, 0.5, 1.2]
 const MUSIC_MIN_SECONDS := 15.0
 const SFX_PLAYER_PREFIX := "CreatureComfortsSound_"
+const CLOSE_WIDTH := 96.0
+const CLOSE_HEIGHT := 28.0
+const CLOSE_MARGIN := 12.0
+const CLOSE_TOP_RATIO := 0.10
+const CLOSE_FONT_SIZE := 14
 
 signal finished
 
@@ -117,8 +123,30 @@ func _begin() -> void:
 	await _start_visual_replay()
 	if not _active or _state == null:
 		return
+	_mount_background()
 	_offset_battle_layers()
 	_log("started")
+
+
+## Mount the game's map scene behind the replay units. The view's own map
+## arrays are preferred; the known map scenes are the fallback.
+func _mount_background() -> void:
+	if _state == null:
+		return
+	var view = _state.get("view")
+	if view == null:
+		return
+	var scene = BattleBackground.scene_for(view)
+	if scene == null:
+		_log("background scene not found")
+		return
+	var map = scene.instantiate()
+	if map == null:
+		return
+	map.name = "CreatureComfortsReplayMap"
+	view.add_child(map)
+	view.move_child(map, 0)
+	_log("background mounted: %s" % str(scene.resource_path))
 
 
 ## Start (or restart) the game's visual replay from the injected templates. The
@@ -304,13 +332,13 @@ func _build_layer() -> void:
 	close.text = "CLOSE"
 	close.tooltip_text = "Close the replay and return to the shop (Esc)"
 	close.focus_mode = Control.FOCUS_NONE
-	close.custom_minimum_size = Vector2(96.0, 28.0)
-	close.add_theme_font_size_override("font_size", 14)
+	close.custom_minimum_size = Vector2(CLOSE_WIDTH, CLOSE_HEIGHT)
+	close.add_theme_font_size_override("font_size", CLOSE_FONT_SIZE)
 	Style.compact_button(close)
 	close.pressed.connect(_teardown)
 	close.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	close.offset_left = -108.0
-	close.offset_right = -12.0
+	close.offset_left = -CLOSE_WIDTH - CLOSE_MARGIN
+	close.offset_right = -CLOSE_MARGIN
 	_ui_layer.add_child(close)
 	_close_button = close
 	_position_close_button()
@@ -327,9 +355,9 @@ func _position_close_button() -> void:
 	var viewport := get_viewport()
 	if viewport == null:
 		return
-	var top := roundf(viewport.get_visible_rect().size.y * 0.10) + 12.0
+	var top := roundf(viewport.get_visible_rect().size.y * CLOSE_TOP_RATIO) + CLOSE_MARGIN
 	_close_button.offset_top = top
-	_close_button.offset_bottom = top + 28.0
+	_close_button.offset_bottom = top + CLOSE_HEIGHT
 
 
 func _save_camera() -> void:
@@ -404,14 +432,12 @@ func _snapshot_audio() -> void:
 			"volume_db": player.volume_db,
 			"paused": player.stream_paused,
 			"bus": player.bus,
-			"name": str(player.name),
 		})
 	for i in range(AudioServer.bus_count):
 		_bus_snapshot.append({
 			"volume_db": AudioServer.get_bus_volume_db(i),
 			"mute": AudioServer.is_bus_mute(i),
 		})
-	_log("audio snapshot: %d playing player(s), %d bus(es)" % [_audio_snapshot.size(), _bus_snapshot.size()])
 
 
 ## Re-apply the saved audio state now and again shortly after, in case the
@@ -453,7 +479,6 @@ func _restore_audio() -> void:
 		player.stream_paused = bool(entry["paused"])
 		if not player.playing:
 			player.play(float(entry["position"]))
-			_log("audio restored: %s" % str(entry["name"]))
 		restored.append(player)
 
 	# Music the replay started on another player (the battle track) must not keep
@@ -472,7 +497,6 @@ func _restore_audio() -> void:
 		var other_stream: AudioStream = other.stream
 		if other_stream != null and other_stream.get_length() > MUSIC_MIN_SECONDS:
 			other.stop()
-			_log("audio stopped extra music: %s" % str(other.name))
 
 
 func _make_fallback_player(entry: Dictionary):
