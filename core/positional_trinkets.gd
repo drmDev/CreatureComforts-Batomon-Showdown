@@ -89,21 +89,14 @@ const TRINKETS := {
 		"position": "top_middle",
 		"passive": [{"stat": "stats", "value": 80, "percent": true, "note": "except Cooldown/Multicast"}],
 		"permanent": [],
-	},
-	"link_cable": {
-		"name": "Link Cable",
-		"description": "All of your team's monsters are now considered adjacent to each other.",
-		"position": "",
-		"passive": [],
-		"permanent": [],
-	},
+	}
 }
 
 const POSITIONS := ["left", "top_middle", "right"]
 const TIMINGS := ["passive", "permanent"]
 
 ## The summary is only shown once the player holds at least this many trinkets.
-const MIN_TRINKETS := 20
+const MIN_TRINKETS := 10
 
 ## Display order inside a subdivision. Text-only effects sort after numeric ones.
 const STAT_ORDER := [

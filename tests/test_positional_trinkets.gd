@@ -104,11 +104,6 @@ func test_master_crown_stats_effect() -> void:
 	assert_eq(passive[0]["note"], "except Cooldown/Multicast")
 
 
-func test_link_cable_is_not_positional() -> void:
-	var summary := PositionalTrinkets.summarize(["link_cable"])
-	assert_false(summary["has_any"])
-
-
 func test_example_scenario() -> void:
 	var held := [
 		"quick_flag", "quick_flag", "quick_flag",
