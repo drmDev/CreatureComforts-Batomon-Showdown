@@ -111,7 +111,8 @@ func handle(state, phase_changed: bool) -> bool:
 	_ui.update_shop_income(_compute_daily_income(run, current_day))
 	_trinket_reminders.update(run, _shop_overlay_gate)
 	_positional_trinkets.update(run)
-	_ui.update_rank_odds(int(run.get("shop_rank")) if NodeUtils.has_property(run, "shop_rank") else 1)
+	var held_trinkets = run.get("trinket_ids") if NodeUtils.has_property(run, "trinket_ids") else []
+	_ui.update_rank_odds(int(run.get("shop_rank")) if NodeUtils.has_property(run, "shop_rank") else 1, held_trinkets if held_trinkets != null else [])
 	var total_hp := int(run.get("player_hp")) if NodeUtils.has_property(run, "player_hp") else 0
 	_ui.update_base_hp(current_day, total_hp)
 	var view = state.get("view") if NodeUtils.has_property(state, "view") else null

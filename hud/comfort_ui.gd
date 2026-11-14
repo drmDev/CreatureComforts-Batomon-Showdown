@@ -291,7 +291,7 @@ func update_sell_values(view, allowed: bool = true) -> void:
 	sell_value_indicators.update_team(view)
 
 
-func update_rank_odds(rank: int) -> void:
+func update_rank_odds(rank: int, held_trinket_ids = []) -> void:
 	if rank_odds_panel == null:
 		return
 	if not _context.feature_enabled(ModConfig.KEY_RANK_ODDS_PREVIEW):
@@ -299,7 +299,7 @@ func update_rank_odds(rank: int) -> void:
 		return
 	if _base_hp_popup_open:
 		return
-	rank_odds_panel.set_rank(rank)
+	rank_odds_panel.set_rank(rank, held_trinket_ids)
 
 
 func update_base_hp(day: int, total_hp: int) -> void:
