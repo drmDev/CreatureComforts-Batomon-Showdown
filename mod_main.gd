@@ -243,6 +243,7 @@ func make_custom_settings_menu_entries() -> Array:
 	slider.custom_minimum_size = Vector2(160, 22)
 	slider.tooltip_text = "Volume of the sounds Creature Comforts plays (reminders and UI clicks)."
 	Style.apply_slider(slider)
+	slider.theme = Style.tooltip_theme(null, slider.get_theme_font_size("font_size", "TooltipLabel"))
 	box.add_child(slider)
 
 	# Text follows the drag; the file is written once on release (or when focus

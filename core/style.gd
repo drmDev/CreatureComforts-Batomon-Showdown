@@ -165,6 +165,21 @@ static func apply_slider(slider: HSlider) -> void:
 	slider.add_theme_icon_override("grabber_disabled", solid_texture(10, 18, LABEL_COLOR))
 
 
+## Build a theme that shrinks tooltips to half the inherited TooltipLabel size.
+## Tooltips are drawn with the TooltipLabel theme type, which per-control theme
+## overrides cannot reach, and the game's default size is far too large at the
+## HUD scale. `font` is optional; `inherited_size` falls back to the engine
+## default when 0 or negative.
+static func tooltip_theme(font: Font = null, inherited_size: int = 0) -> Theme:
+	if inherited_size <= 0:
+		inherited_size = ThemeDB.fallback_font_size
+	var t := Theme.new()
+	t.set_font_size("font_size", "TooltipLabel", maxi(6, roundi(inherited_size * 0.5)))
+	if font != null:
+		t.set_font("font", "TooltipLabel", font)
+	return t
+
+
 ## A flat one-colour texture, used for themed icons such as slider grabbers.
 static func solid_texture(width: int, height: int, color: Color) -> ImageTexture:
 	var image := Image.create(width, height, false, Image.FORMAT_RGBA8)

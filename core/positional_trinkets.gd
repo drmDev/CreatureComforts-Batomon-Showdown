@@ -95,6 +95,12 @@ const TRINKETS := {
 const POSITIONS := ["left", "top_middle", "right"]
 const TIMINGS := ["passive", "permanent"]
 
+## Display labels for each effect timing, used by the panel's right-aligned tag.
+const TAG_LABELS := {
+	"permanent": "Battle Start",
+	"passive": "Passive",
+}
+
 ## The summary is only shown once the player holds at least this many trinkets.
 const MIN_TRINKETS := 10
 
@@ -156,6 +162,16 @@ static func summarize(held_ids) -> Dictionary:
 		for timing in TIMINGS:
 			summary[position][timing] = _sort_effects(summary[position][timing])
 	return summary
+
+
+## Flatten a position's effects into display order: Battle Start (permanent)
+## first, then Passive, preserving the STAT_ORDER sort inside each timing.
+static func ordered_effects(section: Dictionary) -> Array:
+	var ordered: Array = []
+	for timing in ["permanent", "passive"]:
+		for effect in section.get(timing, []):
+			ordered.append({"effect": effect, "timing": timing})
+	return ordered
 
 
 ## Format one summed effect for the panel.

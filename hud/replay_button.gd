@@ -26,25 +26,6 @@ func _init() -> void:
 	modulate = Color(1.0, 1.0, 1.0, DIMMED_ALPHA)
 
 
-func _ready() -> void:
-	super()
-	_apply_tooltip_theme()
-
-
-## Tooltips are drawn with the TooltipLabel theme type, which per-control theme
-## overrides cannot reach, and the game's default size is far too large at this
-## HUD scale. Half of the inherited size matches the watchlist panel's tooltips.
-func _apply_tooltip_theme() -> void:
-	var inherited := get_theme_font_size("font_size", "TooltipLabel")
-	if inherited <= 0:
-		inherited = ThemeDB.fallback_font_size
-	var tooltip_theme := Theme.new()
-	tooltip_theme.set_font_size("font_size", "TooltipLabel", maxi(6, roundi(inherited * 0.5)))
-	if _text_font != null:
-		tooltip_theme.set_font("font", "TooltipLabel", _text_font)
-	theme = tooltip_theme
-
-
 ## The button is always shown in the shop so it can be found; it is dimmed and
 ## inert until a previous battle has been captured.
 func set_available(available: bool) -> void:

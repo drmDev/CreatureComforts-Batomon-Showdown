@@ -126,21 +126,6 @@ func _ready() -> void:
 	_connect_viewport_resize(_on_viewport_resized)
 
 
-## Tooltips are drawn with the TooltipLabel theme type, which per-control theme
-## overrides cannot reach, and the game's default size is far too large at this
-## HUD scale. Half of the inherited size stays readable without covering the
-## panel. Assigned to the panel so every tooltip in its subtree picks it up.
-func _apply_tooltip_theme() -> void:
-	var inherited := get_theme_font_size("font_size", "TooltipLabel")
-	if inherited <= 0:
-		inherited = ThemeDB.fallback_font_size
-	var tooltip_theme := Theme.new()
-	tooltip_theme.set_font_size("font_size", "TooltipLabel", maxi(6, roundi(inherited * 0.5)))
-	if _text_font != null:
-		tooltip_theme.set_font("font", "TooltipLabel", _text_font)
-	theme = tooltip_theme
-
-
 func _on_viewport_resized() -> void:
 	_anchor_button()
 	_position_panel()

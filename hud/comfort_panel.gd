@@ -91,6 +91,14 @@ func _connect_viewport_resize(handler: Callable) -> void:
 		viewport.size_changed.connect(handler)
 
 
+## Tooltips are drawn with the TooltipLabel theme type, which per-control theme
+## overrides cannot reach, and the game's default size is far too large at this
+## HUD scale. Half of the inherited size stays readable without covering the
+## panel. Assigned to the panel so every tooltip in its subtree picks it up.
+func _apply_tooltip_theme() -> void:
+	theme = Style.tooltip_theme(_text_font, get_theme_font_size("font_size", "TooltipLabel"))
+
+
 func _draw_text_shadow(pos: Vector2, text: String, color: Color, font_size: int, align := HORIZONTAL_ALIGNMENT_LEFT, width := -1.0) -> void:
 	draw_string(_text_font, pos + Vector2(0.0, 1.0), text, align, width, font_size, SHADOW_COLOR)
 	draw_string(_text_font, pos, text, align, width, font_size, color)

@@ -7,26 +7,30 @@ extends "collapsible_panel.gd"
 
 const PositionalTrinkets = preload("../core/positional_trinkets.gd")
 
-const CONTENT_PADDING := 5.0
-const BODY_TOP_PADDING := 4.0
-const LINE_HEIGHT := 12.0
-const SECTION_GAP := 4.0
-const INDENT_WIDTH := 8.0
+const CONTENT_PADDING := 4.0
+const BODY_TOP_PADDING := 3.0
+const LINE_HEIGHT := 11.0
+const SECTION_GAP := 3.0
+const TAG_GAP := 6.0
 const FONT_SIZE := 8
 const SECTION_FONT_SIZE := 9
-const MAX_WIDTH := 280.0
+const TAG_FONT_SIZE := 7
+const MAX_WIDTH := 300.0
 const TAB_EXTRA_WIDTH := 30.0
+const SEPARATOR_ALPHA := 0.35
 
 const SECTION_ORDER := ["left", "top_middle", "right"]
 const SECTION_LABELS := {
-	"left": "LEFT COLUMN",
-	"top_middle": "TOP MIDDLE",
-	"right": "RIGHT COLUMN",
+	"left": "Left Column",
+	"top_middle": "Top Middle",
+	"right": "Right Column",
 }
 
 var _summary: Dictionary = {}
 var _anchored := false
 var _initialized := false
+var _layout_cache: Array = []
+var _layout_key := ""
 
 
 func _init() -> void:
@@ -100,10 +104,9 @@ func reset_collapsed() -> void:
 
 
 func full_height() -> float:
-	var rows := _build_rows()
 	var height := HEAD_H + BODY_TOP_PADDING + CONTENT_PADDING
-	for row in rows:
-		height += float(row.get("gap_before", 0.0)) + LINE_HEIGHT
+	for row in _layout():
+		height += float(row.get("gap_before", 0.0)) + float(row.get("height", LINE_HEIGHT))
 	return height + CONTENT_PADDING
 
 
@@ -116,12 +119,14 @@ func _apply_size() -> void:
 func _content_width() -> float:
 	if _text_font == null:
 		return MAX_WIDTH
+	var tag_col := _tag_column_width()
 	var max_width := 0.0
 	for row in _build_rows():
 		var text := str(row.get("text", ""))
 		var font_size := int(row.get("font_size", FONT_SIZE))
-		var indent := float(row.get("indent", 0)) * INDENT_WIDTH
-		var width := indent + _text_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+		var width := _text_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+		if str(row.get("kind", "")) == "bonus":
+			width += tag_col
 		max_width = maxf(max_width, width)
 	return clampf(max_width + CONTENT_PADDING * 2.0 + 2.0, _tab_width(), MAX_WIDTH)
 
@@ -150,7 +155,7 @@ func _build_rows() -> Array:
 	if not bool(_summary.get("has_any", false)):
 		return [{
 			"text": "No positional trinkets",
-			"indent": 0,
+			"kind": "muted",
 			"color": LABEL_COLOR,
 			"font_size": FONT_SIZE,
 		}]
@@ -161,62 +166,128 @@ func _build_rows() -> Array:
 		var section: Dictionary = _summary.get(position, {})
 		rows.append({
 			"text": SECTION_LABELS[position],
-			"indent": 0,
+			"kind": "heading",
 			"color": VALUE_COLOR,
 			"font_size": SECTION_FONT_SIZE,
 			"gap_before": 0.0 if first_section else SECTION_GAP,
 		})
 		first_section = false
-		rows.append({
-			"text": "Passive:",
-			"indent": 1,
-			"color": LABEL_COLOR,
-			"font_size": FONT_SIZE,
-		})
-		_append_effects(rows, section.get("passive", []))
-		rows.append({
-			"text": "Permanent (Battle Start):",
-			"indent": 1,
-			"color": LABEL_COLOR,
-			"font_size": FONT_SIZE,
-		})
-		_append_effects(rows, section.get("permanent", []))
+		var ordered := PositionalTrinkets.ordered_effects(section)
+		if ordered.is_empty():
+			rows.append({
+				"text": "No bonuses",
+				"kind": "muted",
+				"color": LABEL_COLOR,
+				"font_size": FONT_SIZE,
+			})
+		else:
+			for entry in ordered:
+				var effect: Dictionary = entry["effect"]
+				var timing := str(entry["timing"])
+				rows.append({
+					"text": PositionalTrinkets.format_effect(effect),
+					"tag": PositionalTrinkets.TAG_LABELS.get(timing, timing),
+					"kind": "bonus",
+					"color": VALUE_COLOR,
+					"font_size": FONT_SIZE,
+				})
 	return rows
 
 
-func _append_effects(rows: Array, effects: Array) -> void:
-	if effects.is_empty():
-		rows.append({
-			"text": "None",
-			"indent": 2,
-			"color": LABEL_COLOR,
-			"font_size": FONT_SIZE,
-		})
-		return
-	for effect in effects:
-		rows.append({
-			"text": PositionalTrinkets.format_effect(effect),
-			"indent": 2,
-			"color": VALUE_COLOR,
-			"font_size": FONT_SIZE,
-		})
+func _tag_column_width() -> float:
+	if _text_font == null:
+		return 0.0
+	var width := 0.0
+	for tag in ["Battle Start", "Passive"]:
+		width = maxf(width, _text_font.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, TAG_FONT_SIZE).x)
+	return width + TAG_GAP
 
 
-func _draw_body(width: float) -> void:
-	var rows := _build_rows()
+func _wrap_text(text: String, max_width: float, font_size: int) -> Array:
+	if max_width <= 0.0 or text.is_empty():
+		return [text]
+	var lines: Array = []
+	var current := ""
+	for word in text.split(" "):
+		var candidate := word if current.is_empty() else current + " " + word
+		if _text_font.get_string_size(candidate, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x <= max_width:
+			current = candidate
+		else:
+			if not current.is_empty():
+				lines.append(current)
+			current = word
+	if not current.is_empty():
+		lines.append(current)
+	return lines
+
+
+func _layout() -> Array:
+	if _layout_key == _content_key and not _layout_cache.is_empty():
+		return _layout_cache
+	_layout_cache = []
+	_layout_key = _content_key
+	if _text_font == null:
+		return _layout_cache
+	var content_width := _content_width()
+	var text_col := maxf(content_width - CONTENT_PADDING * 2.0 - 2.0 - _tag_column_width(), 20.0)
+	for row in _build_rows():
+		var kind := str(row.get("kind", "text"))
+		var text := str(row.get("text", ""))
+		var font_size := int(row.get("font_size", FONT_SIZE))
+		var lines: Array = [text]
+		var height := LINE_HEIGHT
+		if kind == "bonus":
+			lines = _wrap_text(text, text_col, font_size)
+			height = float(lines.size()) * LINE_HEIGHT
+		_layout_cache.append({
+			"kind": kind,
+			"text": text,
+			"tag": str(row.get("tag", "")),
+			"font_size": font_size,
+			"gap_before": float(row.get("gap_before", 0.0)),
+			"lines": lines,
+			"height": height,
+		})
+	return _layout_cache
+
+
+func _draw_body(_width: float) -> void:
+	var rows := _layout()
 	var cursor_y := HEAD_H + BODY_TOP_PADDING
-	draw_rect(
-		Rect2(CONTENT_PADDING, HEAD_H + 2.0, maxf(0.0, width - CONTENT_PADDING * 2.0), 1.0),
-		BORDER_COLOR
-	)
+	var tag_col := _tag_column_width()
+	var tag_box_width := tag_col - TAG_GAP
+	var right_edge := size.x - CONTENT_PADDING - 1.0
 	for row in rows:
-		cursor_y += float(row.get("gap_before", 0.0))
+		var gap := float(row.get("gap_before", 0.0))
+		if gap > 0.0:
+			var sep_y := cursor_y + gap * 0.5
+			draw_line(
+				Vector2(CONTENT_PADDING + 1.0, sep_y),
+				Vector2(size.x - CONTENT_PADDING - 1.0, sep_y),
+				Color(BORDER_COLOR.r, BORDER_COLOR.g, BORDER_COLOR.b, SEPARATOR_ALPHA),
+				1.0
+			)
+		cursor_y += gap
+		var kind := str(row.get("kind", "text"))
+		var font_size := int(row.get("font_size", FONT_SIZE))
+		var color: Color = row.get("color", VALUE_COLOR)
+		var x := CONTENT_PADDING + 1.0
 		var baseline := cursor_y + LINE_HEIGHT - 3.0
-		var x := CONTENT_PADDING + 1.0 + float(row.get("indent", 0)) * INDENT_WIDTH
-		_draw_text_shadow(
-			Vector2(x, baseline),
-			str(row.get("text", "")),
-			row.get("color", VALUE_COLOR),
-			int(row.get("font_size", FONT_SIZE))
-		)
-		cursor_y += LINE_HEIGHT
+		if kind == "bonus":
+			var lines: Array = row.get("lines", [])
+			for i in range(lines.size()):
+				_draw_text_shadow(Vector2(x, baseline + float(i) * LINE_HEIGHT), str(lines[i]), color, font_size)
+			if reveal >= 0.999:
+				var tag := str(row.get("tag", ""))
+				if not tag.is_empty():
+					_draw_text_shadow(
+						Vector2(right_edge - tag_box_width, baseline),
+						tag,
+						LABEL_COLOR,
+						TAG_FONT_SIZE,
+						HORIZONTAL_ALIGNMENT_RIGHT,
+						tag_box_width
+					)
+		else:
+			_draw_text_shadow(Vector2(x, baseline), str(row.get("text", "")), color, font_size)
+		cursor_y += float(row.get("height", LINE_HEIGHT))

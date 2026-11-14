@@ -340,6 +340,7 @@ func _build_layer() -> void:
 	close.offset_left = -CLOSE_WIDTH - CLOSE_MARGIN
 	close.offset_right = -CLOSE_MARGIN
 	_ui_layer.add_child(close)
+	close.theme = Style.tooltip_theme(null, close.get_theme_font_size("font_size", "TooltipLabel"))
 	_close_button = close
 	_position_close_button()
 	var viewport := get_viewport()

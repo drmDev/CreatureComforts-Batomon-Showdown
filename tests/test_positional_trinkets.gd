@@ -143,6 +143,34 @@ func test_example_scenario() -> void:
 	assert_eq(summary["right"]["permanent"][0]["value"], 10)
 
 
+func test_ordered_effects_battle_start_before_passive() -> void:
+	var summary := PositionalTrinkets.summarize(["quick_flag", "rally_flag"])
+	var ordered := PositionalTrinkets.ordered_effects(summary["left"])
+	assert_eq(ordered.size(), 2)
+	assert_eq(ordered[0]["timing"], "permanent")
+	assert_eq(ordered[0]["effect"]["stat"], "damage")
+	assert_eq(ordered[1]["timing"], "passive")
+	assert_eq(ordered[1]["effect"]["stat"], "cooldown_speed")
+
+
+func test_ordered_effects_preserves_stat_order_within_timing() -> void:
+	var summary := PositionalTrinkets.summarize(["rally_flag", "momentum_flag"])
+	var ordered := PositionalTrinkets.ordered_effects(summary["left"])
+	assert_eq(ordered.size(), 2)
+	assert_eq(ordered[0]["effect"]["stat"], "damage")
+	assert_eq(ordered[1]["effect"]["stat"], "cooldown_speed")
+
+
+func test_ordered_effects_empty_section() -> void:
+	var summary := PositionalTrinkets.summarize(["quick_flag"])
+	assert_empty(PositionalTrinkets.ordered_effects(summary["right"]))
+
+
+func test_tag_labels_map_timings() -> void:
+	assert_eq(PositionalTrinkets.TAG_LABELS["permanent"], "Battle Start")
+	assert_eq(PositionalTrinkets.TAG_LABELS["passive"], "Passive")
+
+
 func test_format_effect_percent() -> void:
 	assert_eq(
 		PositionalTrinkets.format_effect({"stat": "cooldown_speed", "value": 12, "percent": true}),

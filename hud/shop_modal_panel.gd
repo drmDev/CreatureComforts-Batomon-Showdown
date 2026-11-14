@@ -44,6 +44,7 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	_apply_tooltip_theme()
 	_connect_viewport_resize(_on_viewport_resized)
 	_anchor()
 
