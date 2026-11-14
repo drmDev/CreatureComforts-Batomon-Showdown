@@ -394,7 +394,7 @@ func _toolbar_box(parent: Control) -> void:
 	_clear_button = Button.new()
 	_clear_button.icon = _load_texture("../assets/icons/trash.png")
 	_clear_button.expand_icon = true
-	_clear_button.tooltip_text = "Clear all tracked Batomon and items"
+	_clear_button.tooltip_text = _clear_tooltip()
 	_clear_button.focus_mode = Control.FOCUS_NONE
 	_clear_button.custom_minimum_size = Vector2(12, 12)
 	Style.action_button(_clear_button, Style.ACTION_BG, Style.ACTION_BG_HOVER, Style.ACTION_BORDER, Color.WHITE)
@@ -608,15 +608,16 @@ func _on_tab_pressed(tab: String) -> void:
 	_sync_tab_visibility()
 	# Each tab keeps its own rarity filter; reflect the newly active one.
 	_sync_filter_buttons(_rarity_buttons, _rarity_filter_for(_tab))
+	_update_clear_button()
 	_rebuild_rows()
 
 
-## Uncheck every tracked entry on both tabs. The active filters, sort mode and
-## Tracked Only state are left alone; the list simply rebuilds empty.
+## Uncheck every tracked entry on the active tab only. The other tab's tracked
+## entries are left alone. The active filters, sort mode and Tracked Only state
+## are left alone; the list simply rebuilds empty.
 func _on_clear_pressed() -> void:
 	_click_sound.play()
-	selection["monster"] = {}
-	selection["item"] = {}
+	selection[_tab] = {}
 	_save_selection()
 	_rebuild_rows()
 
@@ -789,18 +790,33 @@ func _update_tab_indicators() -> void:
 			dot.visible = _tab_has_tracked(entry["tab"])
 
 
-## Save and Clear are only meaningful with something tracked. Counts both tabs,
-## since a build always captures Batomon and items together.
+## Save is only meaningful with something tracked on either tab, since a build
+## always captures Batomon and items together. Clear is per-tab, so it is only
+## enabled when the active tab has something tracked.
 func _update_action_buttons() -> void:
 	if _save_button == null:
 		return
 	var tracked: int = selection.get("monster", {}).size() + selection.get("item", {}).size()
 	_save_button.disabled = tracked == 0
-	if _clear_button != null:
-		_clear_button.disabled = tracked == 0
-		# The action styling reuses the normal box for `disabled`, so dim the
-		# trash icon when nothing is tracked.
-		_clear_button.modulate.a = 0.4 if tracked == 0 else 1.0
+	_update_clear_button()
+
+
+## Enable/disable the Clear All button based on the active tab's tracked count,
+## and keep its tooltip in sync with the active tab.
+func _update_clear_button() -> void:
+	if _clear_button == null:
+		return
+	var tab_tracked: int = selection.get(_tab, {}).size()
+	_clear_button.disabled = tab_tracked == 0
+	# The action styling reuses the normal box for `disabled`, so dim the
+	# trash icon when nothing is tracked on the active tab.
+	_clear_button.modulate.a = 0.4 if tab_tracked == 0 else 1.0
+	_clear_button.tooltip_text = _clear_tooltip()
+
+
+## Tooltip for the Clear All button, scoped to the active tab.
+func _clear_tooltip() -> String:
+	return "Clear all tracked Batomon" if _tab == TAB_MONSTER else "Clear all tracked items"
 
 
 ## Save the whole watchlist (both tabs, ignoring filters and Tracked Only) as a
