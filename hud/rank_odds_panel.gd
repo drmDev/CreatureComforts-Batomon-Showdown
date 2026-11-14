@@ -27,6 +27,15 @@ const TRINKET_ICON_SIZE := 12.0
 const TRINKET_ICON_GAP := 4.0
 const TRINKET_ICON_Y_OFFSET := -2.0  # Nudge the icon up so it lines up with the checkbox
 
+## Rarity weight deltas are indexed like HEADER_LABELS without the Rank column:
+## [Common, Uncommon, Rare, Super Rare, Legendary]. `ban` zeroes those indices.
+const TRINKET_DEFS := [
+	{"id": TRINKET_PLAIN_LURE, "label": "Plain Lure: +20 common weight", "tooltip": "Preview +20 Common weight", "delta": [PLAIN_LURE_COMMON_BONUS, 0, 0, 0, 0]},
+	{"id": TRINKET_SWEET_LURE, "label": "Sweet Lure: +10 common, +15 uncommon weight", "tooltip": "Preview +10 Common and +15 Uncommon weight", "delta": [SWEET_LURE_COMMON_BONUS, SWEET_LURE_UNCOMMON_BONUS, 0, 0, 0]},
+	{"id": TRINKET_RESEARCH_NOTES, "label": "Research Notes: +30 legendary weight", "tooltip": "Preview +30 Legendary weight", "delta": [0, 0, 0, 0, RESEARCH_NOTES_LEGENDARY_BONUS]},
+	{"id": TRINKET_VIP_PASS, "label": "VIP Pass: Bans Commons and Uncommons", "tooltip": "Bans Common and Uncommon rarities", "ban": [0, 1]},
+]
+
 # Rank 14 represents "14+" (the final row). 0 renders as an em dash.
 const RANK_ODDS := [
 	[1, 100, 0, 0, 0, 0],
@@ -46,18 +55,9 @@ const RANK_ODDS := [
 ]
 
 var _rank := 1
-var _plain_lure := false
-var _sweet_lure := false
-var _research_notes := false
-var _vip_pass := false
-var _plain_lure_check: CheckBox
-var _sweet_lure_check: CheckBox
-var _research_notes_check: CheckBox
-var _vip_pass_check: CheckBox
-var _plain_lure_icon: TextureRect
-var _sweet_lure_icon: TextureRect
-var _research_notes_icon: TextureRect
-var _vip_pass_icon: TextureRect
+var _trinket_states: Array = []
+var _trinket_checks: Array = []
+var _trinket_icons: Array = []
 var _blank_style: StyleBoxEmpty
 var _held_trinket_ids: Array = []
 var _trinket_icons_provider = null
@@ -95,25 +95,25 @@ func _log_detail() -> String:
 
 # --- Trinket preview ------------------------------------------------------------
 
-## Recalculate a rank's rarity percentages from its base weights. Plain Lure
-## adds +20 Common; Sweet Lure adds +10 Common and +15 Uncommon; Research Notes
-## adds +30 Legendary; VIP Pass zeroes Common and Uncommon. All are applied to
-## the base weights before the total is computed, so toggling never accumulates.
-## Returns whole percentages (rounded), one per rarity column.
-static func _row_percentages(row: Array, plain_lure: bool, sweet_lure: bool, research_notes: bool, vip_pass: bool) -> Array:
+## Recalculate a rank's rarity percentages from its base weights. `states` is a
+## bool per TRINKET_DEFS entry; each enabled trinket applies its weight delta or
+## ban to the base weights before the total is computed, so toggling never
+## accumulates. Returns whole percentages (rounded), one per rarity column.
+static func _row_percentages(row: Array, states: Array) -> Array:
 	var weights := []
 	for i in range(1, row.size()):
 		weights.append(int(row[i]))
-	if plain_lure:
-		weights[0] += PLAIN_LURE_COMMON_BONUS
-	if sweet_lure:
-		weights[0] += SWEET_LURE_COMMON_BONUS
-		weights[1] += SWEET_LURE_UNCOMMON_BONUS
-	if research_notes:
-		weights[4] += RESEARCH_NOTES_LEGENDARY_BONUS
-	if vip_pass:
-		weights[0] = 0
-		weights[1] = 0
+	for i in range(TRINKET_DEFS.size()):
+		if not states[i]:
+			continue
+		var def: Dictionary = TRINKET_DEFS[i]
+		if def.has("delta"):
+			var delta: Array = def["delta"]
+			for j in range(delta.size()):
+				weights[j] += int(delta[j])
+		if def.has("ban"):
+			for j in def["ban"]:
+				weights[j] = 0
 	var total := 0
 	for weight in weights:
 		total += weight
@@ -138,26 +138,11 @@ static func _owns_trinket(held_ids: Array, id: String) -> bool:
 func _ready() -> void:
 	super._ready()
 	_blank_style = StyleBoxEmpty.new()
-	_plain_lure_icon = _build_trinket_icon()
-	_sweet_lure_icon = _build_trinket_icon()
-	_research_notes_icon = _build_trinket_icon()
-	_vip_pass_icon = _build_trinket_icon()
-	_plain_lure_check = _build_modifier_check(
-		"Plain Lure: +20 common weight",
-		"Preview +20 Common weight",
-		_on_plain_lure_toggled)
-	_sweet_lure_check = _build_modifier_check(
-		"Sweet Lure: +10 common, +15 uncommon weight",
-		"Preview +10 Common and +15 Uncommon weight",
-		_on_sweet_lure_toggled)
-	_research_notes_check = _build_modifier_check(
-		"Research Notes: +30 legendary weight",
-		"Preview +30 Legendary weight",
-		_on_research_notes_toggled)
-	_vip_pass_check = _build_modifier_check(
-		"VIP Pass: Bans Common, Uncommon",
-		"Bans Common and Uncommon rarities",
-		_on_vip_pass_toggled)
+	for i in range(TRINKET_DEFS.size()):
+		var def: Dictionary = TRINKET_DEFS[i]
+		_trinket_states.append(false)
+		_trinket_icons.append(_build_trinket_icon())
+		_trinket_checks.append(_build_modifier_check(def["label"], def["tooltip"], _on_trinket_toggled.bind(i)))
 
 
 func _build_modifier_check(text: String, tooltip: String, handler: Callable) -> CheckBox:
@@ -193,75 +178,34 @@ func _build_trinket_icon() -> TextureRect:
 
 
 func _open_popup() -> void:
-	_plain_lure = _owns_trinket(_held_trinket_ids, TRINKET_PLAIN_LURE)
-	_sweet_lure = _owns_trinket(_held_trinket_ids, TRINKET_SWEET_LURE)
-	_research_notes = _owns_trinket(_held_trinket_ids, TRINKET_RESEARCH_NOTES)
-	_vip_pass = _owns_trinket(_held_trinket_ids, TRINKET_VIP_PASS)
-	if _plain_lure_check != null:
-		_plain_lure_check.set_pressed_no_signal(_plain_lure)
-	if _sweet_lure_check != null:
-		_sweet_lure_check.set_pressed_no_signal(_sweet_lure)
-	if _research_notes_check != null:
-		_research_notes_check.set_pressed_no_signal(_research_notes)
-	if _vip_pass_check != null:
-		_vip_pass_check.set_pressed_no_signal(_vip_pass)
+	for i in range(TRINKET_DEFS.size()):
+		_trinket_states[i] = _owns_trinket(_held_trinket_ids, TRINKET_DEFS[i]["id"])
+		if _trinket_checks[i] != null:
+			_trinket_checks[i].set_pressed_no_signal(_trinket_states[i])
 	_apply_trinket_icons()
 	super._open_popup()
 
 
 func _close_popup() -> void:
 	super._close_popup()
-	if _plain_lure_check != null:
-		_plain_lure_check.visible = false
-	if _sweet_lure_check != null:
-		_sweet_lure_check.visible = false
-	if _research_notes_check != null:
-		_research_notes_check.visible = false
-	if _vip_pass_check != null:
-		_vip_pass_check.visible = false
-	if _plain_lure_icon != null:
-		_plain_lure_icon.visible = false
-	if _sweet_lure_icon != null:
-		_sweet_lure_icon.visible = false
-	if _research_notes_icon != null:
-		_research_notes_icon.visible = false
-	if _vip_pass_icon != null:
-		_vip_pass_icon.visible = false
+	for i in range(_trinket_checks.size()):
+		if _trinket_checks[i] != null:
+			_trinket_checks[i].visible = false
+		if _trinket_icons[i] != null:
+			_trinket_icons[i].visible = false
 
 
-func _on_plain_lure_toggled(on: bool) -> void:
-	_plain_lure = on
-	queue_redraw()
-
-
-func _on_sweet_lure_toggled(on: bool) -> void:
-	_sweet_lure = on
-	queue_redraw()
-
-
-func _on_research_notes_toggled(on: bool) -> void:
-	_research_notes = on
-	queue_redraw()
-
-
-func _on_vip_pass_toggled(on: bool) -> void:
-	_vip_pass = on
+func _on_trinket_toggled(on: bool, index: int) -> void:
+	_trinket_states[index] = on
 	queue_redraw()
 
 
 func _apply_trinket_icons() -> void:
 	if _trinket_icons_provider == null:
 		_trinket_icons_provider = TrinketIcons.new()
-	_set_icon_texture(_plain_lure_icon, TRINKET_PLAIN_LURE)
-	_set_icon_texture(_sweet_lure_icon, TRINKET_SWEET_LURE)
-	_set_icon_texture(_research_notes_icon, TRINKET_RESEARCH_NOTES)
-	_set_icon_texture(_vip_pass_icon, TRINKET_VIP_PASS)
-
-
-func _set_icon_texture(icon: TextureRect, trinket_id: String) -> void:
-	if icon == null:
-		return
-	icon.texture = _trinket_icons_provider.icon(trinket_id)
+	for i in range(TRINKET_DEFS.size()):
+		if _trinket_icons[i] != null:
+			_trinket_icons[i].texture = _trinket_icons_provider.icon(TRINKET_DEFS[i]["id"])
 
 
 func _position_modifier_checks(rect: Rect2) -> void:
@@ -269,34 +213,18 @@ func _position_modifier_checks(rect: Rect2) -> void:
 	var icon_x := rect.position.x + POPUP_PADDING
 	var check_x := icon_x + TRINKET_ICON_SIZE + TRINKET_ICON_GAP
 	var icon_y := y + (CHECK_ROW_H - TRINKET_ICON_SIZE) * 0.5 + TRINKET_ICON_Y_OFFSET
-	if _plain_lure_icon != null:
-		_plain_lure_icon.visible = true
-		_plain_lure_icon.position = Vector2(icon_x, icon_y)
-	if _plain_lure_check != null:
-		_plain_lure_check.visible = true
-		_plain_lure_check.position = Vector2(check_x, y)
-	if _sweet_lure_icon != null:
-		_sweet_lure_icon.visible = true
-		_sweet_lure_icon.position = Vector2(icon_x, icon_y + CHECK_ROW_H + CHECK_ROW_GAP)
-	if _sweet_lure_check != null:
-		_sweet_lure_check.visible = true
-		_sweet_lure_check.position = Vector2(check_x, y + CHECK_ROW_H + CHECK_ROW_GAP)
-	if _research_notes_icon != null:
-		_research_notes_icon.visible = true
-		_research_notes_icon.position = Vector2(icon_x, icon_y + (CHECK_ROW_H + CHECK_ROW_GAP) * 2.0)
-	if _research_notes_check != null:
-		_research_notes_check.visible = true
-		_research_notes_check.position = Vector2(check_x, y + (CHECK_ROW_H + CHECK_ROW_GAP) * 2.0)
-	if _vip_pass_icon != null:
-		_vip_pass_icon.visible = true
-		_vip_pass_icon.position = Vector2(icon_x, icon_y + (CHECK_ROW_H + CHECK_ROW_GAP) * 3.0)
-	if _vip_pass_check != null:
-		_vip_pass_check.visible = true
-		_vip_pass_check.position = Vector2(check_x, y + (CHECK_ROW_H + CHECK_ROW_GAP) * 3.0)
+	for i in range(_trinket_checks.size()):
+		var row_y := y + (CHECK_ROW_H + CHECK_ROW_GAP) * i
+		if _trinket_icons[i] != null:
+			_trinket_icons[i].visible = true
+			_trinket_icons[i].position = Vector2(icon_x, icon_y + (CHECK_ROW_H + CHECK_ROW_GAP) * i)
+		if _trinket_checks[i] != null:
+			_trinket_checks[i].visible = true
+			_trinket_checks[i].position = Vector2(check_x, row_y)
 
 
 func _modifier_rows_height() -> float:
-	return CHECK_ROW_H * 4.0 + CHECK_ROW_GAP * 3.0
+	return CHECK_ROW_H * TRINKET_DEFS.size() + CHECK_ROW_GAP * (TRINKET_DEFS.size() - 1)
 
 
 func _popup_height() -> float:
@@ -342,6 +270,6 @@ func _table_cell_text(row_index: int, column: int) -> String:
 	var row: Array = RANK_ODDS[row_index]
 	if column == 0:
 		return "14+" if int(row[0]) == 14 else str(int(row[0]))
-	var pct: int = _row_percentages(row, _plain_lure, _sweet_lure, _research_notes, _vip_pass)[column - 1]
+	var pct: int = _row_percentages(row, _trinket_states)[column - 1]
 	# \u2014 keeps the source plain ASCII (the auto-updater rejects non-ASCII scripts).
 	return "\u2014" if pct == 0 else "%d%%" % pct
