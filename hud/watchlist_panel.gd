@@ -368,8 +368,8 @@ func _build_ui() -> void:
 
 
 ## Tools sitting directly above the list: the actions group (Snapshot Team,
-## tracked count, Builds, Save), the Sort group (mode + direction) and the view
-## group (Tracked Only + clear), separated by thin rules.
+## tracked count, Clear All, Builds, Save), the Sort group (mode + direction)
+## and the view group (Tracked Only), separated by thin rules.
 func _toolbar_box(parent: Control) -> void:
 	var toolbar := HBoxContainer.new()
 	toolbar.add_theme_constant_override("separation", 4)
@@ -388,6 +388,18 @@ func _toolbar_box(parent: Control) -> void:
 	_tracked_count_label = Label.new()
 	_apply_font(_tracked_count_label, BODY_FONT_SIZE)
 	toolbar.add_child(_tracked_count_label)
+
+	# Icon-only Clear All worn beside the tracked count. The trash icon and the
+	# muted-destructive action palette read as "remove", not as another filter.
+	_clear_button = Button.new()
+	_clear_button.icon = _load_texture("../assets/icons/trash.png")
+	_clear_button.expand_icon = true
+	_clear_button.tooltip_text = "Clear all tracked Batomon and items"
+	_clear_button.focus_mode = Control.FOCUS_NONE
+	_clear_button.custom_minimum_size = Vector2(12, 12)
+	Style.action_button(_clear_button, Style.ACTION_BG, Style.ACTION_BG_HOVER, Style.ACTION_BORDER, Color.WHITE)
+	_clear_button.pressed.connect(_on_clear_pressed)
+	toolbar.add_child(_clear_button)
 
 	_builds_button = Button.new()
 	_builds_button.text = "Builds"
@@ -449,25 +461,33 @@ func _toolbar_box(parent: Control) -> void:
 
 	_toolbar_separator(toolbar)
 
+	# Tracked Only mirrors the individual rows: a label with its checkbox to the
+	# right. The checkbox keeps an empty text so it does not draw a second label.
+	var tracked_only_label := Label.new()
+	tracked_only_label.text = "Tracked Only"
+	tracked_only_label.tooltip_text = "Show only entries you are tracking"
+	tracked_only_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_apply_font(tracked_only_label, BODY_FONT_SIZE)
+
 	_tracked_only_check = CheckBox.new()
-	_tracked_only_check.text = "Tracked Only"
 	_tracked_only_check.tooltip_text = "Show only entries you are tracking"
 	_tracked_only_check.focus_mode = Control.FOCUS_NONE
 	_style_checkbox(_tracked_only_check)
 	_tracked_only_check.toggled.connect(_on_tracked_only_toggled)
-	toolbar.add_child(_tracked_only_check)
 
-	# Icon-only clear: unchecks every tracked Batomon and item. No text, so the
-	# tooltip carries the meaning.
-	_clear_button = Button.new()
-	_clear_button.icon = _load_texture("../assets/icons/clearFilter.png")
-	_clear_button.expand_icon = true
-	_clear_button.tooltip_text = "Clear all tracked Batomon and items"
-	_clear_button.focus_mode = Control.FOCUS_NONE
-	_clear_button.custom_minimum_size = Vector2(12, 12)
-	Style.compact_button(_clear_button)
-	_clear_button.pressed.connect(_on_clear_pressed)
-	toolbar.add_child(_clear_button)
+	# Fixed-size holder so the checkbox never changes the toolbar height, the
+	# same treatment used by the entry rows.
+	var check_holder := Control.new()
+	check_holder.custom_minimum_size = Vector2(12, 12)
+	check_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	check_holder.add_child(_tracked_only_check)
+	_tracked_only_check.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	var tracked_box := HBoxContainer.new()
+	tracked_box.add_theme_constant_override("separation", 2)
+	tracked_box.add_child(tracked_only_label)
+	tracked_box.add_child(check_holder)
+	toolbar.add_child(tracked_box)
 
 
 func _add_filter_button(parent: Control, text: String, value: String, store: Array, handler: Callable, color: Color = Color.TRANSPARENT) -> void:
@@ -778,7 +798,8 @@ func _update_action_buttons() -> void:
 	_save_button.disabled = tracked == 0
 	if _clear_button != null:
 		_clear_button.disabled = tracked == 0
-		# compact_button reuses the normal box for `disabled`, so dim the icon.
+		# The action styling reuses the normal box for `disabled`, so dim the
+		# trash icon when nothing is tracked.
 		_clear_button.modulate.a = 0.4 if tracked == 0 else 1.0
 
 
