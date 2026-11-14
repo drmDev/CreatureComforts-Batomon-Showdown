@@ -15,6 +15,7 @@ const ReminderLabel = preload("reminder_label.gd")
 const ShopIncomePanel = preload("shop_income_panel.gd")
 const TrinketRemindersPanel = preload("trinket_reminders_panel.gd")
 const PositionalTrinketsPanel = preload("positional_trinkets_panel.gd")
+const TrinketAssistantPanel = preload("trinket_assistant_panel.gd")
 const RankOddsPanel = preload("rank_odds_panel.gd")
 const BaseHpPanel = preload("base_hp_panel.gd")
 const WatchlistPanel = preload("watchlist_panel.gd")
@@ -32,6 +33,7 @@ var reminder_label = null
 var shop_income_panel = null
 var trinket_reminders_panel = null
 var positional_trinkets_panel = null
+var positional_trinkets_assistant = null
 var rank_odds_panel = null
 var base_hp_panel = null
 var watchlist_panel = null
@@ -86,6 +88,13 @@ func _build_reminder_layer() -> void:
 	positional_trinkets_panel = PositionalTrinketsPanel.new()
 	positional_trinkets_panel.name = "PositionalTrinketsPanel"
 	reminder_layer.add_child(positional_trinkets_panel)
+
+	# Clippy-style assistant companion. It follows the positional summary panel
+	# and appears only while its introduction bubble is active.
+	positional_trinkets_assistant = TrinketAssistantPanel.new()
+	positional_trinkets_assistant.name = "TrinketAssistantPanel"
+	reminder_layer.add_child(positional_trinkets_assistant)
+	positional_trinkets_assistant.setup(positional_trinkets_panel, _context.sounds_enabled, _context.mod_volume)
 
 	# Battle trinket gains. Lives here (not on a separate layer) so the shop overlay gate
 	# holds it back through the results/event/gift screens and reveals it once the shop is
@@ -198,6 +207,8 @@ func apply_gate(allowed: bool) -> bool:
 ## Close the shop's modals and hide the sell-value badges. Used when the shop
 ## HUD is hidden, either by the overlay gate or by the replay overlay.
 func _close_shop_popups() -> void:
+	if positional_trinkets_assistant != null:
+		positional_trinkets_assistant.hide_bubble()
 	if watchlist_panel != null:
 		watchlist_panel.close_popup()
 	if rank_odds_panel != null:
@@ -237,6 +248,8 @@ func hide_shop_panels() -> void:
 		trinket_reminders_panel.hide_panel()
 	if positional_trinkets_panel != null:
 		positional_trinkets_panel.hide_panel()
+	if positional_trinkets_assistant != null:
+		positional_trinkets_assistant.hide_bubble()
 	if rank_odds_panel != null:
 		rank_odds_panel.hide_panel()
 	if base_hp_panel != null:
@@ -454,6 +467,8 @@ func on_feature_toggled(key: String, value: bool) -> void:
 	elif key == ModConfig.KEY_POSITIONAL_TRINKETS:
 		if positional_trinkets_panel != null:
 			positional_trinkets_panel.hide_panel()
+		if positional_trinkets_assistant != null:
+			positional_trinkets_assistant.hide_bubble()
 	elif key == ModConfig.KEY_RANK_ODDS_PREVIEW:
 		if rank_odds_panel != null:
 			rank_odds_panel.hide_panel()

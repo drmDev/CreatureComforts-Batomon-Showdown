@@ -55,7 +55,7 @@ func setup(context, ui, shop_overlay_gate, dev_tools, on_shop_entered: Callable,
 	_trinket_reminders.setup(_ui.trinket_reminders_panel, _context)
 
 	_positional_trinkets = PositionalTrinketsController.new()
-	_positional_trinkets.setup(_ui.positional_trinkets_panel, _context)
+	_positional_trinkets.setup(_ui.positional_trinkets_panel, _context, _ui.positional_trinkets_assistant)
 
 
 ## Handle one shop poll. Returns true when the shop phase was processed (so the

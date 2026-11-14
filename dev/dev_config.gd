@@ -15,5 +15,10 @@ const DEBUG_LOGGING := false
 ## Toggle on at runtime with Ctrl+Shift+I only when you need it.
 const DEEP_INSPECTION := false
 
+## When true, the Trinket Summary assistant introduction always appears whenever
+## the positional trinket threshold is met, ignoring the once-per-run guard, the
+## persisted seen flag, and the 25% chance. Off by default; for testing only.
+const TRINKET_ASSISTANT_ALWAYS_SHOW := false
+
 const TOGGLE_DEBUG_KEY := Key.KEY_D
 const TOGGLE_INSPECT_KEY := Key.KEY_I

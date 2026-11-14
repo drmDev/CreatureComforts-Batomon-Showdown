@@ -13,6 +13,7 @@ var _test_scripts := {
 	"base_hp": preload("test_base_hp.gd"),
 	"tracked_trinkets": preload("test_tracked_trinkets.gd"),
 	"positional_trinkets": preload("test_positional_trinkets.gd"),
+	"trinket_assistant": preload("test_trinket_assistant.gd"),
 	"battle_monitor": preload("test_battle_monitor.gd"),
 	"battle_replay_store": preload("test_battle_replay_store.gd"),
 	"battle_background": preload("test_battle_background.gd"),
