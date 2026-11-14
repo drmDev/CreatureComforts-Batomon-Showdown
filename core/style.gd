@@ -22,6 +22,10 @@ const HIGHLIGHT_COLOR := Color(0.95, 0.61, 0.07, 0.18)  # Current-row tint
 const WATCHLIST_HIGHLIGHT_BORDER := Color("#00d9ff")
 const WATCHLIST_HIGHLIGHT_FILL := Color("#00d9ff1a")
 
+# Watchlist tab indicator: a tiny solid blue dot shown on tabs with tracked
+# entries.
+const TRACKED_DOT_COLOR := Color("#4a9ff5")
+
 # Rarity colors (match the shop rank-odds table)
 const RARITY_COMMON := Color("#c8ccd4")
 const RARITY_UNCOMMON := Color("#7ec850")

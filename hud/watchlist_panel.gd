@@ -12,6 +12,10 @@ const BTN_SIZE := 20
 const LEFT_RATIO := 0.27
 const BOTTOM_OFFSET_RATIO := 0.60
 
+## Tiny tab indicator dot. Must stay at or below the gold Sell Value badge icon
+## (5.25 px) in hud/sell_value_badge.gd.
+const TRACKED_DOT_SIZE := 4.0
+
 const POPUP_WIDTH := 352.0
 const POPUP_HEIGHT := 300.0
 
@@ -63,10 +67,11 @@ var _button: WatchlistButton
 var _popup: Control
 var _panel: PanelContainer
 var _filters_box: VBoxContainer
+var _type_label: Label
 var _type_flow: HFlowContainer
 var _tab := TAB_MONSTER
 var _tab_buttons: Array = []
-var _rarity_filter := ""
+var _rarity_filters := {TAB_MONSTER: "", TAB_ITEM: ""}
 var _type_filter := ""
 var _rarity_buttons: Array = []
 var _type_buttons: Array = []
@@ -263,8 +268,19 @@ func _build_ui() -> void:
 		_apply_font(b, BODY_FONT_SIZE)
 		Style.compact_button(b)
 		b.pressed.connect(_on_tab_pressed.bind(tab))
+		var dot := TrackedDot.new()
+		dot.visible = false
+		b.add_child(dot)
+		dot.anchor_left = 1.0
+		dot.anchor_right = 1.0
+		dot.anchor_top = 0.0
+		dot.anchor_bottom = 0.0
+		dot.offset_left = -TRACKED_DOT_SIZE
+		dot.offset_right = 0.0
+		dot.offset_top = 0.0
+		dot.offset_bottom = TRACKED_DOT_SIZE
 		tab_row.add_child(b)
-		_tab_buttons.append({"button": b, "tab": tab})
+		_tab_buttons.append({"button": b, "tab": tab, "dot": dot})
 
 	# Region dropdown, visually distinct from the tab toggles.
 	var spacer := Control.new()
@@ -303,10 +319,10 @@ func _build_ui() -> void:
 		var rarity := str(RARITY_BY_TIER[tier])
 		_add_filter_button(rarity_flow, rarity, rarity, _rarity_buttons, _on_rarity_pressed, RARITY_COLORS.get(rarity, Color.TRANSPARENT))
 
-	var type_label := Label.new()
-	type_label.text = "Type"
-	_apply_font(type_label, BODY_FONT_SIZE)
-	_filters_box.add_child(type_label)
+	_type_label = Label.new()
+	_type_label.text = "Type"
+	_apply_font(_type_label, BODY_FONT_SIZE)
+	_filters_box.add_child(_type_label)
 	_type_flow = HFlowContainer.new()
 	_type_flow.add_theme_constant_override("h_separation", 1)
 	_type_flow.add_theme_constant_override("v_separation", 1)
@@ -344,10 +360,11 @@ func _build_ui() -> void:
 	# Initial state: Batomon tab, "All" filters.
 	_sync_tab_buttons()
 	_sync_tab_visibility()
-	_sync_filter_buttons(_rarity_buttons, _rarity_filter)
+	_sync_filter_buttons(_rarity_buttons, _rarity_filter_for(_tab))
 	_sync_filter_buttons(_type_buttons, _type_filter)
 	_sync_tracked_only_state()
 	_update_action_buttons()
+	_update_tab_indicators()
 
 
 ## Tools sitting directly above the list: the actions group (Snapshot Team,
@@ -471,6 +488,10 @@ func _sync_filter_buttons(buttons: Array, selected: String) -> void:
 		entry["button"].button_pressed = (entry["value"] == selected)
 
 
+func _rarity_filter_for(tab: String) -> String:
+	return str(_rarity_filters.get(tab, ""))
+
+
 func _sync_tab_buttons() -> void:
 	for entry in _tab_buttons:
 		entry["button"].button_pressed = (entry["tab"] == _tab)
@@ -479,7 +500,10 @@ func _sync_tab_buttons() -> void:
 ## Controls that only apply to the Batomon tab.
 func _sync_tab_visibility() -> void:
 	var monster_tab := (_tab == TAB_MONSTER)
-	_filters_box.visible = monster_tab
+	# Rarity applies to both tabs; Type is Batomon-only.
+	_filters_box.visible = true
+	_type_label.visible = monster_tab
+	_type_flow.visible = monster_tab
 	_snapshot_button.visible = monster_tab
 
 
@@ -523,6 +547,7 @@ func _toggle_popup() -> void:
 		_ensure_catalog()
 		_position_panel()
 		_sync_player_region()
+		_update_tab_indicators()
 		if _rows_dirty:
 			_rebuild_rows()
 	else:
@@ -561,6 +586,8 @@ func _on_tab_pressed(tab: String) -> void:
 	_tab = tab
 	_sync_tab_buttons()
 	_sync_tab_visibility()
+	# Each tab keeps its own rarity filter; reflect the newly active one.
+	_sync_filter_buttons(_rarity_buttons, _rarity_filter_for(_tab))
 	_rebuild_rows()
 
 
@@ -621,13 +648,14 @@ static func toggled_filter_value(current: String, value: String) -> String:
 func _on_rarity_pressed(value: String) -> void:
 	var was_tracked_only := _tracked_only
 	_exit_tracked_only()
-	var next := toggled_filter_value(_rarity_filter, value)
+	var current := _rarity_filter_for(_tab)
+	var next := toggled_filter_value(current, value)
 	# Re-clicking the active filter (or "All" while it is active) changes
 	# nothing, so only the button state needs re-syncing.
 	_sync_filter_buttons(_rarity_buttons, next)
-	if next == _rarity_filter and not was_tracked_only:
+	if next == current and not was_tracked_only:
 		return
-	_rarity_filter = next
+	_rarity_filters[_tab] = next
 	_rebuild_rows()
 
 
@@ -726,6 +754,19 @@ func _update_tracked_count() -> void:
 	if _tracked_count_label != null:
 		_tracked_count_label.text = "%d tracked" % selection.get(_tab, {}).size()
 	_update_action_buttons()
+	_update_tab_indicators()
+
+
+## True when `tab` has at least one tracked entry; drives the blue tab dot.
+func _tab_has_tracked(tab: String) -> bool:
+	return not selection.get(tab, {}).is_empty()
+
+
+func _update_tab_indicators() -> void:
+	for entry in _tab_buttons:
+		var dot = entry.get("dot")
+		if dot != null:
+			dot.visible = _tab_has_tracked(entry["tab"])
 
 
 ## Save and Clear are only meaningful with something tracked. Counts both tabs,
@@ -1082,6 +1123,8 @@ func _rebuild_rows() -> void:
 				continue
 		elif _tab == TAB_MONSTER and not _passes_monster_filters(entry):
 			continue
+		elif _tab == TAB_ITEM and not _passes_item_filters(entry):
+			continue
 		entries.append(entry)
 	sort_entries(entries, _sort_mode, _sort_descending)
 	var added := 0
@@ -1199,11 +1242,22 @@ func _add_entry_row(entry: Dictionary, index: int, watched: bool) -> void:
 	_rows_box.add_child(row)
 
 
+func _passes_rarity_filter(entry: Dictionary) -> bool:
+	var filter := _rarity_filter_for(_tab)
+	if filter.is_empty():
+		return true
+	var rarity: String = RARITY_BY_TIER.get(int(entry.get("tier", 0)), "")
+	return rarity == filter
+
+
+func _passes_item_filters(entry: Dictionary) -> bool:
+	# Items carry no Type or Region data, so only Rarity applies.
+	return _passes_rarity_filter(entry)
+
+
 func _passes_monster_filters(entry: Dictionary) -> bool:
-	if not _rarity_filter.is_empty():
-		var rarity: String = RARITY_BY_TIER.get(int(entry.get("tier", 0)), "")
-		if rarity != _rarity_filter:
-			return false
+	if not _passes_rarity_filter(entry):
+		return false
 	if not _type_filter.is_empty():
 		var types: Array = entry.get("types", [])
 		if not types.has(_type_filter):
@@ -1231,6 +1285,7 @@ func _on_entry_toggled(on: bool, kind: String, key: String) -> void:
 		bucket.erase(key)
 	selection[kind] = bucket
 	_save_selection()
+	_update_tab_indicators()
 	if _tracked_only:
 		# Visible rows and the count both follow the selection; deferred so the row
 		# that emitted this signal can be freed safely.
@@ -1331,3 +1386,23 @@ class WatchlistButton extends Control:
 			if on_press.is_valid():
 				on_press.call()
 			accept_event()
+
+
+## Tiny solid blue dot marking a tab that has tracked entries. It is a child of
+## the tab Button, so it follows the button rect without altering its minimum
+## size; MOUSE_FILTER_IGNORE keeps it from intercepting the tab click.
+class TrackedDot extends Control:
+	const Style = preload("../core/style.gd")
+	const COLOR := Style.TRACKED_DOT_COLOR
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		focus_mode = Control.FOCUS_NONE
+		z_index = 2
+		resized.connect(func(): queue_redraw())
+
+	func _draw() -> void:
+		var radius := minf(size.x, size.y) * 0.5
+		if radius <= 0.0:
+			return
+		draw_circle(size * 0.5, radius, COLOR)

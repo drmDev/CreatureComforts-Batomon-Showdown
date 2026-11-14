@@ -105,7 +105,7 @@ func test_regions_for_species_falls_back_to_sets() -> void:
 
 func test_rarity_and_type_filters() -> void:
 	var panel = WatchlistPanel.new()
-	panel._rarity_filter = "Rare"
+	panel._rarity_filters[WatchlistPanel.TAB_MONSTER] = "Rare"
 	panel._type_filter = "Fire"
 	var entry := {"tier": 3, "types": ["Fire"], "regions": []}
 	assert_true(panel._passes_monster_filters(entry))
@@ -129,6 +129,39 @@ func test_toggled_filter_value() -> void:
 	assert_eq(WatchlistPanel.toggled_filter_value("Fire", "Fire"), "")
 	assert_eq(WatchlistPanel.toggled_filter_value("Fire", "Water"), "Water")
 	assert_eq(WatchlistPanel.toggled_filter_value("", ""), "")
+
+
+func test_item_rarity_filter() -> void:
+	var panel = WatchlistPanel.new()
+	panel._tab = WatchlistPanel.TAB_ITEM
+	panel._rarity_filters[WatchlistPanel.TAB_ITEM] = "Rare"
+	var entry := {"kind": "item", "tier": 3}
+	assert_true(panel._passes_item_filters(entry))
+	entry["tier"] = 2
+	assert_false(panel._passes_item_filters(entry))
+	panel._rarity_filters[WatchlistPanel.TAB_ITEM] = ""
+	assert_true(panel._passes_item_filters(entry))
+	panel.free()
+
+
+func test_rarity_filters_are_independent_per_tab() -> void:
+	var panel = WatchlistPanel.new()
+	panel._rarity_filters[WatchlistPanel.TAB_MONSTER] = "Rare"
+	panel._rarity_filters[WatchlistPanel.TAB_ITEM] = "Common"
+	assert_eq(panel._rarity_filter_for(WatchlistPanel.TAB_MONSTER), "Rare")
+	assert_eq(panel._rarity_filter_for(WatchlistPanel.TAB_ITEM), "Common")
+	panel.free()
+
+
+func test_tab_has_tracked() -> void:
+	var panel = WatchlistPanel.new()
+	panel.selection = {"monster": {"monster.name.cairnage": true}, "item": {}}
+	assert_true(panel._tab_has_tracked(WatchlistPanel.TAB_MONSTER))
+	assert_false(panel._tab_has_tracked(WatchlistPanel.TAB_ITEM))
+	var item_bucket: Dictionary = panel.selection["item"]
+	item_bucket["black_sludge"] = true
+	assert_true(panel._tab_has_tracked(WatchlistPanel.TAB_ITEM))
+	panel.free()
 
 
 func test_sort_entries_by_name() -> void:

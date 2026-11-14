@@ -7,7 +7,9 @@ Creature Comforts adds helpful reminders, shop planning tools, combat statistics
 
 ### Watchlist & Shop Highlighting
 Track Batomon and items you're looking for, with automatic highlighting in the shop.
-- Filter by rarity, type, and region.
+- Filter Batomon by rarity, type, and region.
+- Filter items by rarity.
+- Tab buttons show a blue dot when they contain tracked entries.
 - Sort by name or rarity.
 - Add your current team to the Watchlist.
 - Save, load, and manage builds.

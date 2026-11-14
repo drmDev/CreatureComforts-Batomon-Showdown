@@ -53,6 +53,12 @@ func test_watchlist_highlight_is_cyan_and_distinct() -> void:
 	assert_eq(Style.WATCHLIST_HIGHLIGHT_FILL.b, Style.WATCHLIST_HIGHLIGHT_BORDER.b)
 
 
+func test_tracked_dot_color_is_blue_and_distinct() -> void:
+	assert_eq(Style.TRACKED_DOT_COLOR, Color("#4a9ff5"))
+	assert_ne(Style.TRACKED_DOT_COLOR, Style.BORDER_COLOR)
+	assert_ne(Style.TRACKED_DOT_COLOR, Style.WATCHLIST_HIGHLIGHT_BORDER)
+
+
 func test_save_palette_is_muted_green_and_distinct() -> void:
 	# Save mirrors Snapshot Team's action treatment but must not be mistaken for it.
 	assert_eq(Style.SAVE_BG, Color("#376B4B"))
