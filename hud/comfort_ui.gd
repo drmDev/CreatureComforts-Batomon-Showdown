@@ -24,6 +24,7 @@ const BattleElapsedPanel = preload("battle_elapsed_panel.gd")
 const OpponentPanel = preload("opponent_panel.gd")
 const CombatStatsPanel = preload("combat_stats_panel.gd")
 const ReplayButton = preload("replay_button.gd")
+const ShopButtonBar = preload("../core/shop_button_bar.gd")
 
 var reminder_layer: CanvasLayer = null
 var player_hud_layer: CanvasLayer = null
@@ -49,6 +50,7 @@ var _rank_odds_popup_open := false
 var _base_hp_popup_open := false
 var _replay_available := false
 var _replay_active := false
+var _replay_button_host_id := 0
 
 
 func setup(context) -> void:
@@ -114,14 +116,10 @@ func _build_reminder_layer() -> void:
 	watchlist_panel.setup(_context.formatter, _context.sounds_enabled, _context.mod_volume)
 	reminder_layer.add_child(watchlist_panel)
 
-	# Replay Last Battle: shop-gated like the other HUD buttons. The controller
-	# owns the read-only battle overlay; this button only asks for it.
-	replay_button = ReplayButton.new()
-	replay_button.name = "ReplayButton"
-	replay_button.setup_sound(_context.sounds_enabled, _context.mod_volume)
-	replay_button.log_line.connect(_on_panel_log_line)
-	replay_button.pressed.connect(func(): replay_requested.emit())
-	reminder_layer.add_child(replay_button)
+	# Replay Last Battle is created on demand and attached to the game's shop
+	# HudButtons bar (see attach_to_shop_view) so the game owns its layout and
+	# visibility. The controller owns the read-only battle overlay; this button
+	# only asks for it.
 
 
 ## Shop highlighting and the watchlist button share one setting: highlights are
@@ -243,8 +241,6 @@ func hide_shop_panels() -> void:
 		base_hp_panel.hide_panel()
 	if watchlist_panel != null:
 		watchlist_panel.close_popup()
-	if replay_button != null:
-		replay_button.hide_panel()
 
 
 ## Close any open shop modal when the shop becomes interactive again.
@@ -255,19 +251,90 @@ func reset_shop_popups_for_shop() -> void:
 		base_hp_panel.reset_for_shop()
 
 
-## Update the Replay Last Battle button. The shop controller calls this on every
-## shop poll. The button is always shown in the shop while the feature is on
-## (dimmed until a battle has been captured), and is hidden by the shop overlay
-## gate and by an open modal.
-func update_replay_button(available: bool) -> void:
-	_replay_available = available
+## Attach the replay button to the game's shop HudButtons bar. The bar is a
+## fresh node on every shop entry, so its instance id is tracked and the button
+## is rebuilt whenever the bar changes. Mirrors Brain Rot's shop button attach
+## (name-sorted insertion and idempotent bar widening) so the two mods coexist.
+func attach_to_shop_view(view) -> void:
+	var hud_buttons = _get_shop_hud_buttons(view)
+	if hud_buttons == null:
+		if _replay_button_alive():
+			_detach_replay_button()
+			_replay_log("detached (no HudButtons)")
+		return
+	var host_id: int = hud_buttons.get_instance_id()
+	if _replay_button_alive() and _replay_button_host_id == host_id:
+		return
+	_detach_replay_button()
+	replay_button = _make_replay_button()
 	if replay_button == null:
 		return
-	if _rank_odds_popup_open or _base_hp_popup_open:
-		replay_button.hide_panel()
+	hud_buttons.add_child(replay_button)
+	_insert_replay_button(hud_buttons)
+	_replay_button_host_id = host_id
+	_widen_hud_buttons(hud_buttons)
+	replay_button.set_available(_replay_available)
+	_replay_log("attached")
+
+
+func _get_shop_hud_buttons(view):
+	if not is_instance_valid(view):
+		return null
+	return view.get_node_or_null("HudButtons")
+
+
+func _replay_button_alive() -> bool:
+	return replay_button != null and is_instance_valid(replay_button)
+
+
+func _make_replay_button():
+	var button = ReplayButton.new()
+	button.setup_sound(_context.sounds_enabled, _context.mod_volume)
+	button.log_line.connect(_on_panel_log_line)
+	button.replay_pressed.connect(func(): replay_requested.emit())
+	return button
+
+
+func _detach_replay_button() -> void:
+	if _replay_button_alive():
+		replay_button.free()
+	replay_button = null
+	_replay_button_host_id = 0
+
+
+func _insert_replay_button(hud_buttons) -> void:
+	var names: Array = []
+	for i in range(hud_buttons.get_child_count()):
+		var child = hud_buttons.get_child(i)
+		if child == replay_button:
+			continue
+		names.append(str(child.name))
+	var index: int = ShopButtonBar.sorted_insert_index(names, str(replay_button.name))
+	hud_buttons.move_child(replay_button, index)
+
+
+func _widen_hud_buttons(hud_buttons) -> void:
+	var widths: Array = []
+	for i in range(hud_buttons.get_child_count()):
+		var child = hud_buttons.get_child(i)
+		widths.append(child.get_combined_minimum_size().x if child is Control else 0.0)
+	var separation := float(hud_buttons.get_theme_constant("separation"))
+	hud_buttons.offset_left = ShopButtonBar.widened_left_offset(widths, separation, hud_buttons.offset_right)
+
+
+func _replay_log(detail: String) -> void:
+	_on_panel_log_line("REPLAY | " + detail)
+
+
+## Update the Replay Last Battle button. The shop controller calls this on every
+## shop poll with the current view. The button's visibility is owned by the
+## game's HudButtons bar; the mod only sets its availability (dimming).
+func update_replay_button(view, available: bool) -> void:
+	_replay_available = available
+	attach_to_shop_view(view)
+	if not _replay_button_alive():
 		return
 	replay_button.set_available(available)
-	replay_button.show_button()
 
 
 func update_shop_income(income: int) -> void:
@@ -485,7 +552,7 @@ func _on_shop_modal_visibility_changed(open: bool, modal) -> void:
 	if not open:
 		_restore_shop_buttons()
 		return
-	for panel in [rank_odds_panel, base_hp_panel, watchlist_panel, replay_button]:
+	for panel in [rank_odds_panel, base_hp_panel, watchlist_panel]:
 		if panel != null and panel != modal:
 			panel.visible = false
 
@@ -504,9 +571,8 @@ func _restore_shop_buttons(watchlist_override = null) -> void:
 		if watchlist_override == null:
 			watchlist_override = _context.feature_enabled(ModConfig.KEY_SHOP_HIGHLIGHTS)
 		watchlist_panel.visible = bool(watchlist_override)
-	if replay_button != null:
+	if _replay_button_alive():
 		replay_button.set_available(_replay_available)
-		replay_button.show_button()
 
 
 func _on_trinket_panel_layout_debug(message: String) -> void:

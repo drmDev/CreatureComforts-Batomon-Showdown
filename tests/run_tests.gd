@@ -32,6 +32,7 @@ var _test_scripts := {
 	"sell_value": preload("test_sell_value.gd"),
 	"auto_updater": preload("test_auto_updater.gd"),
 	"rank_odds": preload("test_rank_odds.gd"),
+	"shop_button_bar": preload("test_shop_button_bar.gd"),
 }
 
 

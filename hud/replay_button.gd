@@ -1,16 +1,21 @@
-extends "shop_modal_panel.gd"
+extends Button
 ## Shop button that replays the last battle in a read-only overlay.
 ##
-## Reuses the shared HUD box, icon loader, and viewport anchoring from
-## shop_modal_panel.gd, but overrides the press hook so it acts instead of
-## opening a modal.
+## Attached to the game's shop HudButtons bar (see comfort_ui.gd) instead of
+## being drawn at a viewport fraction, so the game keeps owning layout,
+## visibility, and input. The button is dimmed until a battle has been captured.
 
-signal pressed
+signal log_line(message: String)
+## Emitted only when the button is available and actually pressed. The native
+## Button.pressed signal fires on every click, so this custom signal gates the
+## replay request behind the availability state.
+signal replay_pressed
 
+const Style = preload("../core/style.gd")
+const PanelIcons = preload("panel_icons.gd")
 const UiSound = preload("../core/ui_sound.gd")
 
-const RIGHT_RATIO := 0.80
-const TOP_RATIO := 0.05
+const ICON_FILE := "replay.png"
 
 const TOOLTIP_READY := "Replay last battle"
 const TOOLTIP_EMPTY := "Replay last battle (fight a battle first)"
@@ -21,9 +26,16 @@ var _available := false
 
 
 func _init() -> void:
-	super()
+	name = "CreatureComfortsReplayButton"
 	tooltip_text = TOOLTIP_EMPTY
 	modulate = Color(1.0, 1.0, 1.0, DIMMED_ALPHA)
+	focus_mode = Control.FOCUS_NONE
+	custom_minimum_size = Vector2(24, 24)
+	size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	expand_icon = true
+	icon = _load_icon()
+	Style.compact_button(self)
+	pressed.connect(_on_pressed)
 
 
 ## The button is always shown in the shop so it can be found; it is dimmed and
@@ -34,7 +46,6 @@ func set_available(available: bool) -> void:
 	_available = available
 	tooltip_text = TOOLTIP_READY if available else TOOLTIP_EMPTY
 	modulate = Color(1.0, 1.0, 1.0, 1.0 if available else DIMMED_ALPHA)
-	queue_redraw()
 
 
 ## Wire the optional click sound. The callables are the same gates the rest of
@@ -44,29 +55,14 @@ func setup_sound(enabled: Callable, volume: Callable) -> void:
 	_click.setup(self, "click.ogg", enabled, volume)
 
 
-func show_button() -> void:
-	_ensure_visible()
-
-
-func _button_texture_path() -> String:
-	return "../assets/icons/replay.png"
-
-
-func _button_position(viewport_size: Vector2) -> Vector2:
-	var half := _button_size() * 0.5
-	return Vector2(
-		roundf(viewport_size.x * RIGHT_RATIO - half),
-		roundf(viewport_size.y * TOP_RATIO - half))
-
-
-func _log_label() -> String:
-	return "REPLAY"
-
-
-func _on_button_pressed() -> void:
+func _on_pressed() -> void:
 	if not _available:
 		return
 	if _click != null:
 		_click.play()
-	_emit_log("button pressed")
-	pressed.emit()
+	log_line.emit("REPLAY | button pressed")
+	replay_pressed.emit()
+
+
+func _load_icon() -> Texture2D:
+	return PanelIcons.load_icon(str(get_script().resource_path), ICON_FILE)

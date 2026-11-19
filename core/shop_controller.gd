@@ -119,7 +119,7 @@ func handle(state, phase_changed: bool) -> bool:
 	var gate_allowed: bool = _shop_overlay_gate == null or _shop_overlay_gate.is_allowed()
 	_ui.update_sell_values(view, gate_allowed)
 	if _has_replay.is_valid():
-		_ui.update_replay_button(bool(_has_replay.call()))
+		_ui.update_replay_button(view, bool(_has_replay.call()))
 
 	_last_snapshot = current_snapshot
 	return true

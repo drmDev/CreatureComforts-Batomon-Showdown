@@ -97,8 +97,8 @@ const TIMINGS := ["passive", "permanent"]
 
 ## Display labels for each effect timing, used by the panel's right-aligned tag.
 const TAG_LABELS := {
-	"permanent": "Battle Start",
-	"passive": "Passive",
+	"permanent": "Permanent",
+	"passive": "Temporary",
 }
 
 ## The summary is only shown once the player holds at least this many trinkets.

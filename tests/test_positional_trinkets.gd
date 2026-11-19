@@ -167,8 +167,8 @@ func test_ordered_effects_empty_section() -> void:
 
 
 func test_tag_labels_map_timings() -> void:
-	assert_eq(PositionalTrinkets.TAG_LABELS["permanent"], "Battle Start")
-	assert_eq(PositionalTrinkets.TAG_LABELS["passive"], "Passive")
+	assert_eq(PositionalTrinkets.TAG_LABELS["permanent"], "Permanent")
+	assert_eq(PositionalTrinkets.TAG_LABELS["passive"], "Temporary")
 
 
 func test_format_effect_percent() -> void:
