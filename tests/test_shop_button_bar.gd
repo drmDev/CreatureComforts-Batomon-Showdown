@@ -33,3 +33,7 @@ func test_widened_left_offset_single() -> void:
 func test_widened_left_offset_three() -> void:
 	# 24 + 4 + 24 + 4 + 24 = 80
 	assert_eq(ShopButtonBar.widened_left_offset([24.0, 24.0, 24.0], 4.0, 636.0), 556.0)
+
+
+func test_insert_on_left() -> void:
+	assert_eq(ShopButtonBar.insert_on_left(-196.0, 20.0, 1.0), -217.0)

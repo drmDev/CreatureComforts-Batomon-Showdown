@@ -34,3 +34,9 @@ static func widened_left_offset(child_min_widths: Array, separation: float, righ
 		if i > 0:
 			total += separation
 	return right_edge - total
+
+
+## Left offset after inserting a child of `added_width` at the front of a panel
+## whose right edge stays fixed, with `separation` before the existing content.
+static func insert_on_left(base_left: float, added_width: float, separation: float) -> float:
+	return base_left - added_width - separation

@@ -3,8 +3,6 @@ extends "table_modal_panel.gd"
 
 const TrinketIcons = preload("../core/trinket_icons.gd")
 
-const LEFT_MARGIN := 100.0
-const BOTTOM_OFFSET_RATIO := 0.20  # Button bottom sits 20% of the viewport height above the bottom
 
 const COLUMN_FRACTIONS := [0.12, 0.16, 0.18, 0.14, 0.20, 0.20]
 const HEADER_LABELS := ["Rank", "Common", "Uncommon", "Rare", "Super Rare", "Legendary"]
@@ -63,6 +61,11 @@ var _held_trinket_ids: Array = []
 var _trinket_icons_provider = null
 
 
+func _init() -> void:
+	super()
+	use_external_button()
+
+
 func set_rank(rank: int, held_trinket_ids = []) -> void:
 	_rank = clampi(rank, 1, 14)
 	_held_trinket_ids = []
@@ -74,11 +77,6 @@ func set_rank(rank: int, held_trinket_ids = []) -> void:
 
 func _button_texture_path() -> String:
 	return "../assets/icons/rankChart.png"
-
-
-func _button_position(viewport_size: Vector2) -> Vector2:
-	var button := _button_size()
-	return Vector2(LEFT_MARGIN, roundf(viewport_size.y * (1.0 - BOTTOM_OFFSET_RATIO) - button))
 
 
 func _popup_title() -> String:

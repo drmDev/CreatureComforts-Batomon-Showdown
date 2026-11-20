@@ -37,6 +37,7 @@ var rank_odds_panel = null
 var base_hp_panel = null
 var watchlist_panel = null
 var replay_button = null
+var rank_odds_button = null
 var trinket_panel = null
 var player_hud = null
 var battle_elapsed_panel = null
@@ -51,6 +52,8 @@ var _base_hp_popup_open := false
 var _replay_available := false
 var _replay_active := false
 var _replay_button_host_id := 0
+var _rank_odds_button_host_id := 0
+var _rank_odds_button_extra := 0.0
 
 
 func setup(context) -> void:
@@ -241,6 +244,7 @@ func hide_shop_panels() -> void:
 		base_hp_panel.hide_panel()
 	if watchlist_panel != null:
 		watchlist_panel.close_popup()
+	_detach_rank_odds_button()
 
 
 ## Close any open shop modal when the shop becomes interactive again.
@@ -358,14 +362,79 @@ func update_sell_values(view, allowed: bool = true) -> void:
 	sell_value_indicators.update_team(view)
 
 
-func update_rank_odds(rank: int, held_trinket_ids = []) -> void:
+## Attach the rank odds icon to the game's RankUI panel. The icon becomes the
+## first child of the panel's HBoxContainer and the panel extends leftward by
+## the icon width plus separation, so the game's odds text stays in place.
+func _attach_rank_odds_button(view) -> void:
+	if rank_odds_panel == null:
+		return
+	var rank_ui = _get_shop_rank_ui(view)
+	var hbox = _get_rank_ui_hbox(rank_ui)
+	if hbox == null:
+		if _rank_odds_button_alive():
+			_detach_rank_odds_button()
+			_rank_odds_log("detached (no RankUI)")
+		return
+	var host_id: int = rank_ui.get_instance_id()
+	if _rank_odds_button_alive() and _rank_odds_button_host_id == host_id:
+		return
+	_detach_rank_odds_button()
+	rank_odds_button = rank_odds_panel.make_external_button()
+	if rank_odds_button == null:
+		return
+	rank_odds_button.name = "CreatureComfortsRankOddsButton"
+	rank_odds_button.tooltip_text = "Preview shop rank odds"
+	hbox.add_child(rank_odds_button)
+	hbox.move_child(rank_odds_button, 0)
+	_rank_odds_button_host_id = host_id
+	var separation := float(hbox.get_theme_constant("separation"))
+	var added_width: float = rank_odds_button.get_combined_minimum_size().x
+	_rank_odds_button_extra = added_width + separation
+	rank_ui.offset_left = ShopButtonBar.insert_on_left(rank_ui.offset_left, added_width, separation)
+	_rank_odds_log("attached")
+
+
+func _get_shop_rank_ui(view):
+	if not is_instance_valid(view):
+		return null
+	return view.get_node_or_null("RankUI")
+
+
+func _get_rank_ui_hbox(rank_ui):
+	if not is_instance_valid(rank_ui):
+		return null
+	return rank_ui.get_node_or_null("HBoxContainer")
+
+
+func _rank_odds_button_alive() -> bool:
+	return rank_odds_button != null and is_instance_valid(rank_odds_button)
+
+
+func _detach_rank_odds_button() -> void:
+	if _rank_odds_button_alive():
+		var parent = rank_odds_button.get_parent()
+		if is_instance_valid(parent):
+			var grandparent = parent.get_parent()
+			if is_instance_valid(grandparent) and grandparent.get_instance_id() == _rank_odds_button_host_id:
+				grandparent.offset_left += _rank_odds_button_extra
+		rank_odds_button.free()
+	rank_odds_button = null
+	_rank_odds_button_host_id = 0
+	_rank_odds_button_extra = 0.0
+
+
+func _rank_odds_log(detail: String) -> void:
+	_on_panel_log_line("RANK ODDS | " + detail)
+
+
+func update_rank_odds(view, rank: int, held_trinket_ids = []) -> void:
 	if rank_odds_panel == null:
 		return
 	if not _context.feature_enabled(ModConfig.KEY_RANK_ODDS_PREVIEW):
 		rank_odds_panel.hide_panel()
+		_detach_rank_odds_button()
 		return
-	if _base_hp_popup_open:
-		return
+	_attach_rank_odds_button(view)
 	rank_odds_panel.set_rank(rank, held_trinket_ids)
 
 
@@ -524,6 +593,7 @@ func on_feature_toggled(key: String, value: bool) -> void:
 	elif key == ModConfig.KEY_RANK_ODDS_PREVIEW:
 		if rank_odds_panel != null:
 			rank_odds_panel.hide_panel()
+		_detach_rank_odds_button()
 	elif key == ModConfig.KEY_BASE_HP_CHART:
 		if base_hp_panel != null:
 			base_hp_panel.hide_panel()

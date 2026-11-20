@@ -23,6 +23,7 @@ const HEADER_BG := Style.HEADER_BG
 const DIM_COLOR := Style.DIM_COLOR
 
 var _popup_open := false
+var _external_button := false
 var _button_screen_pos := Vector2.ZERO
 
 var _button_texture: Texture2D = null
@@ -105,6 +106,33 @@ func _on_button_pressed() -> void:
 	_open_popup()
 
 
+## Use a plain Button hosted by the game's own scene instead of drawing one
+## here. The popup stays on this control; only the button moves out.
+func use_external_button() -> void:
+	_external_button = true
+	_anchor()
+
+
+## Build a plain Button matching this panel's icon/style for a caller to insert
+## into a game container. Its `pressed` signal opens this panel's popup.
+func make_external_button() -> Button:
+	var button := Button.new()
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(_button_size(), _button_size())
+	button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	button.expand_icon = true
+	if _button_texture != null:
+		button.icon = _button_texture
+	Style.compact_button(button)
+	button.pressed.connect(_on_button_pressed)
+	return button
+
+
+## Open the popup programmatically (used by an external button).
+func open_popup() -> void:
+	_open_popup()
+
+
 # --- Lifecycle ----------------------------------------------------------------------------------
 
 ## Called by subclass setters after updating their state.
@@ -154,6 +182,9 @@ func _anchor() -> void:
 	if _popup_open:
 		position = Vector2.ZERO
 		size = viewport_size
+	elif _external_button:
+		position = Vector2.ZERO
+		size = Vector2.ZERO
 	else:
 		position = _button_screen_pos
 		size = Vector2(_button_size(), _button_size())
@@ -225,7 +256,8 @@ func _draw() -> void:
 		return
 	if _popup_open:
 		_draw_popup()
-	_draw_button()
+	if not _external_button:
+		_draw_button()
 
 
 func _draw_button() -> void:
@@ -266,7 +298,7 @@ func _gui_input(event) -> void:
 			elif not _popup_rect().has_point(event.position):
 				_close_popup()  # Clicking the icon again or outside closes
 			accept_event()
-		elif _button_rect().has_point(event.position):
+		elif not _external_button and _button_rect().has_point(event.position):
 			_on_button_pressed()
 			accept_event()
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE and _popup_open:

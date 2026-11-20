@@ -112,10 +112,10 @@ func handle(state, phase_changed: bool) -> bool:
 	_trinket_reminders.update(run, _shop_overlay_gate)
 	_positional_trinkets.update(run)
 	var held_trinkets = run.get("trinket_ids") if NodeUtils.has_property(run, "trinket_ids") else []
-	_ui.update_rank_odds(int(run.get("shop_rank")) if NodeUtils.has_property(run, "shop_rank") else 1, held_trinkets if held_trinkets != null else [])
+	var view = state.get("view") if NodeUtils.has_property(state, "view") else null
+	_ui.update_rank_odds(view, int(run.get("shop_rank")) if NodeUtils.has_property(run, "shop_rank") else 1, held_trinkets if held_trinkets != null else [])
 	var total_hp := int(run.get("player_hp")) if NodeUtils.has_property(run, "player_hp") else 0
 	_ui.update_base_hp(current_day, total_hp)
-	var view = state.get("view") if NodeUtils.has_property(state, "view") else null
 	var gate_allowed: bool = _shop_overlay_gate == null or _shop_overlay_gate.is_allowed()
 	_ui.update_sell_values(view, gate_allowed)
 	if _has_replay.is_valid():
