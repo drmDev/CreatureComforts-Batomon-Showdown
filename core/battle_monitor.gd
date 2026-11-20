@@ -12,19 +12,22 @@ const RESULT_DRAW := "DRAW"
 const RESULT_UNKNOWN := "UNKNOWN"
 
 
-## True when the battle state's simulation reports battle_over.
-static func is_over(state) -> bool:
+## simulation.data of a battle state, or null when unavailable.
+static func battle_data(state):
 	if not NodeUtils.has_property(state, "simulation"):
-		return false
+		return null
 	var sim = state.get("simulation")
 	if sim == null or not is_instance_valid(sim):
-		return false
+		return null
 	if not NodeUtils.has_property(sim, "data"):
-		return false
-	var data = sim.get("data")
-	if data == null:
-		return false
-	return bool(data.get("battle_over"))
+		return null
+	return sim.get("data")
+
+
+## True when the battle state's simulation reports battle_over.
+static func is_over(state) -> bool:
+	var data = battle_data(state)
+	return data != null and bool(data.get("battle_over"))
 
 
 ## Classify a finished battle from simulation.data.

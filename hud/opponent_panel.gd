@@ -1,7 +1,7 @@
 extends "comfort_panel.gd"
 ## Bottom-right battle card: the opponent's display name and MMR.
 ##
-## Positioned about 30% up from the bottom of the viewport. Two lines:
+## Positioned just above the enemy trainer badge (bottom-right). Two lines:
 ##   <opponent name>
 ##   MMR: <value>
 ## The panel is battle-only and shares the Battle Status Panel toggle with the

@@ -189,8 +189,7 @@ func _snapshot_meta(state) -> Dictionary:
 func _check_battle_completion(state) -> void:
 	if not _battle_completion.check(state):
 		return
-	var sim = state.get("simulation") if NodeUtils.has_property(state, "simulation") else null
-	var battle_data = sim.get("data") if sim != null and NodeUtils.has_property(sim, "data") else null
+	var battle_data = BattleMonitor.battle_data(state)
 	var info := BattleMonitor.classify(battle_data)
 	# Log the result once per battle; a replay only refreshes the elapsed readout.
 	if _battle_completion.is_first_completion():

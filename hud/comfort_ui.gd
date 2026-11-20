@@ -24,7 +24,6 @@ const OpponentPanel = preload("opponent_panel.gd")
 const CombatStatsPanel = preload("combat_stats_panel.gd")
 const ReplayButton = preload("replay_button.gd")
 const ShopButtonBar = preload("../core/shop_button_bar.gd")
-const OpponentInfo = preload("../core/opponent_info.gd")
 const BattleMonitor = preload("../core/battle_monitor.gd")
 
 const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
@@ -58,6 +57,8 @@ var _replay_available := false
 var _replay_active := false
 var _replay_opponent_name := "?"
 var _replay_opponent_mmr := "-"
+var _replay_elapsed_shown := false
+var _replay_player_hud_shown := false
 var _replay_button_host_id := 0
 var _rank_odds_button_host_id := 0
 var _rank_odds_button_extra := 0.0
@@ -228,10 +229,12 @@ func _track_battle_badges() -> void:
 		_battle_state_id = state_id
 		_player_badge = state.get_node_or_null("BattleView/CanvasLayer/PlayerTrainerBadge")
 		_enemy_badge = state.get_node_or_null("BattleView/CanvasLayer/EnemyTrainerBadge")
+		if _replay_active:
+			_show_replay_opponent()
 	_position_player_anchor()
 	_position_enemy_anchor()
 	if _replay_active:
-		_sync_replay_panels(state)
+		_check_replay_completion(state)
 
 
 func _current_battle_state():
@@ -330,17 +333,28 @@ func _badge_rest_rect(badge):
 
 ## During the mod's replay overlay the phase router is paused (mod_main skips
 ## its poll), so the battle readouts are not driven by the normal controllers.
-## Sync them from the replay battle state here. The real battle is unaffected
-## because this only runs while _replay_active is true.
-func _sync_replay_panels(state) -> void:
+## The opponent card is static for the whole replay, so it is shown once when the
+## replay battle state is first seen.
+func _show_replay_opponent() -> void:
 	show_opponent(_replay_opponent_name, _replay_opponent_mmr)
+
+
+## Per-frame replay completion check. The player HUD is refreshed only until it
+## becomes visible (the battle's is_battle_active flips on a few frames after the
+## state is first seen), and the elapsed readout is shown once when the battle
+## ends. After that this is a cheap battle_over lookup.
+func _check_replay_completion(state) -> void:
+	if _replay_elapsed_shown:
+		return
 	if BattleMonitor.is_over(state):
-		var sim = state.get("simulation") if NodeUtils.has_property(state, "simulation") else null
-		var battle_data = sim.get("data") if sim != null and NodeUtils.has_property(sim, "data") else null
-		show_battle_elapsed(BattleMonitor.format_seconds(BattleMonitor.time_elapsed(battle_data)))
+		_replay_elapsed_shown = true
+		show_battle_elapsed(BattleMonitor.format_seconds(BattleMonitor.time_elapsed(BattleMonitor.battle_data(state))))
 		hide_player_hud()
-	else:
+		return
+	if not _replay_player_hud_shown:
 		update_player_hud(state, true)
+		if player_hud != null and player_hud.visible:
+			_replay_player_hud_shown = true
 
 
 ## Apply the shop overlay gate to the reminder layer. Returns true when the
@@ -374,9 +388,6 @@ func _close_shop_popups() -> void:
 		sell_value_indicators.hide_all()
 
 
-## Hide every mod-owned shop panel while the replay overlay is up. The game's
-## own battle UI is part of the replay; the mod's HUD would otherwise float
-## over it.
 ## Store the opponent name/MMR for the shop replay overlay. The replay's p2
 ## template lacks the MMR fields, so mod_main passes the captured values here.
 func set_replay_opponent(name: String, mmr: String) -> void:
@@ -386,6 +397,8 @@ func set_replay_opponent(name: String, mmr: String) -> void:
 
 func set_replay_active(active: bool) -> void:
 	_replay_active = active
+	_replay_elapsed_shown = false
+	_replay_player_hud_shown = false
 	if reminder_layer != null:
 		reminder_layer.visible = not active
 	# The battle HUD layer stays visible during the mod's replay so the three
