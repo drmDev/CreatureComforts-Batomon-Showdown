@@ -8,7 +8,7 @@
 		{"key": "day_reminders", "label": "Day Reminders", "type": "bool", "default": true,
 		 "description": "Show reminders before important trainer events."},
 		{"key": "trinket_reminders", "label": "Trinket Reminders", "type": "bool", "default": true,
-		 "description": "Show collapsible reminders for timing-sensitive trinkets."},		
+		 "description": "Show collapsible reminders for timing-sensitive trinkets."},
 		{"key": "battle_status_panel", "label": "Battle HUD", "type": "bool", "default": true,
 		 "description": "Show remaining lives, wins, and current day during battles."},
 		{"key": "trinkets_gained_panel", "label": "Trinkets Gained Panel", "type": "bool", "default": true,
