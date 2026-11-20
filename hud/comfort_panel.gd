@@ -49,6 +49,21 @@ func _build_hud_box(radius := 3, border_width := 1) -> StyleBoxFlat:
 	return box
 
 
+## Build a compact icon-only Button at the HUD scale. The caller attaches it to a
+## game node and connects `pressed` itself.
+func _build_icon_button(icon: Texture2D, size: float, vertical_alignment: int, tooltip: String = "") -> Button:
+	var button := Button.new()
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(size, size)
+	button.size_flags_vertical = vertical_alignment
+	button.expand_icon = true
+	button.icon = icon
+	if not tooltip.is_empty():
+		button.tooltip_text = tooltip
+	Style.compact_button(button)
+	return button
+
+
 ## Draw a texture inside `rect` at its natural aspect ratio (contain), centred.
 ## Keeps a wide icon from being stretched into a square button.
 func _draw_texture_fit(tex: Texture2D, rect: Rect2) -> void:

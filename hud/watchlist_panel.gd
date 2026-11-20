@@ -535,34 +535,15 @@ func _ensure_row_styles() -> void:
 ## Build the small shop button that opens the watchlist. comfort_ui.gd attaches
 ## it to the game's active-team HBox; the popup stays on this panel.
 func make_button() -> Button:
-	var button := Button.new()
-	button.focus_mode = Control.FOCUS_NONE
-	button.custom_minimum_size = Vector2(BTN_SIZE, BTN_SIZE)
-	button.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	button.expand_icon = true
-	button.icon = _load_watchlist_icon()
-	button.tooltip_text = "Watchlist"
-	Style.compact_button(button)
+	var button := _build_icon_button(_load_watchlist_icon(), BTN_SIZE, Control.SIZE_SHRINK_BEGIN, "Watchlist")
 	button.pressed.connect(_toggle_popup)
 	return button
 
 
-## The watchlist asset is a tall 54x80 glyph drawn flush to its left edge, so
-## `expand_icon` pushes it against the button's left border. Rebuild it centred
-## in a square canvas so the expanded square glyph stays centred in the button.
+## Centre the watchlist glyph in a square canvas so `expand_icon` keeps it centred
+## inside the button (the raw asset is a tall 54x80 glyph flush to its left edge).
 func _load_watchlist_icon() -> Texture2D:
-	var source := PanelIcons.load_icon(str(get_script().resource_path), "watchlist.png")
-	if source == null:
-		return null
-	var glyph := source.get_image()
-	if glyph == null:
-		return source
-	var side := maxi(glyph.get_width(), glyph.get_height())
-	var square := Image.create(side, side, false, Image.FORMAT_RGBA8)
-	square.fill(Color.TRANSPARENT)
-	var pos := Vector2i((side - glyph.get_width()) / 2, (side - glyph.get_height()) / 2)
-	square.blit_rect(glyph, Rect2i(Vector2i.ZERO, glyph.get_size()), pos)
-	return ImageTexture.create_from_image(square)
+	return PanelIcons.square_icon(str(get_script().resource_path), "watchlist.png")
 
 
 func _toggle_popup() -> void:

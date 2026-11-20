@@ -116,14 +116,7 @@ func use_external_button() -> void:
 ## Build a plain Button matching this panel's icon/style for a caller to insert
 ## into a game container. Its `pressed` signal opens this panel's popup.
 func make_external_button() -> Button:
-	var button := Button.new()
-	button.focus_mode = Control.FOCUS_NONE
-	button.custom_minimum_size = Vector2(_button_size(), _button_size())
-	button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	button.expand_icon = true
-	if _button_texture != null:
-		button.icon = _button_texture
-	Style.compact_button(button)
+	var button := _build_icon_button(_button_texture, _button_size(), Control.SIZE_SHRINK_CENTER)
 	button.pressed.connect(_on_button_pressed)
 	return button
 

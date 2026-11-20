@@ -15,6 +15,11 @@ const BODY_FONT_SIZE := 8
 const HIGHLIGHT_COLOR := Style.HIGHLIGHT_COLOR
 
 
+func _init() -> void:
+	super()
+	use_external_button()
+
+
 # --- Subclass table description -------------------------------------------------
 
 ## Total number of body rows.

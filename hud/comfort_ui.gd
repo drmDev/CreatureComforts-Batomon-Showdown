@@ -272,7 +272,7 @@ func attach_to_shop_view(view) -> void:
 	if hud_buttons == null:
 		if _replay_button_alive():
 			_detach_replay_button()
-			_replay_log("detached (no HudButtons)")
+			_panel_log("REPLAY", "detached (no HudButtons)")
 		return
 	var host_id: int = hud_buttons.get_instance_id()
 	if _replay_button_alive() and _replay_button_host_id == host_id:
@@ -286,7 +286,7 @@ func attach_to_shop_view(view) -> void:
 	_replay_button_host_id = host_id
 	_widen_hud_buttons(hud_buttons)
 	replay_button.set_available(_replay_available)
-	_replay_log("attached")
+	_panel_log("REPLAY", "attached")
 
 
 func _get_shop_hud_buttons(view):
@@ -334,8 +334,8 @@ func _widen_hud_buttons(hud_buttons) -> void:
 	hud_buttons.offset_left = ShopButtonBar.widened_left_offset(widths, separation, hud_buttons.offset_right)
 
 
-func _replay_log(detail: String) -> void:
-	_on_panel_log_line("REPLAY | " + detail)
+func _panel_log(label: String, detail: String) -> void:
+	_on_panel_log_line("%s | %s" % [label, detail])
 
 
 ## Update the Replay Last Battle button. The shop controller calls this on every
@@ -381,7 +381,7 @@ func _attach_rank_odds_button(view) -> void:
 	if hbox == null:
 		if _rank_odds_button_alive():
 			_detach_rank_odds_button()
-			_rank_odds_log("detached (no RankUI)")
+			_panel_log("RANK ODDS", "detached (no RankUI)")
 		return
 	var host_id: int = rank_ui.get_instance_id()
 	if _rank_odds_button_alive() and _rank_odds_button_host_id == host_id:
@@ -399,7 +399,7 @@ func _attach_rank_odds_button(view) -> void:
 	var added_width: float = rank_odds_button.get_combined_minimum_size().x
 	_rank_odds_button_extra = added_width + separation
 	rank_ui.offset_left = ShopButtonBar.insert_on_left(rank_ui.offset_left, added_width, separation)
-	_rank_odds_log("attached")
+	_panel_log("RANK ODDS", "attached")
 
 
 func _get_shop_rank_ui(view):
@@ -431,8 +431,6 @@ func _detach_rank_odds_button() -> void:
 	_rank_odds_button_extra = 0.0
 
 
-func _rank_odds_log(detail: String) -> void:
-	_on_panel_log_line("RANK ODDS | " + detail)
 
 
 func update_rank_odds(view, rank: int, held_trinket_ids = []) -> void:
@@ -465,7 +463,7 @@ func _attach_watchlist_button(view) -> void:
 	if hbox == null:
 		if _watchlist_button_alive():
 			_detach_watchlist_button()
-			_watchlist_log("detached (no team HBox)")
+			_panel_log("WATCHLIST", "detached (no team HBox)")
 		return
 	var host_id: int = hbox.get_instance_id()
 	if _watchlist_button_alive() and _watchlist_button_host_id == host_id:
@@ -483,7 +481,7 @@ func _attach_watchlist_button(view) -> void:
 	_watchlist_button_shift = added * 0.5
 	hbox.offset_left -= _watchlist_button_shift
 	hbox.offset_right -= _watchlist_button_shift
-	_watchlist_log("attached")
+	_panel_log("WATCHLIST", "attached")
 
 
 func _get_team_hbox(view):
@@ -511,8 +509,6 @@ func _detach_watchlist_button() -> void:
 	_watchlist_button_shift = 0.0
 
 
-func _watchlist_log(detail: String) -> void:
-	_on_panel_log_line("WATCHLIST | " + detail)
 
 
 ## Attach the base HP heart icon to the game's trainer HP bar, extending the bar
@@ -524,7 +520,7 @@ func _attach_base_hp_button(view) -> void:
 	if hp_ui == null:
 		if _base_hp_button_alive():
 			_detach_base_hp_button()
-			_base_hp_log("detached (no HpUI)")
+			_panel_log("BASE HP", "detached (no HpUI)")
 		return
 	var host_id: int = hp_ui.get_instance_id()
 	if _base_hp_button_alive() and _base_hp_button_host_id == host_id:
@@ -545,7 +541,7 @@ func _attach_base_hp_button(view) -> void:
 	_base_hp_button_extra = button_size.x + gap
 	hp_ui.offset_right += _base_hp_button_extra
 	base_hp_button.position = Vector2(width + gap, roundf((height - button_size.y) * 0.5))
-	_base_hp_log("attached")
+	_panel_log("BASE HP", "attached")
 
 
 func _get_shop_hp_ui(view):
@@ -569,8 +565,6 @@ func _detach_base_hp_button() -> void:
 	_base_hp_button_extra = 0.0
 
 
-func _base_hp_log(detail: String) -> void:
-	_on_panel_log_line("BASE HP | " + detail)
 
 
 func update_base_hp(view, day: int, total_hp: int) -> void:

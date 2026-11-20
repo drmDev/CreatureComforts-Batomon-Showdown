@@ -61,11 +61,6 @@ var _held_trinket_ids: Array = []
 var _trinket_icons_provider = null
 
 
-func _init() -> void:
-	super()
-	use_external_button()
-
-
 func set_rank(rank: int, held_trinket_ids = []) -> void:
 	_rank = clampi(rank, 1, 14)
 	_held_trinket_ids = []

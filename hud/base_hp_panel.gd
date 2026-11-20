@@ -12,11 +12,6 @@ var _day := 1
 var _bonus := 0
 
 
-func _init() -> void:
-	super()
-	use_external_button()
-
-
 func set_day(day: int, total_hp: int) -> void:
 	_day = maxi(day, 1)
 	_bonus = BaseHp.bonus(total_hp, _day)
