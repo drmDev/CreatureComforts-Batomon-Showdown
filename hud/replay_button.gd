@@ -33,6 +33,9 @@ func _init() -> void:
 	custom_minimum_size = Vector2(24, 24)
 	size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	expand_icon = true
+	# The replay glyph is a tight 46x51 crop of a 60x60 canvas. Pad it (see
+	# _load_icon) so expand_icon keeps it centred with breathing room inside the
+	# 24x24 button.
 	icon = _load_icon()
 	Style.compact_button(self)
 	pressed.connect(_on_pressed)
@@ -65,4 +68,4 @@ func _on_pressed() -> void:
 
 
 func _load_icon() -> Texture2D:
-	return PanelIcons.load_icon(str(get_script().resource_path), ICON_FILE)
+	return PanelIcons.padded_icon(str(get_script().resource_path), ICON_FILE, 6)

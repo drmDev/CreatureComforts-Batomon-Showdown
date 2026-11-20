@@ -45,6 +45,24 @@ static func square_icon(script_path: String, file_name: String) -> Texture2D:
 	return ImageTexture.create_from_image(square)
 
 
+## Like square_icon, but adds `padding` px of transparent margin on every side.
+## Used for glyphs that are already roughly square (e.g. replay) and would
+## otherwise crowd a square button edge-to-edge.
+static func padded_icon(script_path: String, file_name: String, padding: int) -> Texture2D:
+	var tex := load_icon(script_path, file_name)
+	if tex == null:
+		return null
+	var glyph := tex.get_image()
+	if glyph == null:
+		return tex
+	var side := maxi(glyph.get_width(), glyph.get_height()) + padding * 2
+	var square := Image.create(side, side, false, Image.FORMAT_RGBA8)
+	square.fill(Color.TRANSPARENT)
+	var pos := Vector2i((side - glyph.get_width()) / 2, (side - glyph.get_height()) / 2)
+	square.blit_rect(glyph, Rect2i(Vector2i.ZERO, glyph.get_size()), pos)
+	return ImageTexture.create_from_image(square)
+
+
 ## Crop an image to its non-transparent bounding box. Fully transparent or
 ## already tight images are returned unchanged.
 static func _trim_transparent(image: Image) -> Image:
