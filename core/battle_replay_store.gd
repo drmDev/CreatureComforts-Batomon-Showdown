@@ -15,6 +15,8 @@ var _wins := 0
 var _lives := 0
 var _loss_cost := 1
 var _result := ""
+var _opponent_name := "?"
+var _opponent_mmr := "-"
 
 
 ## Capture the current battle's replay inputs. `meta` carries battle_id, wins,
@@ -42,6 +44,14 @@ func set_result(result: String) -> void:
 	_result = result
 
 
+## The opponent display name and MMR captured from the live battle transition.
+## The replay's p2 template does not carry the MMR fields, so this is stored
+## separately for the shop replay overlay.
+func set_opponent(name: String, mmr: String) -> void:
+	_opponent_name = name
+	_opponent_mmr = mmr
+
+
 func has_replay() -> bool:
 	return _p1 != null and _p2 != null
 
@@ -60,6 +70,8 @@ func payload() -> Dictionary:
 		"loss_cost": _loss_cost,
 		"result": _result,
 		"context": result_context(),
+		"opponent_name": _opponent_name,
+		"opponent_mmr": _opponent_mmr,
 	}
 
 
@@ -88,3 +100,5 @@ func clear() -> void:
 	_lives = 0
 	_loss_cost = 1
 	_result = ""
+	_opponent_name = "?"
+	_opponent_mmr = "-"

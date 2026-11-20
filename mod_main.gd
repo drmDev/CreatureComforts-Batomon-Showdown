@@ -186,7 +186,9 @@ func _on_shop_run_changed() -> void:
 func _on_replay_requested() -> void:
 	if _replay == null or _battle == null:
 		return
-	if _replay.start(_battle.replay_payload()):
+	var payload = _battle.replay_payload()
+	if _replay.start(payload):
+		_ui.set_replay_opponent(str(payload.get("opponent_name", "?")), str(payload.get("opponent_mmr", "-")))
 		_ui.set_replay_active(true)
 
 

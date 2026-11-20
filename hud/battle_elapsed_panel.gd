@@ -8,9 +8,6 @@ extends "comfort_panel.gd"
 
 const PANEL_WIDTH := 64.0
 const PANEL_HEIGHT := 16.0
-const BOTTOM_MARGIN := 32.0
-const OFFSET_RATIO := 0.10
-const UP_PANEL_OFFSET := 2.7
 
 const TEXT_SIZE := 8
 const TEXT_BASELINE := 11.0
@@ -26,11 +23,6 @@ func _init() -> void:
 	custom_minimum_size = Vector2(PANEL_WIDTH, PANEL_HEIGHT)
 	_setup_styles()
 	_text_font = _build_panel_font()
-
-
-func _ready() -> void:
-	_connect_viewport_resize(_on_viewport_resized)
-	_anchor_bottom_center()
 
 
 func _setup_styles() -> void:
@@ -54,23 +46,6 @@ func hide_panel() -> void:
 		return
 	visible = false
 	queue_redraw()
-
-
-func _anchor_bottom_center() -> void:
-	var viewport := get_viewport()
-	if viewport == null:
-		return
-	var viewport_size := viewport.get_visible_rect().size
-	var centered_x := (viewport_size.x - size.x) * 0.5
-	var bottom_y := viewport_size.y - size.y - BOTTOM_MARGIN
-	position = Vector2(
-		roundf(centered_x),
-		roundf(bottom_y - viewport_size.y * 0.5 * OFFSET_RATIO - PANEL_HEIGHT * UP_PANEL_OFFSET)
-	)
-
-
-func _on_viewport_resized() -> void:
-	_anchor_bottom_center()
 
 
 func _draw() -> void:

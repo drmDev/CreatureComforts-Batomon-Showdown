@@ -7,8 +7,6 @@ extends "comfort_panel.gd"
 ## The panel is battle-only and shares the Battle Status Panel toggle with the
 ## lives/wins/day HUD.
 
-const RIGHT_MARGIN := 15.0
-const BOTTOM_RATIO := 0.25
 const PANEL_HEIGHT := 24.0
 const PADDING := 4.0
 const MIN_WIDTH := 70.0
@@ -30,11 +28,6 @@ func _init() -> void:
 	custom_minimum_size = Vector2(MIN_WIDTH, PANEL_HEIGHT)
 	_setup_styles()
 	_text_font = _build_panel_font()
-
-
-func _ready() -> void:
-	_connect_viewport_resize(_on_viewport_resized)
-	_anchor_bottom_right()
 
 
 func _setup_styles() -> void:
@@ -66,26 +59,10 @@ func _apply_size() -> void:
 		mmr_w = _text_font.get_string_size(_mmr_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, MMR_SIZE).x
 	var w := clampf(maxf(name_w, mmr_w) + PADDING * 2.0, MIN_WIDTH, MAX_WIDTH)
 	size = Vector2(w, PANEL_HEIGHT)
-	_anchor_bottom_right()
 
 
 func _mmr_text() -> String:
 	return "MMR: %s" % _mmr
-
-
-func _anchor_bottom_right() -> void:
-	var viewport := get_viewport()
-	if viewport == null:
-		return
-	var viewport_size := viewport.get_visible_rect().size
-	position = Vector2(
-		roundf(viewport_size.x - size.x - RIGHT_MARGIN),
-		roundf(viewport_size.y * (1.0 - BOTTOM_RATIO) - size.y * 0.5)
-	)
-
-
-func _on_viewport_resized() -> void:
-	_anchor_bottom_right()
 
 
 func _draw() -> void:

@@ -171,6 +171,8 @@ func _refresh_opponent_info(state, p2) -> void:
 	if battle_id != _opponent_battle_id or _opponent_info.is_empty():
 		_opponent_battle_id = battle_id
 		_opponent_info = OpponentInfo.info(p2, _captured_opponent, _captured_at)
+		if _replay_store != null:
+			_replay_store.set_opponent(str(_opponent_info.get("name", "?")), str(_opponent_info.get("mmr", "-")))
 
 
 ## Facts the combat stats panel needs for its trainer portraits. Plain Strings

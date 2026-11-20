@@ -7,7 +7,6 @@ const CONTENT_PADDING := 4.0
 const CONTENT_INSET := 2.0  # Extra left/right breathing room inside the padding
 const ROW_HEIGHT := 12.0
 const FONT_SIZE := 9
-const TOP_OFFSET := 244.0   # Fixed distance from the top of the battle screen
 
 const LABEL_GAP := 3.0
 const GROUP_GAP := 8.0
@@ -40,11 +39,6 @@ func _init() -> void:
 	size = Vector2(_measure_content_width({}), CONTENT_PADDING + ROW_HEIGHT + CONTENT_PADDING)
 
 
-func _ready() -> void:
-	_connect_viewport_resize(_on_viewport_resized)
-	_anchor_centered()
-
-
 func _setup_styles() -> void:
 	_panel_style = StyleBoxFlat.new()
 	_panel_style.bg_color = BG_COLOR
@@ -62,7 +56,6 @@ func update_stats(new_stats: Dictionary) -> void:
 	var fitted_width := _measure_content_width(new_stats)
 	if not is_equal_approx(size.x, fitted_width):
 		size.x = fitted_width
-		_anchor_centered()
 	queue_redraw()
 
 
@@ -99,18 +92,6 @@ func _text_width(text: String) -> float:
 	if _text_font == null:
 		return 0.0
 	return _text_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
-
-
-func _anchor_centered() -> void:
-	var viewport := get_viewport()
-	if viewport == null:
-		return
-	var viewport_size := viewport.get_visible_rect().size
-	position = Vector2(roundf((viewport_size.x - size.x) * 0.5), TOP_OFFSET)
-
-
-func _on_viewport_resized() -> void:
-	_anchor_centered()
 
 
 func _draw() -> void:

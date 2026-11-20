@@ -24,6 +24,11 @@ const OpponentPanel = preload("opponent_panel.gd")
 const CombatStatsPanel = preload("combat_stats_panel.gd")
 const ReplayButton = preload("replay_button.gd")
 const ShopButtonBar = preload("../core/shop_button_bar.gd")
+const OpponentInfo = preload("../core/opponent_info.gd")
+const BattleMonitor = preload("../core/battle_monitor.gd")
+
+const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
+const BADGE_GAP := 4.0
 
 var reminder_layer: CanvasLayer = null
 var player_hud_layer: CanvasLayer = null
@@ -51,6 +56,8 @@ var _rank_odds_popup_open := false
 var _base_hp_popup_open := false
 var _replay_available := false
 var _replay_active := false
+var _replay_opponent_name := "?"
+var _replay_opponent_mmr := "-"
 var _replay_button_host_id := 0
 var _rank_odds_button_host_id := 0
 var _rank_odds_button_extra := 0.0
@@ -58,6 +65,15 @@ var _watchlist_button_host_id := 0
 var _watchlist_button_shift := 0.0
 var _base_hp_button_host_id := 0
 var _base_hp_button_extra := 0.0
+
+# Battle trainer badge tracking. The three battle readouts follow the game's
+# trainer badges (bottom-left player, bottom-right enemy) each frame.
+var _player_anchor: Control = null
+var _enemy_anchor: Control = null
+var _player_badge = null
+var _enemy_badge = null
+var _battle_state_id := 0
+var _replay_battle_state = null
 
 
 func setup(context) -> void:
@@ -154,20 +170,35 @@ func _build_player_hud() -> void:
 	player_hud_layer.name = "CreatureComforts_PlayerHud"
 	add_child(player_hud_layer)
 
+	# Player-side anchor: a plain Control (not a container) placed at the top
+	# centre of the game's PlayerTrainerBadge. The HUD and elapsed panels are its
+	# children and are positioned above that point each frame, so they follow the
+	# badge's slide-in/out tween. A container would re-layout its children.
+	_player_anchor = Control.new()
+	_player_anchor.name = "CreatureComforts_PlayerAnchor"
+	_player_anchor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	player_hud_layer.add_child(_player_anchor)
+
 	player_hud = PlayerHud.new()
 	player_hud.name = "PlayerHud"
-	player_hud_layer.add_child(player_hud)
+	_player_anchor.add_child(player_hud)
 
 	# Post-battle simulation time. Lives on the battle HUD layer (not the shop-gated
 	# reminder layer) so it can appear during the battle results screen.
 	battle_elapsed_panel = BattleElapsedPanel.new()
 	battle_elapsed_panel.name = "BattleElapsedPanel"
-	player_hud_layer.add_child(battle_elapsed_panel)
+	_player_anchor.add_child(battle_elapsed_panel)
+
+	# Enemy-side anchor: placed at the top-right of the game's EnemyTrainerBadge.
+	_enemy_anchor = Control.new()
+	_enemy_anchor.name = "CreatureComforts_EnemyAnchor"
+	_enemy_anchor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	player_hud_layer.add_child(_enemy_anchor)
 
 	# Bottom-right opponent name + MMR readout, battle-only and on the same layer.
 	opponent_panel = OpponentPanel.new()
 	opponent_panel.name = "OpponentPanel"
-	player_hud_layer.add_child(opponent_panel)
+	_enemy_anchor.add_child(opponent_panel)
 
 	# Post-battle combat statistics (merged from BatoStats++). Lives on the battle
 	# HUD layer so it can appear on the results screen; the battle coordinator
@@ -175,6 +206,141 @@ func _build_player_hud() -> void:
 	combat_stats_panel = CombatStatsPanel.new()
 	combat_stats_panel.name = "CombatStatsPanel"
 	player_hud_layer.add_child(combat_stats_panel)
+
+
+## Follow the game's trainer badges every frame so the battle readouts stay
+## glued to the trainers during their slide-in/out tweens. The panels remain on
+## this mod's CanvasLayer (not children of the badge), so a PanelContainer cannot
+## re-layout them; this tracker mirrors the badge's global rect instead.
+func _process(_delta: float) -> void:
+	if player_hud_layer == null or not player_hud_layer.visible:
+		return
+	_track_battle_badges()
+
+
+func _track_battle_badges() -> void:
+	var state = _current_battle_state()
+	if state == null:
+		_clear_battle_badges()
+		return
+	var state_id = state.get_instance_id()
+	if state_id != _battle_state_id:
+		_battle_state_id = state_id
+		_player_badge = state.get_node_or_null("BattleView/CanvasLayer/PlayerTrainerBadge")
+		_enemy_badge = state.get_node_or_null("BattleView/CanvasLayer/EnemyTrainerBadge")
+	_position_player_anchor()
+	_position_enemy_anchor()
+	if _replay_active:
+		_sync_replay_panels(state)
+
+
+func _current_battle_state():
+	var state = _current_scene_battle_state()
+	if state != null:
+		return state
+	if _replay_battle_state != null and is_instance_valid(_replay_battle_state):
+		return _replay_battle_state
+	_replay_battle_state = _find_replay_battle_state()
+	return _replay_battle_state
+
+
+func _current_scene_battle_state():
+	var tree := get_tree()
+	if tree == null:
+		return null
+	var main = tree.current_scene
+	if main == null:
+		return null
+	var state = main.get("current_state") if NodeUtils.has_property(main, "current_state") else null
+	if state == null or not NodeUtils.script_is(state, BATTLE_SCRIPT):
+		return null
+	return state
+
+
+## The mod's replay overlay instantiates a battle scene named
+## "CreatureComfortsReplayBattle" (see hud/battle_replay_controller.gd). It is not
+## the current scene state, so the phase router does not drive it; the tracker
+## finds it here so the battle readouts can follow its trainer badges.
+func _find_replay_battle_state():
+	var tree := get_tree()
+	if tree == null:
+		return null
+	var root = tree.root
+	if root == null:
+		return null
+	return root.find_child("CreatureComfortsReplayBattle", true, false)
+
+
+func _clear_battle_badges() -> void:
+	_battle_state_id = 0
+	_player_badge = null
+	_enemy_badge = null
+	_replay_battle_state = null
+	if _player_anchor != null:
+		_player_anchor.visible = false
+	if _enemy_anchor != null:
+		_enemy_anchor.visible = false
+
+
+func _position_player_anchor() -> void:
+	if _player_anchor == null:
+		return
+	var badge = _player_badge
+	if badge == null or not is_instance_valid(badge):
+		_player_anchor.visible = false
+		return
+	_player_anchor.visible = true
+	var rect = _badge_rest_rect(badge)
+	var ref := Vector2(rect.position.x + rect.size.x * 0.5, rect.position.y)
+	_player_anchor.position = ref
+	if player_hud != null:
+		player_hud.position = Vector2(-player_hud.size.x * 0.5, -player_hud.size.y - BADGE_GAP)
+	if battle_elapsed_panel != null:
+		battle_elapsed_panel.position = Vector2(-battle_elapsed_panel.size.x * 0.5, -battle_elapsed_panel.size.y - BADGE_GAP)
+
+
+func _position_enemy_anchor() -> void:
+	if _enemy_anchor == null:
+		return
+	var badge = _enemy_badge
+	if badge == null or not is_instance_valid(badge):
+		_enemy_anchor.visible = false
+		return
+	_enemy_anchor.visible = true
+	var rect = _badge_rest_rect(badge)
+	var ref := Vector2(rect.position.x + rect.size.x, rect.position.y)
+	_enemy_anchor.position = ref
+	if opponent_panel != null:
+		opponent_panel.position = Vector2(-opponent_panel.size.x, -opponent_panel.size.y - BADGE_GAP)
+
+
+## The badge's rest rect (before the end-screen inset). The game tweens the
+## badge inward to make room for the Hide/Confirm buttons at the end of a battle;
+## the mod panels stay at the rest position instead of following that inward
+## shift. `rest_left()` returns the badge's captured rest x offset.
+func _badge_rest_rect(badge):
+	var rect = badge.get_global_rect()
+	if badge.has_method("rest_left"):
+		var rest_x = badge.rest_left()
+		var shifted = rect.position
+		shifted.x += rest_x - badge.position.x
+		rect.position = shifted
+	return rect
+
+
+## During the mod's replay overlay the phase router is paused (mod_main skips
+## its poll), so the battle readouts are not driven by the normal controllers.
+## Sync them from the replay battle state here. The real battle is unaffected
+## because this only runs while _replay_active is true.
+func _sync_replay_panels(state) -> void:
+	show_opponent(_replay_opponent_name, _replay_opponent_mmr)
+	if BattleMonitor.is_over(state):
+		var sim = state.get("simulation") if NodeUtils.has_property(state, "simulation") else null
+		var battle_data = sim.get("data") if sim != null and NodeUtils.has_property(sim, "data") else null
+		show_battle_elapsed(BattleMonitor.format_seconds(BattleMonitor.time_elapsed(battle_data)))
+		hide_player_hud()
+	else:
+		update_player_hud(state, true)
 
 
 ## Apply the shop overlay gate to the reminder layer. Returns true when the
@@ -211,18 +377,32 @@ func _close_shop_popups() -> void:
 ## Hide every mod-owned shop panel while the replay overlay is up. The game's
 ## own battle UI is part of the replay; the mod's HUD would otherwise float
 ## over it.
+## Store the opponent name/MMR for the shop replay overlay. The replay's p2
+## template lacks the MMR fields, so mod_main passes the captured values here.
+func set_replay_opponent(name: String, mmr: String) -> void:
+	_replay_opponent_name = name
+	_replay_opponent_mmr = mmr
+
+
 func set_replay_active(active: bool) -> void:
 	_replay_active = active
 	if reminder_layer != null:
 		reminder_layer.visible = not active
-	if player_hud_layer != null:
-		player_hud_layer.visible = not active
+	# The battle HUD layer stays visible during the mod's replay so the three
+	# battle readouts can follow the replay battle's trainer badges. The tracker
+	# syncs them from the replay battle state while _replay_active is true.
 	if active:
 		_close_shop_popups()
 		if shop_highlight != null:
 			shop_highlight.set_enabled(false)
-	elif shop_highlight != null:
-		shop_highlight.set_enabled(_context.feature_enabled(ModConfig.KEY_SHOP_HIGHLIGHTS))
+	else:
+		# Leaving the replay overlay: hide the battle readouts until the next
+		# phase poll re-shows them for a real battle.
+		hide_player_hud()
+		hide_battle_elapsed()
+		hide_opponent_panel()
+		if shop_highlight != null:
+			shop_highlight.set_enabled(_context.feature_enabled(ModConfig.KEY_SHOP_HIGHLIGHTS))
 
 
 ## Defensive fallback: hide shop-only panels whenever the shop is not current.
