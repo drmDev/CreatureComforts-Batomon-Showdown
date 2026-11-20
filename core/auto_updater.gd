@@ -12,8 +12,7 @@ extends Node
 ## version starts with the next game start. Nothing outside Mods/CreatureComforts and
 ## user://creature_comforts_update is written.
 ##
-## Auto-update (Settings > Mods > Creature Comforts, default on) installs new versions by itself.
-## With it off a new version only shows a notice, and the player updates by hand.
+## Auto-update is always on: a new version is downloaded and installed by itself.
 ##
 ## It never runs on a developer install (a folder with .git or dev/run_tests.ps1): it would
 ## overwrite the working copy. Engine APIs only (no game classes), so it keeps working when a game
@@ -60,7 +59,6 @@ const OFFLINE_RESULTS := [
 var version := ""
 var mod_dir := ""                     # folder of the running mod_main.gd (absolute or res://)
 var cfg: ConfigFile
-var auto_update := true
 var manifest_url := MANIFEST_URL
 var allow_prefix := DOWNLOAD_PREFIX
 var enabled := true                   # dev / test builds: only with a test channel (setup)
@@ -75,12 +73,11 @@ var _toast = null
 var _shown := {}                      # notices already shown this session
 
 
-## Called by mod_main once. auto is the Auto-update setting; mod_dir is the folder of the running
-## mod_main.gd (res:// in the editor, an absolute OS path in the Mod Loader).
-func setup(p_version: String, p_mod_dir: String, auto: bool) -> void:
+## Called by mod_main once. mod_dir is the folder of the running mod_main.gd
+## (res:// in the editor, an absolute OS path in the Mod Loader).
+func setup(p_version: String, p_mod_dir: String) -> void:
 	version = p_version
 	mod_dir = p_mod_dir
-	auto_update = auto
 	DirAccess.make_dir_recursive_absolute(CFG_PATH.get_base_dir())
 	cfg = ConfigFile.new()
 	cfg.load(CFG_PATH)  # a missing / unreadable file just leaves the defaults
@@ -109,7 +106,7 @@ func start() -> void:
 	if is_dev_install(dir):
 		enabled = false
 		state = "dev_install"
-		print("Creature Comforts update: dev install (%s) - auto-update off" % dir)
+		print("Creature Comforts update: dev install (%s) - updater disabled" % dir)
 		return
 	if str(cfg.get_value("update", "installed_version", "")) == version \
 			and not bool(cfg.get_value("update", "announced", true)):
@@ -120,13 +117,6 @@ func start() -> void:
 			notes if notes != "" else "The new version is running.")
 	if enabled:
 		_next_check_ms = Time.get_ticks_msec() + int(FIRST_CHECK_SEC * 1000.0)
-
-
-## The Auto-update setting changed. Turning it on while a version is waiting installs it now.
-func set_auto(on: bool) -> void:
-	auto_update = on
-	if on and state == "available":
-		check_now()
 
 
 func _process(_delta: float) -> void:
@@ -161,11 +151,6 @@ func check_now() -> void:
 	remote = m
 	if cmp_version(str(m.version), version) <= 0:
 		_finish("current", str(m.version))
-		return
-	if not auto_update:
-		_notice_once("available " + str(m.version), "Creature Comforts %s is out" % m.version,
-			"Turn on Auto-update in Settings > Mods > Creature Comforts, or download it from GitHub.")
-		_finish("available", str(m.version))
 		return
 	await _install(m)
 

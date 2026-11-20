@@ -36,7 +36,6 @@ const KEY_TRINKETS_GAINED_PANEL := "trinkets_gained_panel"
 ## Gold sell-value badges on the fielded and bench slots of the shop's My Team
 ## grid. Shop-phase only; the shop controller drives the attach/hide lifecycle.
 const KEY_SELL_VALUE_INDICATORS := "sell_value_indicators"
-const KEY_SHOP_INCOME := "shop_income"
 const KEY_RANK_ODDS_PREVIEW := "rank_odds_preview"
 const KEY_BASE_HP_CHART := "base_hp_chart"
 ## Gates the watchlist button/popup and the matching-card shop highlights
@@ -46,7 +45,6 @@ const KEY_SHOP_HIGHLIGHTS := "shop_highlights"
 ## Post-battle combat statistics panel (merged from BatoStats++). It is the only
 ## control for that panel: the team headings and summed comparison are part of it.
 const KEY_COMBAT_STATS_PANEL := "combat_stats_panel"
-const KEY_AUTO_UPDATE := "auto_update"
 
 ## Most features default to enabled to preserve existing behavior. The beta
 ## positional trinket summary defaults to disabled.
@@ -58,12 +56,10 @@ const DEFAULTS := {
 	KEY_BATTLE_STATUS_PANEL: true,
 	KEY_TRINKETS_GAINED_PANEL: true,
 	KEY_SELL_VALUE_INDICATORS: true,
-	KEY_SHOP_INCOME: true,
 	KEY_RANK_ODDS_PREVIEW: true,
 	KEY_BASE_HP_CHART: true,
 	KEY_SHOP_HIGHLIGHTS: true,
 	KEY_COMBAT_STATS_PANEL: true,
-	KEY_AUTO_UPDATE: true,
 }
 
 ## Emitted when a feature toggle changes (loader-driven). Mod Volume is read on

@@ -155,8 +155,7 @@ func _setup_auto_updater() -> void:
 	_updater = AutoUpdater.new()
 	_updater.name = "AutoUpdater"
 	add_child(_updater)
-	_updater.setup(VERSION, get_script().resource_path.get_base_dir(),
-		_context.feature_enabled(ModConfig.KEY_AUTO_UPDATE))
+	_updater.setup(VERSION, get_script().resource_path.get_base_dir())
 	_updater.start()
 
 
@@ -207,8 +206,6 @@ func _on_feature_toggled(key: String, value: bool) -> void:
 		_context.chimes.clear()
 	elif key == ModConfig.KEY_TRINKETS_GAINED_PANEL:
 		_battle.hide_trinket_gains()
-	elif key == ModConfig.KEY_AUTO_UPDATE:
-		_updater.set_auto(value)
 
 
 ## Community Mod Loader hook (Settings > Mods). The loader appends custom

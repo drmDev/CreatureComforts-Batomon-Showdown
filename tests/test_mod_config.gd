@@ -36,12 +36,6 @@ func test_positional_trinkets_defaults_to_disabled() -> void:
 	assert_false(config.is_enabled(ModConfig.KEY_POSITIONAL_TRINKETS))
 
 
-func test_auto_update_defaults_to_enabled() -> void:
-	var config = ModConfig.new()
-	assert_eq(ModConfig.KEY_AUTO_UPDATE, "auto_update")
-	assert_true(config.is_enabled(ModConfig.KEY_AUTO_UPDATE))
-
-
 func test_base_hp_chart_defaults_to_enabled() -> void:
 	var config = ModConfig.new()
 	assert_eq(ModConfig.KEY_BASE_HP_CHART, "base_hp_chart")
@@ -71,19 +65,19 @@ func test_unknown_key_defaults_to_enabled() -> void:
 
 func test_loader_override_disables_feature() -> void:
 	var loader = FakeLoader.new()
-	loader.values[ModConfig.KEY_SHOP_INCOME] = false
+	loader.values[ModConfig.KEY_SHOP_HIGHLIGHTS] = false
 	var config = ModConfig.new()
 	config.setup(loader)
-	assert_false(config.is_enabled(ModConfig.KEY_SHOP_INCOME))
+	assert_false(config.is_enabled(ModConfig.KEY_SHOP_HIGHLIGHTS))
 	assert_true(config.is_enabled(ModConfig.KEY_RANK_ODDS_PREVIEW))
 
 
 func test_loader_non_bool_falls_back_to_default() -> void:
 	var loader = FakeLoader.new()
-	loader.values[ModConfig.KEY_SHOP_INCOME] = "nope"
+	loader.values[ModConfig.KEY_SHOP_HIGHLIGHTS] = "nope"
 	var config = ModConfig.new()
 	config.setup(loader)
-	assert_true(config.is_enabled(ModConfig.KEY_SHOP_INCOME))
+	assert_true(config.is_enabled(ModConfig.KEY_SHOP_HIGHLIGHTS))
 
 
 func test_changed_signal_reemits_known_keys_only() -> void:
@@ -92,11 +86,11 @@ func test_changed_signal_reemits_known_keys_only() -> void:
 	config.setup(loader)
 	var received: Array = []
 	config.changed.connect(func(key, value): received.append([key, value]))
-	loader.config_changed.emit(ModConfig.MOD_ID, ModConfig.KEY_SHOP_INCOME, false)
-	loader.config_changed.emit("other_mod", ModConfig.KEY_SHOP_INCOME, false)
+	loader.config_changed.emit(ModConfig.MOD_ID, ModConfig.KEY_SHOP_HIGHLIGHTS, false)
+	loader.config_changed.emit("other_mod", ModConfig.KEY_SHOP_HIGHLIGHTS, false)
 	loader.config_changed.emit(ModConfig.MOD_ID, "unknown_key", false)
 	assert_eq(received.size(), 1)
-	assert_eq(received[0][0], ModConfig.KEY_SHOP_INCOME)
+	assert_eq(received[0][0], ModConfig.KEY_SHOP_HIGHLIGHTS)
 	assert_eq(received[0][1], false)
 
 
@@ -107,7 +101,7 @@ func test_setup_is_idempotent() -> void:
 	config.setup(loader)
 	var received: Array = []
 	config.changed.connect(func(key, _value): received.append(key))
-	loader.config_changed.emit(ModConfig.MOD_ID, ModConfig.KEY_SHOP_INCOME, false)
+	loader.config_changed.emit(ModConfig.MOD_ID, ModConfig.KEY_SHOP_HIGHLIGHTS, false)
 	assert_eq(received.size(), 1, "no duplicate subscriptions")
 
 

@@ -42,9 +42,6 @@ Compare your team's performance against your opponent after each battle.
 - Side-by-side comparisons of both teams.
 - Individual unit statistics with highlighted top performers.
 
-### Shop Income
-Displays your current income directly in the shop.
-
 ### Sell Value Indicators
 When an item or trinket raises a unit's sell value above its base, a gold coin icon appears in the top-right corner of its team or bench slot. Hover the unit to see the exact sell value.
 
@@ -73,10 +70,7 @@ Settings are saved automatically between sessions.
 
 ## AUTO-UPDATE
 
-Creature Comforts automatically checks for updates when the game starts.
-
-- **Auto-update enabled (default):** Downloads and verifies new versions automatically. Restart the game to apply updates.
-- **Auto-update disabled:** Notifies you when a new version is available so you can install it manually.
+Creature Comforts automatically checks for updates when the game starts and installs new versions automatically. Restart the game to apply updates.
 
 Updates are verified before installation. If verification fails, existing files remain unchanged.
 

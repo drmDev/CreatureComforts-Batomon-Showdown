@@ -11,7 +11,6 @@ const NodeUtils = preload("node_utils.gd")
 const RunData = preload("run_data.gd")
 const ShopSnapshot = preload("shop_snapshot.gd")
 const ShopChanges = preload("shop_changes.gd")
-const ShopIncome = preload("shop_income.gd")
 const AdviceController = preload("../advice/advice_controller.gd")
 const TrinketRemindersController = preload("../hud/trinket_reminders_controller.gd")
 const PositionalTrinketsController = preload("../hud/positional_trinkets_controller.gd")
@@ -108,7 +107,6 @@ func handle(state, phase_changed: bool) -> bool:
 	_advice.evaluate(current_snapshot, _shop_overlay_gate)
 
 	var current_day := int(run.get("current_round")) if NodeUtils.has_property(run, "current_round") else 1
-	_ui.update_shop_income(_compute_daily_income(run, current_day))
 	_trinket_reminders.update(run, _shop_overlay_gate)
 	_positional_trinkets.update(run)
 	var held_trinkets = run.get("trinket_ids") if NodeUtils.has_property(run, "trinket_ids") else []
@@ -139,17 +137,6 @@ func on_feature_toggled(key: String, value: bool) -> void:
 		_trinket_reminders.on_feature_toggled(key, value)
 	elif key == ModConfig.KEY_POSITIONAL_TRINKETS:
 		_positional_trinkets.on_feature_toggled(key, value)
-
-
-func _compute_daily_income(run, day: int) -> int:
-	var passive_gains: Array = []
-	if NodeUtils.has_property(run, "_active_passives"):
-		var passives = run.get("_active_passives")
-		if passives is Array:
-			for passive in passives:
-				if passive != null and is_instance_valid(passive) and NodeUtils.has_property(passive, "gold_gain"):
-					passive_gains.append(int(passive.get("gold_gain")))
-	return ShopIncome.compute(day, passive_gains)
 
 
 func _log_phase_entry(run, manager) -> void:

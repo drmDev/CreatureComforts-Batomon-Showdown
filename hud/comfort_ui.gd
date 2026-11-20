@@ -12,7 +12,6 @@ const ModConfig = preload("../core/mod_config.gd")
 const ShopHighlight = preload("shop_highlight.gd")
 const SellValueIndicators = preload("sell_value_indicators.gd")
 const ReminderLabel = preload("reminder_label.gd")
-const ShopIncomePanel = preload("shop_income_panel.gd")
 const TrinketRemindersPanel = preload("trinket_reminders_panel.gd")
 const PositionalTrinketsPanel = preload("positional_trinkets_panel.gd")
 const RankOddsPanel = preload("rank_odds_panel.gd")
@@ -30,7 +29,6 @@ var reminder_layer: CanvasLayer = null
 var player_hud_layer: CanvasLayer = null
 
 var reminder_label = null
-var shop_income_panel = null
 var trinket_reminders_panel = null
 var positional_trinkets_panel = null
 var rank_odds_panel = null
@@ -79,11 +77,6 @@ func _build_reminder_layer() -> void:
 	reminder_label = ReminderLabel.new()
 	reminder_label.name = "ReminderLabel"
 	reminder_layer.add_child(reminder_label)
-
-	# Bottom-center income readout; the reminder layer's shop gate controls visibility.
-	shop_income_panel = ShopIncomePanel.new()
-	shop_income_panel.name = "ShopIncomePanel"
-	reminder_layer.add_child(shop_income_panel)
 
 	# Left-aligned trinket reminders ~10% down the screen; shop-gated. Added after the label
 	# so it draws on top while visible.
@@ -238,8 +231,6 @@ func set_replay_active(active: bool) -> void:
 func hide_shop_panels() -> void:
 	if sell_value_indicators != null:
 		sell_value_indicators.hide_all()
-	if shop_income_panel != null:
-		shop_income_panel.hide_panel()
 	if trinket_reminders_panel != null:
 		trinket_reminders_panel.hide_panel()
 	if positional_trinkets_panel != null:
@@ -347,15 +338,6 @@ func update_replay_button(view, available: bool) -> void:
 	if not _replay_button_alive():
 		return
 	replay_button.set_available(available)
-
-
-func update_shop_income(income: int) -> void:
-	if shop_income_panel == null:
-		return
-	if not _context.feature_enabled(ModConfig.KEY_SHOP_INCOME):
-		shop_income_panel.hide_panel()
-		return
-	shop_income_panel.set_income(income)
 
 
 ## Attach/refresh the sell-value badges for the current shop view. Called on
@@ -715,9 +697,6 @@ func on_feature_toggled(key: String, value: bool) -> void:
 			opponent_panel.hide_panel()
 	elif key == ModConfig.KEY_COMBAT_STATS_PANEL:
 		hide_combat_stats()
-	elif key == ModConfig.KEY_SHOP_INCOME:
-		if shop_income_panel != null:
-			shop_income_panel.hide_panel()
 	elif key == ModConfig.KEY_POSITIONAL_TRINKETS:
 		if positional_trinkets_panel != null:
 			positional_trinkets_panel.hide_panel()

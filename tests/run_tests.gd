@@ -9,7 +9,6 @@ var _test_scripts := {
 	"trainer_rules": preload("test_trainer_rules.gd"),
 	"team_adjacency": preload("test_team_adjacency.gd"),
 	"trinket_gains": preload("test_trinket_gains.gd"),
-	"shop_income": preload("test_shop_income.gd"),
 	"base_hp": preload("test_base_hp.gd"),
 	"tracked_trinkets": preload("test_tracked_trinkets.gd"),
 	"positional_trinkets": preload("test_positional_trinkets.gd"),
