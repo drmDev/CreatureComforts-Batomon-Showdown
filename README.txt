@@ -68,6 +68,15 @@ Customize individual features under:
 
 Settings are saved automatically between sessions.
 
+## HOTKEYS
+
+The Add Hotkeys setting (enabled by default) controls the keyboard shortcuts
+below. Disabling it turns them off.
+
+- Backtick (`) toggles fast-forward during battle and replay. It uses the
+  fast-forward speed configured in Settings.
+- Tab toggles the trinket bag during the shop and battle.
+
 ## AUTO-UPDATE
 
 Creature Comforts automatically checks for updates when the game starts and installs new versions automatically. Restart the game to apply updates.

@@ -45,6 +45,8 @@ const KEY_SHOP_HIGHLIGHTS := "shop_highlights"
 ## Post-battle combat statistics panel (merged from BatoStats++). It is the only
 ## control for that panel: the team headings and summed comparison are part of it.
 const KEY_COMBAT_STATS_PANEL := "combat_stats_panel"
+## Backtick fast-forward and Tab trinket bag hotkeys.
+const KEY_HOTKEYS := "hotkeys"
 
 ## Most features default to enabled to preserve existing behavior. The beta
 ## positional trinket summary defaults to disabled.
@@ -60,6 +62,7 @@ const DEFAULTS := {
 	KEY_BASE_HP_CHART: true,
 	KEY_SHOP_HIGHLIGHTS: true,
 	KEY_COMBAT_STATS_PANEL: true,
+	KEY_HOTKEYS: true,
 }
 
 ## Emitted when a feature toggle changes (loader-driven). Mod Volume is read on

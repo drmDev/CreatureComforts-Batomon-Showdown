@@ -72,6 +72,13 @@ func is_active() -> bool:
 	return _active
 
 
+## The battle view owned by the active replay, or null when no replay is running.
+func active_battle_view():
+	if not _active or _state == null or not is_instance_valid(_state):
+		return null
+	return _state.get("view")
+
+
 ## Start a replay from a payload produced by core/battle_replay_store.gd.
 ## Returns false when a replay is already running or the payload is incomplete.
 func start(payload: Dictionary) -> bool:

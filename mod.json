@@ -25,6 +25,8 @@
 		 "description": "Show the post-battle combat statistics comparison panel."},
 		{"key": "sell_value_indicators", "label": "Sell Value Indicators", "type": "bool", "default": true,
 		 "description": "Show a gold coin icon in the top-right corner when an item or trinket raises a unit's sell value above its base."},
+		{"key": "hotkeys", "label": "Add Hotkeys", "type": "bool", "default": true,
+		 "description": "Enable the backtick fast-forward and Tab trinket bag hotkeys."},
 		{"key": "notification_sounds", "label": "Notification Sounds", "type": "bool", "default": true,
 		 "description": "Play reminder and UI sound effects. The Mod Volume slider below sets how loud they are."}
 	]

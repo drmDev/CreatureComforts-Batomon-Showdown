@@ -19,6 +19,7 @@ const DevTools = preload("core/dev_tools.gd")
 const ShopController = preload("core/shop_controller.gd")
 const BattleCoordinator = preload("core/battle_coordinator.gd")
 const PhaseRouter = preload("core/phase_router.gd")
+const Hotkeys = preload("core/hotkeys.gd")
 
 var _initialization_started := false
 var _initialized := false
@@ -37,6 +38,9 @@ var _battle = null
 
 # Read-only shop replay overlay (hud/battle_replay_controller.gd).
 var _replay = null
+
+# User-facing hotkeys (backtick = fast-forward, Tab = trinket bag).
+var _hotkeys = null
 
 # Phase detection and dispatch (core/phase_router.gd).
 var _router = null
@@ -112,6 +116,11 @@ func _initialize_mod() -> void:
 	add_child(_replay)
 	_replay.setup(_context)
 	_replay.finished.connect(_on_replay_finished)
+
+	_hotkeys = Hotkeys.new()
+	_hotkeys.name = "Hotkeys"
+	add_child(_hotkeys)
+	_hotkeys.setup(_context, _replay)
 
 	_shop = ShopController.new()
 	_shop.setup(_context, _ui, _shop_overlay_gate, _dev_tools, _on_shop_entered, _on_shop_run_changed, _battle.has_replay)
