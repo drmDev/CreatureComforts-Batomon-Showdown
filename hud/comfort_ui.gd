@@ -39,6 +39,7 @@ var watchlist_panel = null
 var replay_button = null
 var rank_odds_button = null
 var watchlist_button = null
+var base_hp_button = null
 var trinket_panel = null
 var player_hud = null
 var battle_elapsed_panel = null
@@ -57,6 +58,8 @@ var _rank_odds_button_host_id := 0
 var _rank_odds_button_extra := 0.0
 var _watchlist_button_host_id := 0
 var _watchlist_button_shift := 0.0
+var _base_hp_button_host_id := 0
+var _base_hp_button_extra := 0.0
 
 
 func setup(context) -> void:
@@ -249,6 +252,7 @@ func hide_shop_panels() -> void:
 		watchlist_panel.close_popup()
 	_detach_rank_odds_button()
 	_detach_watchlist_button()
+	_detach_base_hp_button()
 
 
 ## Close any open shop modal when the shop becomes interactive again.
@@ -511,14 +515,72 @@ func _watchlist_log(detail: String) -> void:
 	_on_panel_log_line("WATCHLIST | " + detail)
 
 
-func update_base_hp(day: int, total_hp: int) -> void:
+## Attach the base HP heart icon to the game's trainer HP bar, extending the bar
+## rightward so the icon sits just past its right edge without moving the bar.
+func _attach_base_hp_button(view) -> void:
+	if base_hp_panel == null:
+		return
+	var hp_ui = _get_shop_hp_ui(view)
+	if hp_ui == null:
+		if _base_hp_button_alive():
+			_detach_base_hp_button()
+			_base_hp_log("detached (no HpUI)")
+		return
+	var host_id: int = hp_ui.get_instance_id()
+	if _base_hp_button_alive() and _base_hp_button_host_id == host_id:
+		return
+	_detach_base_hp_button()
+	base_hp_button = base_hp_panel.make_external_button()
+	if base_hp_button == null:
+		return
+	base_hp_button.name = "CreatureComfortsBaseHpButton"
+	base_hp_button.tooltip_text = "Base HP by day"
+	hp_ui.add_child(base_hp_button)
+	_base_hp_button_host_id = host_id
+	var button_size: Vector2 = base_hp_button.get_combined_minimum_size()
+	base_hp_button.size = button_size
+	var width: float = hp_ui.offset_right - hp_ui.offset_left
+	var height: float = hp_ui.offset_bottom - hp_ui.offset_top
+	var gap := 4.0
+	_base_hp_button_extra = button_size.x + gap
+	hp_ui.offset_right += _base_hp_button_extra
+	base_hp_button.position = Vector2(width + gap, roundf((height - button_size.y) * 0.5))
+	_base_hp_log("attached")
+
+
+func _get_shop_hp_ui(view):
+	if not is_instance_valid(view):
+		return null
+	return view.get_node_or_null("HpUI")
+
+
+func _base_hp_button_alive() -> bool:
+	return base_hp_button != null and is_instance_valid(base_hp_button)
+
+
+func _detach_base_hp_button() -> void:
+	if _base_hp_button_alive():
+		var parent = base_hp_button.get_parent()
+		if is_instance_valid(parent) and parent.get_instance_id() == _base_hp_button_host_id:
+			parent.offset_right -= _base_hp_button_extra
+		base_hp_button.free()
+	base_hp_button = null
+	_base_hp_button_host_id = 0
+	_base_hp_button_extra = 0.0
+
+
+func _base_hp_log(detail: String) -> void:
+	_on_panel_log_line("BASE HP | " + detail)
+
+
+func update_base_hp(view, day: int, total_hp: int) -> void:
 	if base_hp_panel == null:
 		return
 	if not _context.feature_enabled(ModConfig.KEY_BASE_HP_CHART):
 		base_hp_panel.hide_panel()
+		_detach_base_hp_button()
 		return
-	if _rank_odds_popup_open:
-		return
+	_attach_base_hp_button(view)
 	base_hp_panel.set_day(day, total_hp)
 
 
@@ -672,6 +734,7 @@ func on_feature_toggled(key: String, value: bool) -> void:
 	elif key == ModConfig.KEY_BASE_HP_CHART:
 		if base_hp_panel != null:
 			base_hp_panel.hide_panel()
+		_detach_base_hp_button()
 
 
 ## Panel lifecycle lines are debug detail, not events: drop them unless Debug

@@ -115,7 +115,7 @@ func handle(state, phase_changed: bool) -> bool:
 	var view = state.get("view") if NodeUtils.has_property(state, "view") else null
 	_ui.update_rank_odds(view, int(run.get("shop_rank")) if NodeUtils.has_property(run, "shop_rank") else 1, held_trinkets if held_trinkets != null else [])
 	var total_hp := int(run.get("player_hp")) if NodeUtils.has_property(run, "player_hp") else 0
-	_ui.update_base_hp(current_day, total_hp)
+	_ui.update_base_hp(view, current_day, total_hp)
 	var gate_allowed: bool = _shop_overlay_gate == null or _shop_overlay_gate.is_allowed()
 	_ui.update_sell_values(view, gate_allowed)
 	_ui.update_watchlist_button(view)

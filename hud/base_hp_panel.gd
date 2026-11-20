@@ -3,12 +3,6 @@ extends "table_modal_panel.gd"
 
 const BaseHp = preload("../core/base_hp.gd")
 
-# 22% across the viewport, 25 px above the rank-odds button's row.
-const LEFT_RATIO := 0.22
-# Same vertical row as the rank-odds button, then shifted up by UP_OFFSET_PX.
-const BOTTOM_OFFSET_RATIO := 0.20
-const UP_OFFSET_PX := 25.0
-
 # Day | Base HP | Total (base + the run's trinket/trainer HP bonus)
 const COLUMN_FRACTIONS := [0.18, 0.40, 0.42]
 const HEADER_LABELS := ["Day", "Base HP", "Total"]
@@ -16,6 +10,11 @@ const COLUMN_COLORS := [Style.VALUE_COLOR, Style.RARITY_RARE, Style.BORDER_COLOR
 
 var _day := 1
 var _bonus := 0
+
+
+func _init() -> void:
+	super()
+	use_external_button()
 
 
 func set_day(day: int, total_hp: int) -> void:
@@ -26,11 +25,6 @@ func set_day(day: int, total_hp: int) -> void:
 
 func _button_texture_path() -> String:
 	return "../assets/icons/heartChart.png"
-
-
-func _button_position(viewport_size: Vector2) -> Vector2:
-	var button := _button_size()
-	return Vector2(roundf(viewport_size.x * LEFT_RATIO), roundf(viewport_size.y * (1.0 - BOTTOM_OFFSET_RATIO) - button - UP_OFFSET_PX))
 
 
 func _popup_title() -> String:
