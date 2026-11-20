@@ -30,6 +30,11 @@ var _total_count := 0
 var _gem_texture: Texture2D = null
 
 
+func _init() -> void:
+	super._init()
+	clamp_to_viewport = true
+
+
 func _ready() -> void:
 	# Left-aligned with the reminder label, ~10% down so both can be visible at once.
 	var viewport := get_viewport()
@@ -40,6 +45,12 @@ func _ready() -> void:
 	minimized = true
 	reveal = 0.0
 	_gem_texture = _load_texture("../assets/icons/gem.png")
+	_connect_viewport_resize(_on_viewport_resized)
+	_clamp_to_viewport()
+
+
+func _on_viewport_resized() -> void:
+	_clamp_to_viewport()
 
 
 func full_height() -> float:
@@ -144,6 +155,7 @@ func _make_content_key(entries: Array) -> String:
 func _apply_size() -> void:
 	var w := lerpf(_tab_width(), _content_width(), reveal)
 	size = Vector2(w, lerpf(HEAD_H + 1.0, full_height(), reveal))
+	_clamp_to_viewport()
 
 
 func _content_width() -> float:

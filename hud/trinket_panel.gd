@@ -26,6 +26,21 @@ const MARGIN_BOTTOM := 130.0  # Leaves room for the shop's bottom-right controls
 var _anchored := false
 
 
+func _init() -> void:
+	super._init()
+	# Keep the header (and its minimize button) reachable: the panel is free-floating
+	# and can otherwise be dragged or anchored off-screen when it grows tall.
+	clamp_to_viewport = true
+
+
+func _ready() -> void:
+	_connect_viewport_resize(_on_viewport_resized)
+
+
+func _on_viewport_resized() -> void:
+	_clamp_to_viewport()
+
+
 func full_height() -> float:
 	return HEAD_H + CONTENT_PADDING + ROW_HEIGHT * float(_entries.size()) \
 		+ ROW_GAP * float(_entries.size()) + CONTENT_PADDING
@@ -96,6 +111,7 @@ func _row_width(entry: Dictionary) -> float:
 
 func _apply_size() -> void:
 	size = Vector2(_content_width(), lerpf(HEAD_H + 1.0, full_height(), reveal))
+	_clamp_to_viewport()
 
 
 func _content_width() -> float:
@@ -115,6 +131,7 @@ func _content_width() -> float:
 func _anchor_bottom_right() -> void:
 	var viewport_size := get_viewport().get_visible_rect().size
 	position = Vector2(viewport_size.x - size.x - MARGIN_RIGHT, viewport_size.y - size.y - MARGIN_BOTTOM)
+	_clamp_to_viewport()
 
 
 func _draw_body(_width: float) -> void:
