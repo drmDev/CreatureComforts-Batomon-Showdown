@@ -25,6 +25,7 @@ const CombatStatsPanel = preload("combat_stats_panel.gd")
 const ReplayButton = preload("replay_button.gd")
 const ShopButtonBar = preload("../core/shop_button_bar.gd")
 const BattleMonitor = preload("../core/battle_monitor.gd")
+const HotkeyHint = preload("hotkey_hint.gd")
 
 const BATTLE_SCRIPT := "res://game/states/battle_state.gd"
 const BADGE_GAP := 4.0
@@ -49,6 +50,7 @@ var opponent_panel = null
 var combat_stats_panel = null
 var shop_highlight = null
 var sell_value_indicators = null
+var purchase_reminder_hint = null
 
 var _context = null
 var _rank_odds_popup_open := false
@@ -134,6 +136,11 @@ func _build_reminder_layer() -> void:
 	watchlist_panel.name = "WatchlistPanel"
 	watchlist_panel.setup(_context.formatter, _context.sounds_enabled, _context.mod_volume)
 	reminder_layer.add_child(watchlist_panel)
+
+	# Shop monster purchase reminder tooltip (hover over a shop monster card).
+	purchase_reminder_hint = HotkeyHint.new()
+	purchase_reminder_hint.name = "PurchaseReminderHint"
+	reminder_layer.add_child(purchase_reminder_hint)
 
 	# Replay Last Battle is created on demand and attached to the game's shop
 	# HudButtons bar (see attach_to_shop_view) so the game owns its layout and

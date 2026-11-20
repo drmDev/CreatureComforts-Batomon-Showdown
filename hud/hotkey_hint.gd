@@ -91,6 +91,21 @@ func _hide() -> void:
 	set_process(false)
 
 
+## Show the hint for `target` immediately. Used by the purchase reminder, which
+## is driven by the card's own hover signal rather than mouse_entered.
+func show_for(target: Control, text: String) -> void:
+	_hovered = target
+	_text = text
+	_dwell = 0.0
+	visible = false
+	set_process(true)
+
+
+## Hide the hint without disconnecting any watched control.
+func hide_hint() -> void:
+	_hide()
+
+
 func _process(delta: float) -> void:
 	if _hovered == null or not is_instance_valid(_hovered) or not _hovered.is_visible_in_tree():
 		_hide()

@@ -33,6 +33,7 @@ var _test_scripts := {
 	"rank_odds": preload("test_rank_odds.gd"),
 	"shop_button_bar": preload("test_shop_button_bar.gd"),
 	"hotkeys": preload("test_hotkeys.gd"),
+	"purchase_reminders": preload("test_purchase_reminders.gd"),
 }
 
 

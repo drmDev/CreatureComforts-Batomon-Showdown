@@ -18,6 +18,9 @@ Track Batomon and items you're looking for, with automatic highlighting in the s
 ### Trinket Reminders
 Get reminders for timing-sensitive trinkets, including Duplicators, Treasure Map, Upgrade Disc, and Greedy Gloves.
 
+### Shop Purchase Reminders
+Hover a shop monster to see which next-purchase trinkets will affect it, such as Upgrade Disc, Speed Whistle, and Power Band.
+
 ### Positional Trinket Summary
 A movable panel summarizes positional trinket bonuses, helping you optimize unit placement.
 

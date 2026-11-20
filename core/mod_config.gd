@@ -47,6 +47,8 @@ const KEY_SHOP_HIGHLIGHTS := "shop_highlights"
 const KEY_COMBAT_STATS_PANEL := "combat_stats_panel"
 ## Backtick fast-forward and Tab trinket bag hotkeys.
 const KEY_HOTKEYS := "hotkeys"
+## Shop monster purchase hover reminders (next-purchase trinkets).
+const KEY_PURCHASE_REMINDERS := "purchase_reminders"
 
 ## Most features default to enabled to preserve existing behavior. The beta
 ## positional trinket summary defaults to disabled.
@@ -63,6 +65,7 @@ const DEFAULTS := {
 	KEY_SHOP_HIGHLIGHTS: true,
 	KEY_COMBAT_STATS_PANEL: true,
 	KEY_HOTKEYS: true,
+	KEY_PURCHASE_REMINDERS: true,
 }
 
 ## Emitted when a feature toggle changes (loader-driven). Mod Volume is read on

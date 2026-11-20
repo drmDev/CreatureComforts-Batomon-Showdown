@@ -15,6 +15,7 @@ const AdviceController = preload("../advice/advice_controller.gd")
 const TrinketRemindersController = preload("../hud/trinket_reminders_controller.gd")
 const PositionalTrinketsController = preload("../hud/positional_trinkets_controller.gd")
 const ModConfig = preload("mod_config.gd")
+const PurchaseRemindersController = preload("../hud/purchase_reminders_controller.gd")
 
 var _context = null
 var _ui = null
@@ -32,6 +33,7 @@ var _last_run_id := ""
 var _advice = null
 var _trinket_reminders = null
 var _positional_trinkets = null
+var _purchase_reminders = null
 
 
 func setup(context, ui, shop_overlay_gate, dev_tools, on_shop_entered: Callable, on_run_changed: Callable, has_replay: Callable = Callable()) -> void:
@@ -55,6 +57,9 @@ func setup(context, ui, shop_overlay_gate, dev_tools, on_shop_entered: Callable,
 
 	_positional_trinkets = PositionalTrinketsController.new()
 	_positional_trinkets.setup(_ui.positional_trinkets_panel, _context)
+
+	_purchase_reminders = PurchaseRemindersController.new()
+	_purchase_reminders.setup(_context, _ui.purchase_reminder_hint)
 
 
 ## Handle one shop poll. Returns true when the shop phase was processed (so the
@@ -117,6 +122,7 @@ func handle(state, phase_changed: bool) -> bool:
 	var gate_allowed: bool = _shop_overlay_gate == null or _shop_overlay_gate.is_allowed()
 	_ui.update_sell_values(view, gate_allowed)
 	_ui.update_watchlist_button(view)
+	_purchase_reminders.update(run, view)
 	if _has_replay.is_valid():
 		_ui.update_replay_button(view, bool(_has_replay.call()))
 
@@ -137,6 +143,8 @@ func on_feature_toggled(key: String, value: bool) -> void:
 		_trinket_reminders.on_feature_toggled(key, value)
 	elif key == ModConfig.KEY_POSITIONAL_TRINKETS:
 		_positional_trinkets.on_feature_toggled(key, value)
+	elif key == ModConfig.KEY_PURCHASE_REMINDERS:
+		_purchase_reminders.on_feature_toggled(key, value)
 
 
 func _log_phase_entry(run, manager) -> void:
