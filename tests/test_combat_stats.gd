@@ -193,6 +193,41 @@ func test_format_value() -> void:
 	assert_eq(CombatStats.format_value(-1500.0), "-1,500")
 
 
+func _font() -> Font:
+	var f := SystemFont.new()
+	f.font_names = PackedStringArray(["Arial"])
+	return f
+
+
+func test_format_value_abbreviates_when_too_wide() -> void:
+	var font := _font()
+	# A tiny width forces abbreviation even for a modest number.
+	assert_eq(CombatStats.format_value(204880.0, 1.0, font, 5), "205K")
+	assert_eq(CombatStats.format_value(3548042.0, 1.0, font, 5), "3.55M")
+	assert_eq(CombatStats.format_value(641758458.0, 1.0, font, 5), "642M")
+	assert_eq(CombatStats.format_value(1234567890.0, 1.0, font, 5), "1.23B")
+
+
+func test_format_value_keeps_full_when_it_fits() -> void:
+	var font := _font()
+	# A very wide max width keeps the full thousands-separated form.
+	assert_eq(CombatStats.format_value(18408.0, 1000.0, font, 5), "18,408")
+
+
+func test_format_value_null_ignores_width() -> void:
+	assert_eq(CombatStats.format_value(null, 1.0, _font(), 5), "-")
+
+
+func test_format_value_zero_through_billions() -> void:
+	var font := _font()
+	assert_eq(CombatStats.format_value(0.0, 1.0, font, 5), "0")
+	assert_eq(CombatStats.format_value(999.0, 1.0, font, 5), "999")
+	assert_eq(CombatStats.format_value(1000.0, 1.0, font, 5), "1K")
+	assert_eq(CombatStats.format_value(999999.0, 1.0, font, 5), "1000K")
+	assert_eq(CombatStats.format_value(1000000.0, 1.0, font, 5), "1M")
+	assert_eq(CombatStats.format_value(1000000000.0, 1.0, font, 5), "1B")
+
+
 func test_metric_labels() -> void:
 	assert_eq(CombatStats.metric_label("damage"), "Damage")
 	assert_eq(CombatStats.metric_label("status_damage"), "Status Damage")

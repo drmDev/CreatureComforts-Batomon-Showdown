@@ -116,14 +116,66 @@ static func compare(player_value, opponent_value) -> String:
 
 ## Format a metric value for display: thousands separators, no trailing ".0" for
 ## whole numbers, and "-" for an unavailable (null) value.
-static func format_value(value) -> String:
+##
+## When `max_width` and `font` are provided, the value is abbreviated (K/M/B) if
+## the full string would not fit, so large numbers never overflow their column.
+static func format_value(value, max_width: float = -1.0, font = null, font_size: int = 5) -> String:
 	if value == null:
 		return "-"
 	var number := float(value)
+	var full := _full_format(number)
+	if max_width <= 0.0 or font == null:
+		return full
+	if font.get_string_size(full, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x <= max_width:
+		return full
+	return _abbreviate(number)
+
+
+## Full-precision display string for a number (thousands separators, no trailing
+## ".0" for whole numbers).
+static func _full_format(number: float) -> String:
 	var rounded := roundf(number)
 	if is_equal_approx(number, rounded):
 		return _group_thousands(str(int(rounded)))
 	return _group_thousands("%.1f" % number)
+
+
+## Abbreviate a number to three significant digits with a K/M/B suffix, trimming
+## trailing zeros (e.g. 204880 -> "205K", 3548042 -> "3.55M", 641758458 -> "642M").
+static func _abbreviate(number: float) -> String:
+	var negative := number < 0.0
+	var magnitude := absf(number)
+	if magnitude >= 1_000_000_000.0:
+		return _suffix(_round_sig(number / 1_000_000_000.0, 3), "B", negative)
+	if magnitude >= 1_000_000.0:
+		return _suffix(_round_sig(number / 1_000_000.0, 3), "M", negative)
+	if magnitude >= 1_000.0:
+		return _suffix(_round_sig(number / 1_000.0, 3), "K", negative)
+	return _full_format(number)
+
+
+## Round `value` to `digits` significant figures.
+static func _round_sig(value: float, digits: int) -> float:
+	if is_zero_approx(value):
+		return 0.0
+	var magnitude := absf(value)
+	var scale := pow(10.0, digits - 1 - floor(log(magnitude) / log(10.0)))
+	return roundf(value * scale) / scale
+
+
+## Format a scaled value with a suffix, trimming a trailing ".0" for whole values.
+static func _suffix(scaled: float, suffix: String, negative: bool) -> String:
+	var text := ""
+	if is_equal_approx(scaled, roundf(scaled)):
+		text = str(int(roundf(scaled)))
+	else:
+		text = "%.2f" % scaled
+		# Trim trailing zeros (e.g. "3.50" -> "3.5", "3.00" -> "3").
+		while text.ends_with("0"):
+			text = text.left(text.length() - 1)
+		if text.ends_with("."):
+			text = text.left(text.length() - 1)
+	return ("-" if negative else "") + text + suffix
 
 
 static func _read_unit(unit) -> Dictionary:

@@ -185,8 +185,8 @@ func _draw_body(_width: float) -> void:
 		var pv = player_totals.get(key)
 		var ov = opponent_totals.get(key)
 		var op := CombatStats.compare(pv, ov)
-		var left_text := "%s: %s" % [label, CombatStats.format_value(pv)]
-		var right_text := "%s: %s" % [label, CombatStats.format_value(ov)]
+		var left_text := "%s: %s" % [label, CombatStats.format_value(pv, COLUMN_WIDTH, _text_font, ROW_FONT_SIZE)]
+		var right_text := "%s: %s" % [label, CombatStats.format_value(ov, COLUMN_WIDTH, _text_font, ROW_FONT_SIZE)]
 		var baseline := y + ROW_H - 2.0
 		_draw_text_shadow(Vector2(_left_col_x(), baseline), left_text, VALUE_COLOR, ROW_FONT_SIZE, HORIZONTAL_ALIGNMENT_RIGHT, COLUMN_WIDTH)
 		_draw_text_shadow(Vector2(_gutter_x(), baseline), op, _operator_color(op), ROW_FONT_SIZE, HORIZONTAL_ALIGNMENT_CENTER, GUTTER)
@@ -300,7 +300,7 @@ func _draw_table_cell(x: float, y: float, w: float, text: String, color: Color, 
 ## Numeric cell: right-aligned, thousands-separated, muted when zero or missing,
 ## green when it is the team's top value for that metric (ties all highlight).
 func _draw_metric_cell(x: float, y: float, w: float, value, best) -> void:
-	var text := CombatStats.format_value(value)
+	var text := CombatStats.format_value(value, w, _text_font, TABLE_FONT_SIZE)
 	var color := VALUE_COLOR
 	if _is_zero(value):
 		color = ZERO_COLOR
