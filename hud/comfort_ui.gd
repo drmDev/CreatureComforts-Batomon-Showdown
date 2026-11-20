@@ -38,6 +38,7 @@ var base_hp_panel = null
 var watchlist_panel = null
 var replay_button = null
 var rank_odds_button = null
+var watchlist_button = null
 var trinket_panel = null
 var player_hud = null
 var battle_elapsed_panel = null
@@ -54,6 +55,8 @@ var _replay_active := false
 var _replay_button_host_id := 0
 var _rank_odds_button_host_id := 0
 var _rank_odds_button_extra := 0.0
+var _watchlist_button_host_id := 0
+var _watchlist_button_shift := 0.0
 
 
 func setup(context) -> void:
@@ -245,6 +248,7 @@ func hide_shop_panels() -> void:
 	if watchlist_panel != null:
 		watchlist_panel.close_popup()
 	_detach_rank_odds_button()
+	_detach_watchlist_button()
 
 
 ## Close any open shop modal when the shop becomes interactive again.
@@ -438,6 +442,75 @@ func update_rank_odds(view, rank: int, held_trinket_ids = []) -> void:
 	rank_odds_panel.set_rank(rank, held_trinket_ids)
 
 
+## Attach the watchlist button to the game's active-team HBox (the row holding
+## the Team panel), inserting it left of the team and shifting the centred HBox
+## left by half the added width so the team stays put.
+func update_watchlist_button(view) -> void:
+	if watchlist_panel == null:
+		return
+	if not _context.feature_enabled(ModConfig.KEY_SHOP_HIGHLIGHTS):
+		_detach_watchlist_button()
+		return
+	_attach_watchlist_button(view)
+
+
+func _attach_watchlist_button(view) -> void:
+	if watchlist_panel == null:
+		return
+	var hbox = _get_team_hbox(view)
+	if hbox == null:
+		if _watchlist_button_alive():
+			_detach_watchlist_button()
+			_watchlist_log("detached (no team HBox)")
+		return
+	var host_id: int = hbox.get_instance_id()
+	if _watchlist_button_alive() and _watchlist_button_host_id == host_id:
+		return
+	_detach_watchlist_button()
+	watchlist_button = watchlist_panel.make_button()
+	if watchlist_button == null:
+		return
+	watchlist_button.name = "CreatureComfortsWatchlistButton"
+	hbox.add_child(watchlist_button)
+	hbox.move_child(watchlist_button, 0)
+	_watchlist_button_host_id = host_id
+	var separation := float(hbox.get_theme_constant("separation"))
+	var added: float = watchlist_button.get_combined_minimum_size().x + separation
+	_watchlist_button_shift = added * 0.5
+	hbox.offset_left -= _watchlist_button_shift
+	hbox.offset_right -= _watchlist_button_shift
+	_watchlist_log("attached")
+
+
+func _get_team_hbox(view):
+	if not is_instance_valid(view):
+		return null
+	var team_ui = view.get_node_or_null("MonsterTeamUI")
+	if not is_instance_valid(team_ui):
+		return null
+	return team_ui.get_node_or_null("HBoxContainer")
+
+
+func _watchlist_button_alive() -> bool:
+	return watchlist_button != null and is_instance_valid(watchlist_button)
+
+
+func _detach_watchlist_button() -> void:
+	if _watchlist_button_alive():
+		var parent = watchlist_button.get_parent()
+		if is_instance_valid(parent) and parent.get_instance_id() == _watchlist_button_host_id:
+			parent.offset_left += _watchlist_button_shift
+			parent.offset_right += _watchlist_button_shift
+		watchlist_button.free()
+	watchlist_button = null
+	_watchlist_button_host_id = 0
+	_watchlist_button_shift = 0.0
+
+
+func _watchlist_log(detail: String) -> void:
+	_on_panel_log_line("WATCHLIST | " + detail)
+
+
 func update_base_hp(day: int, total_hp: int) -> void:
 	if base_hp_panel == null:
 		return
@@ -565,6 +638,8 @@ func on_feature_toggled(key: String, value: bool) -> void:
 			shop_highlight.set_enabled(value)
 		if not value and watchlist_panel != null:
 			watchlist_panel.close_popup()
+		if not value:
+			_detach_watchlist_button()
 		# Restore the button row, which also respects an open Base HP popup.
 		_restore_shop_buttons(value)
 		return

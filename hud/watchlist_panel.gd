@@ -8,9 +8,7 @@ extends "comfort_panel.gd"
 ## are never changed by either.
 
 const CFG_PATH := "user://creature_comforts/watchlist.cfg"
-const BTN_SIZE := 20
-const LEFT_RATIO := 0.27
-const BOTTOM_OFFSET_RATIO := 0.60
+const BTN_SIZE := 18
 
 ## Tiny tab indicator dot. Must stay at or below the gold Sell Value badge icon
 ## (5.25 px) in hud/sell_value_badge.gd.
@@ -63,7 +61,6 @@ var _catalog_index := {}  # "kind:key" -> catalog entry, for saved-build preview
 var _available_types: Array = []
 var _catalog_loaded := false
 
-var _button: WatchlistButton
 var _popup: Control
 var _panel: PanelContainer
 var _filters_box: VBoxContainer
@@ -125,27 +122,13 @@ func setup(formatter, sounds_enabled: Callable = Callable(), sound_volume: Calla
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_anchor_button()
 	_position_panel()
 	_apply_tooltip_theme()
 	_connect_viewport_resize(_on_viewport_resized)
 
 
 func _on_viewport_resized() -> void:
-	_anchor_button()
 	_position_panel()
-
-
-func _anchor_button() -> void:
-	if _button == null:
-		return
-	var vp := get_viewport()
-	if vp == null:
-		return
-	var vs := vp.get_visible_rect().size
-	_button.position = Vector2(
-		roundf(vs.x * LEFT_RATIO),
-		roundf(vs.y * (1.0 - BOTTOM_OFFSET_RATIO) - BTN_SIZE))
 
 
 func _position_panel() -> void:
@@ -194,17 +177,6 @@ func _build_ui() -> void:
 	_click_sound.setup(self, "click.ogg", _sounds_enabled, _sound_volume)
 	_save_sound = UiSound.new()
 	_save_sound.setup(self, "save.ogg", _sounds_enabled, _sound_volume)
-	# Custom-drawn control (not a Button) so BTN_SIZE fully controls the size;
-	# a Button clamps to its text + theme padding minimum.
-	_button = WatchlistButton.new()
-	_button.font = _text_font
-	_button.font_size = BODY_FONT_SIZE
-	_button.icon = _load_texture("../assets/icons/watchlist.png")
-	_button.style_box = _build_hud_box()
-	_button.on_press = _toggle_popup
-	_button.custom_minimum_size = Vector2(BTN_SIZE, BTN_SIZE)
-	_button.size = Vector2(BTN_SIZE, BTN_SIZE)
-	add_child(_button)
 
 	_popup = Control.new()
 	_popup.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -558,6 +530,39 @@ func _ensure_row_styles() -> void:
 	_row_pressed_style = StyleBoxFlat.new()
 	_row_pressed_style.bg_color = Color(0.95, 0.61, 0.07, 0.22)
 	_row_pressed_style.set_corner_radius_all(2)
+
+
+## Build the small shop button that opens the watchlist. comfort_ui.gd attaches
+## it to the game's active-team HBox; the popup stays on this panel.
+func make_button() -> Button:
+	var button := Button.new()
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(BTN_SIZE, BTN_SIZE)
+	button.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	button.expand_icon = true
+	button.icon = _load_watchlist_icon()
+	button.tooltip_text = "Watchlist"
+	Style.compact_button(button)
+	button.pressed.connect(_toggle_popup)
+	return button
+
+
+## The watchlist asset is a tall 54x80 glyph drawn flush to its left edge, so
+## `expand_icon` pushes it against the button's left border. Rebuild it centred
+## in a square canvas so the expanded square glyph stays centred in the button.
+func _load_watchlist_icon() -> Texture2D:
+	var source := PanelIcons.load_icon(str(get_script().resource_path), "watchlist.png")
+	if source == null:
+		return null
+	var glyph := source.get_image()
+	if glyph == null:
+		return source
+	var side := maxi(glyph.get_width(), glyph.get_height())
+	var square := Image.create(side, side, false, Image.FORMAT_RGBA8)
+	square.fill(Color.TRANSPARENT)
+	var pos := Vector2i((side - glyph.get_width()) / 2, (side - glyph.get_height()) / 2)
+	square.blit_rect(glyph, Rect2i(Vector2i.ZERO, glyph.get_size()), pos)
+	return ImageTexture.create_from_image(square)
 
 
 func _toggle_popup() -> void:
@@ -1377,52 +1382,6 @@ static func _format_ids(ids: Dictionary) -> String:
 	var keys: Array = ids.keys()
 	keys.sort()
 	return ",".join(keys)
-
-
-## Small self-drawn button. A plain Control has no content minimum, so its size
-## is exactly BTN_SIZE (unlike a Button, which clamps to text + theme padding).
-class WatchlistButton extends Control:
-	const Style = preload("../core/style.gd")
-	const ICON_PADDING := 2.0
-	var font: Font
-	var font_size := 7
-	var icon: Texture2D
-	# Rounded HUD box supplied by the owning panel (comfort_panel._build_hud_box),
-	# so this button matches the rank-odds and income widgets.
-	var style_box: StyleBoxFlat
-	var on_press: Callable
-
-	func _ready() -> void:
-		mouse_filter = Control.MOUSE_FILTER_STOP
-		focus_mode = Control.FOCUS_NONE
-		tooltip_text = "Watchlist"
-
-	func _draw() -> void:
-		if style_box != null:
-			style_box.draw(get_canvas_item(), Rect2(Vector2.ZERO, size))
-		if icon != null:
-			var tex_size := icon.get_size()
-			if tex_size.x > 0.0 and tex_size.y > 0.0:
-				# Same inset the rank-odds icon uses, so the rounded border shows.
-				var box := Vector2(
-					maxf(size.x - ICON_PADDING * 2.0, 1.0),
-					maxf(size.y - ICON_PADDING * 2.0, 1.0))
-				var draw_size := tex_size * minf(box.x / tex_size.x, box.y / tex_size.y)
-				draw_texture_rect(icon, Rect2((size - draw_size) * 0.5, draw_size), false)
-				return
-		if font != null:
-			# Fallback when the asset is missing (e.g. an incomplete install).
-			var text := "WL"
-			var tw := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-			var th := font.get_height(font_size)
-			draw_string(font, Vector2((size.x - tw) * 0.5, (size.y + th) * 0.5 - 2.0),
-				text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Style.VALUE_COLOR)
-
-	func _gui_input(event) -> void:
-		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-			if on_press.is_valid():
-				on_press.call()
-			accept_event()
 
 
 ## Tiny solid blue dot marking a tab that has tracked entries. It is a child of
