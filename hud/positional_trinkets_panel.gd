@@ -12,24 +12,28 @@ extends "collapsible_panel.gd"
 const PositionalTrinkets = preload("../core/positional_trinkets.gd")
 const EconomicalTrinkets = preload("../core/economical_trinkets.gd")
 
-const CONTENT_PADDING := 4.0
-const BODY_TOP_PADDING := 3.0
-const LINE_HEIGHT := 11.0
-const SECTION_GAP := 3.0
+const CONTENT_PADDING := 3.0
+const BODY_TOP_PADDING := 2.0
+const LINE_HEIGHT := 10.0
+const CATEGORY_GAP := 4.0
+const POSITION_GAP := 2.0
 const TAG_GAP := 6.0
 const FONT_SIZE := 8
-const GROUP_FONT_SIZE := 10
-const SECTION_FONT_SIZE := 9
+const CATEGORY_FONT_SIZE := 9
+const POSITION_FONT_SIZE := 7
+const SECONDARY_FONT_SIZE := 7
 const TAG_FONT_SIZE := 7
 const MAX_WIDTH := 300.0
 const TAB_EXTRA_WIDTH := 30.0
 const SEPARATOR_ALPHA := 0.35
 
-const SECTION_ORDER := ["left", "top_middle", "right"]
+## Dimmest text, used for secondary explanations such as "No more Items".
+const MUTED_COLOR := Style.MUTED_COLOR
+
 const SECTION_LABELS := {
-	"left": "Left Column",
-	"top_middle": "Top Middle",
-	"right": "Right Column",
+	"left": "LEFT COLUMN",
+	"top_middle": "TOP MIDDLE",
+	"right": "RIGHT COLUMN",
 }
 
 var _summary: Dictionary = {}
@@ -37,6 +41,8 @@ var _anchored := false
 var _initialized := false
 var _layout_cache: Array = []
 var _layout_key := ""
+var _rows_cache: Array = []
+var _rows_key := ""
 
 
 func _init() -> void:
@@ -157,7 +163,17 @@ func _on_viewport_resized() -> void:
 	_clamp_to_viewport()
 
 
+## Rows are rebuilt only when the summary changes. The panel redraws every frame
+## while dragging or animating, so this avoids repeated allocations.
 func _build_rows() -> Array:
+	if _rows_key == _content_key and not _rows_cache.is_empty():
+		return _rows_cache
+	_rows_key = _content_key
+	_rows_cache = _compose_rows()
+	return _rows_cache
+
+
+func _compose_rows() -> Array:
 	var positional: Dictionary = _summary.get("positional", {})
 	var economical: Dictionary = _summary.get("economical", {})
 	var has_positional := bool(positional.get("has_any", false))
@@ -171,66 +187,65 @@ func _build_rows() -> Array:
 		}]
 
 	var rows: Array = []
-	var first_group := true
+	var first_category := true
 	if has_positional:
-		rows.append({
-			"text": "Positional Trinkets",
-			"kind": "group",
-			"color": VALUE_COLOR,
-			"font_size": GROUP_FONT_SIZE,
-			"gap_before": 0.0,
-		})
-		first_group = false
-		var first_section := true
-		for position in SECTION_ORDER:
-			var section: Dictionary = positional.get(position, {})
+		rows.append(_category_row("POSITIONAL", first_category))
+		first_category = false
+		# Only positions with active bonuses are shown, so the panel stays
+		# compact and a column appears as soon as a relevant trinket is held.
+		for position in PositionalTrinkets.active_positions(positional):
 			rows.append({
 				"text": SECTION_LABELS[position],
-				"kind": "heading",
-				"color": VALUE_COLOR,
-				"font_size": SECTION_FONT_SIZE,
-				"gap_before": 0.0 if first_section else SECTION_GAP,
+				"kind": "position",
+				"color": LABEL_COLOR,
+				"font_size": POSITION_FONT_SIZE,
+				"gap_before": POSITION_GAP,
 			})
-			first_section = false
-			var ordered := PositionalTrinkets.ordered_effects(section)
-			if ordered.is_empty():
+			for entry in PositionalTrinkets.ordered_effects(positional.get(position, {})):
+				var effect: Dictionary = entry["effect"]
+				var timing := str(entry["timing"])
 				rows.append({
-					"text": "No bonuses",
-					"kind": "muted",
-					"color": LABEL_COLOR,
+					"text": PositionalTrinkets.format_effect(effect),
+					"tag": PositionalTrinkets.TAG_LABELS.get(timing, timing),
+					"kind": "bonus",
+					"color": VALUE_COLOR,
 					"font_size": FONT_SIZE,
 				})
-			else:
-				for entry in ordered:
-					var effect: Dictionary = entry["effect"]
-					var timing := str(entry["timing"])
-					rows.append({
-						"text": PositionalTrinkets.format_effect(effect),
-						"tag": PositionalTrinkets.TAG_LABELS.get(timing, timing),
-						"kind": "bonus",
-						"color": VALUE_COLOR,
-						"font_size": FONT_SIZE,
-					})
 	if has_economical:
-		rows.append({
-			"text": "Economical Trinkets",
-			"kind": "group",
-			"color": VALUE_COLOR,
-			"font_size": GROUP_FONT_SIZE,
-			"gap_before": 0.0 if first_group else SECTION_GAP,
-		})
-		first_group = false
+		rows.append(_category_row("ECONOMY", first_category))
+		first_category = false
 		for entry in EconomicalTrinkets.ordered_effects(economical):
 			var effect: Dictionary = entry["effect"]
 			var timing := str(entry["timing"])
-			rows.append({
-				"text": EconomicalTrinkets.format_effect(effect),
-				"tag": EconomicalTrinkets.TAG_LABELS.get(timing, timing),
-				"kind": "bonus",
-				"color": VALUE_COLOR,
-				"font_size": FONT_SIZE,
-			})
+			if effect.has("text"):
+				# Secondary explanations (e.g. "No more Items") are muted and
+				# carry no effect tag.
+				rows.append({
+					"text": EconomicalTrinkets.format_effect(effect),
+					"kind": "secondary",
+					"color": MUTED_COLOR,
+					"font_size": SECONDARY_FONT_SIZE,
+				})
+			else:
+				rows.append({
+					"text": EconomicalTrinkets.format_effect(effect, timing),
+					"tag": EconomicalTrinkets.TAG_LABELS.get(timing, timing),
+					"kind": "bonus",
+					"color": VALUE_COLOR,
+					"font_size": FONT_SIZE,
+				})
 	return rows
+
+
+func _category_row(text: String, first: bool) -> Dictionary:
+	return {
+		"text": text,
+		"kind": "category",
+		"color": BORDER_COLOR,
+		"font_size": CATEGORY_FONT_SIZE,
+		"gap_before": 0.0 if first else CATEGORY_GAP,
+		"separator": not first,
+	}
 
 
 func _tag_column_width() -> float:
@@ -272,6 +287,7 @@ func _layout() -> Array:
 		return _layout_cache
 	var content_width := _content_width()
 	var text_col := maxf(content_width - CONTENT_PADDING * 2.0 - 2.0 - _tag_column_width(), 20.0)
+	var full_col := maxf(content_width - CONTENT_PADDING * 2.0 - 2.0, 20.0)
 	for row in _build_rows():
 		var kind := str(row.get("kind", "text"))
 		var text := str(row.get("text", ""))
@@ -281,12 +297,16 @@ func _layout() -> Array:
 		if kind == "bonus":
 			lines = _wrap_text(text, text_col, font_size)
 			height = float(lines.size()) * LINE_HEIGHT
+		elif kind == "secondary":
+			lines = _wrap_text(text, full_col, font_size)
+			height = float(lines.size()) * LINE_HEIGHT
 		_layout_cache.append({
 			"kind": kind,
 			"text": text,
 			"tag": str(row.get("tag", "")),
 			"font_size": font_size,
 			"gap_before": float(row.get("gap_before", 0.0)),
+			"separator": bool(row.get("separator", false)),
 			"lines": lines,
 			"height": height,
 		})
@@ -301,7 +321,7 @@ func _draw_body(_width: float) -> void:
 	var right_edge := size.x - CONTENT_PADDING - 1.0
 	for row in rows:
 		var gap := float(row.get("gap_before", 0.0))
-		if gap > 0.0:
+		if bool(row.get("separator", false)) and gap > 0.0:
 			var sep_y := cursor_y + gap * 0.5
 			draw_line(
 				Vector2(CONTENT_PADDING + 1.0, sep_y),
@@ -315,11 +335,11 @@ func _draw_body(_width: float) -> void:
 		var color: Color = row.get("color", VALUE_COLOR)
 		var x := CONTENT_PADDING + 1.0
 		var baseline := cursor_y + LINE_HEIGHT - 3.0
-		if kind == "bonus":
+		if kind == "bonus" or kind == "secondary":
 			var lines: Array = row.get("lines", [])
 			for i in range(lines.size()):
 				_draw_text_shadow(Vector2(x, baseline + float(i) * LINE_HEIGHT), str(lines[i]), color, font_size)
-			if reveal >= 0.999:
+			if kind == "bonus" and reveal >= 0.999:
 				var tag := str(row.get("tag", ""))
 				if not tag.is_empty():
 					_draw_text_shadow(
@@ -332,13 +352,4 @@ func _draw_body(_width: float) -> void:
 					)
 		else:
 			_draw_text_shadow(Vector2(x, baseline), str(row.get("text", "")), color, font_size)
-			if kind == "group":
-				# Underline the group title so it reads above the section headings.
-				var line_y := cursor_y + float(row.get("height", LINE_HEIGHT)) - 1.0
-				draw_line(
-					Vector2(x, line_y),
-					Vector2(right_edge, line_y),
-					Color(BORDER_COLOR.r, BORDER_COLOR.g, BORDER_COLOR.b, SEPARATOR_ALPHA),
-					1.0
-				)
 		cursor_y += float(row.get("height", LINE_HEIGHT))

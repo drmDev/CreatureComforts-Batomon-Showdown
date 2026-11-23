@@ -155,7 +155,21 @@ func test_ordered_effects_empty_section() -> void:
 
 func test_tag_labels_map_timings() -> void:
 	assert_eq(PositionalTrinkets.TAG_LABELS["permanent"], "Permanent")
-	assert_eq(PositionalTrinkets.TAG_LABELS["passive"], "Temporary")
+	assert_eq(PositionalTrinkets.TAG_LABELS["passive"], "Passive")
+
+
+func test_active_positions_hides_empty_columns() -> void:
+	var summary := PositionalTrinkets.summarize(["quick_flag"])
+	assert_eq(PositionalTrinkets.active_positions(summary), ["left"])
+
+
+func test_active_positions_lists_all_held_columns() -> void:
+	var summary := PositionalTrinkets.summarize(["quick_flag", "power_crown", "speed_crest"])
+	assert_eq(PositionalTrinkets.active_positions(summary), ["left", "top_middle", "right"])
+
+
+func test_active_positions_empty_summary() -> void:
+	assert_empty(PositionalTrinkets.active_positions(PositionalTrinkets.summarize([])))
 
 
 func test_format_effect_percent() -> void:

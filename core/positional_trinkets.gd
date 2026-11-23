@@ -96,9 +96,11 @@ const POSITIONS := ["left", "top_middle", "right"]
 const TIMINGS := ["passive", "permanent"]
 
 ## Display labels for each effect timing, used by the panel's right-aligned tag.
+## "permanent" effects are applied on Battle Start and persist on the monster;
+## "passive" effects are active while the trinket is held.
 const TAG_LABELS := {
 	"permanent": "Permanent",
-	"passive": "Temporary",
+	"passive": "Passive",
 }
 
 ## Display order inside a subdivision. Text-only effects sort after numeric ones.
@@ -164,6 +166,17 @@ static func ordered_effects(section: Dictionary) -> Array:
 		for effect in section.get(timing, []):
 			ordered.append({"effect": effect, "timing": timing})
 	return ordered
+
+
+## Positions that currently have at least one effect, in display order. The
+## panel hides empty positions so only relevant columns take up space.
+static func active_positions(summary: Dictionary) -> Array:
+	var active: Array = []
+	for position in POSITIONS:
+		var section: Dictionary = summary.get(position, {})
+		if not ordered_effects(section).is_empty():
+			active.append(position)
+	return active
 
 
 ## Format one summed effect for the panel.

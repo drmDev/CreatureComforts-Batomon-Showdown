@@ -123,18 +123,26 @@ func test_format_effect_income() -> void:
 func test_format_effect_gold() -> void:
 	assert_eq(
 		EconomicalTrinkets.format_effect({"stat": "gold", "value": 100}),
-		"Gain $100"
+		"+$100"
+	)
+	assert_eq(
+		EconomicalTrinkets.format_effect({"stat": "gold", "value": 8}, "victory"),
+		"+$8 On Victory"
+	)
+	assert_eq(
+		EconomicalTrinkets.format_effect({"stat": "gold", "value": 40}, "next_loss"),
+		"+$40 On Next Loss"
 	)
 
 
 func test_format_effect_gold_per_10() -> void:
 	assert_eq(
 		EconomicalTrinkets.format_effect({"stat": "gold_per_10", "value": 2, "rate": 1, "count": 1}),
-		"Gain $2 (1 per $10 held)"
+		"+$2 Income ($1 per $10 held)"
 	)
 	assert_eq(
 		EconomicalTrinkets.format_effect({"stat": "gold_per_10", "value": 4, "rate": 2, "count": 2}),
-		"Gain $4 (2 per $10 held)"
+		"+$4 Income ($2 per $10 held)"
 	)
 
 

@@ -12,8 +12,8 @@ extends RefCounted
 ##   "victory"   - triggers when the player wins a battle
 ##   "next_loss" - triggers on the player's next loss
 ##
-## The panel renders this summary as its own "Economical Trinkets" group next to
-## the positional breakdown.
+## The panel renders this summary as its own ECONOMY group next to the
+## positional breakdown.
 
 const TRINKETS := {
 	"gold_bracelet": {
@@ -113,8 +113,9 @@ static func ordered_effects(summary: Dictionary) -> Array:
 	return ordered
 
 
-## Format one summed effect for the panel.
-static func format_effect(effect: Dictionary) -> String:
+## Format one summed effect for the panel. `timing` lets gold payouts name their
+## trigger ("On Victory", "On Next Loss") while the right-hand tag stays short.
+static func format_effect(effect: Dictionary, timing: String = "") -> String:
 	if effect.has("text"):
 		var text := str(effect["text"])
 		var count := int(effect.get("count", 1))
@@ -132,12 +133,17 @@ static func format_effect(effect: Dictionary) -> String:
 		"income":
 			return "+$%d Income" % value
 		"gold":
-			return "Gain $%d" % value
+			match timing:
+				"victory":
+					return "+$%d On Victory" % value
+				"next_loss":
+					return "+$%d On Next Loss" % value
+			return "+$%d" % value
 		"gold_per_10":
 			# `rate` is the per-$10 payout for all held copies; `value` is the
 			# payout at the player's current gold.
 			var rate := int(effect.get("rate", value))
-			return "Gain $%d (%d per $10 held)" % [value, rate]
+			return "+$%d Income ($%d per $10 held)" % [value, rate]
 	return "+%d %s" % [value, stat.capitalize()]
 
 
@@ -153,15 +159,19 @@ static func _add_effect(target: Array, effect: Dictionary, count: int, gold: int
 
 	var stat := str(effect.get("stat", ""))
 	var note := str(effect.get("note", ""))
-	var rate := int(effect.get("value", 0)) * count
-	var value := rate
+	var value := int(effect.get("value", 0)) * count
+	var rate := 0
 	if stat == "gold_per_10":
+		# `rate` is the per-$10 payout for all held copies; `value` is the
+		# payout at the player's current gold.
+		rate = int(effect.get("value", 0)) * count
 		value = int(floor(float(gold) / 10.0)) * rate
 	for existing in target:
 		if str(existing.get("stat", "")) == stat and str(existing.get("note", "")) == note:
 			existing["value"] = int(existing.get("value", 0)) + value
-			existing["rate"] = int(existing.get("rate", 0)) + rate
 			existing["count"] = int(existing.get("count", 0)) + count
+			if stat == "gold_per_10":
+				existing["rate"] = int(existing.get("rate", 0)) + rate
 			return
 	var entry := {
 		"stat": stat,
