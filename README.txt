@@ -21,8 +21,8 @@ Get reminders for timing-sensitive trinkets, including Duplicators, Treasure Map
 ### Shop Purchase Reminders
 Hover a shop monster to see which next-purchase trinkets will affect it, such as Upgrade Disc, Speed Whistle, and Power Band.
 
-### Positional Trinket Summary
-A movable panel summarizes positional trinket bonuses, helping you optimize unit placement.
+### Trinket Bonus Summary
+A movable panel summarizes positional trinket bonuses (left column, top middle, right column) and economical trinkets (sell value, income, and gold payouts), helping you optimize unit placement and spending.
 
 ### Battle Trinket Rewards
 See which trinkets you earned during combat, including their quantities.

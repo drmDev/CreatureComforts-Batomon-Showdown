@@ -1,11 +1,16 @@
 extends "collapsible_panel.gd"
-## Movable, collapsible summary of the player's positional trinket bonuses.
+## Movable, collapsible summary of the player's trinket bonuses.
+##
+## Renders two groups in one panel: the positional breakdown (left column, top
+## middle, right column) and the economical trinkets (sell value, income, gold
+## payouts). A group is omitted when the player holds no trinket from it.
 ##
 ## The panel is shop-gated by the reminder layer. It starts collapsed on the
 ## first shop visit, anchors at 25% of the viewport width and height, and keeps
 ## the player's dragged position and collapsed/expanded choice across visits.
 
 const PositionalTrinkets = preload("../core/positional_trinkets.gd")
+const EconomicalTrinkets = preload("../core/economical_trinkets.gd")
 
 const CONTENT_PADDING := 4.0
 const BODY_TOP_PADDING := 3.0
@@ -13,6 +18,7 @@ const LINE_HEIGHT := 11.0
 const SECTION_GAP := 3.0
 const TAG_GAP := 6.0
 const FONT_SIZE := 8
+const GROUP_FONT_SIZE := 10
 const SECTION_FONT_SIZE := 9
 const TAG_FONT_SIZE := 7
 const MAX_WIDTH := 300.0
@@ -48,7 +54,7 @@ func _ready() -> void:
 
 
 func header_text() -> String:
-	return "Positional Trinkets"
+	return "Trinket Bonuses"
 
 
 func header_width() -> float:
@@ -152,45 +158,78 @@ func _on_viewport_resized() -> void:
 
 
 func _build_rows() -> Array:
-	if not bool(_summary.get("has_any", false)):
+	var positional: Dictionary = _summary.get("positional", {})
+	var economical: Dictionary = _summary.get("economical", {})
+	var has_positional := bool(positional.get("has_any", false))
+	var has_economical := bool(economical.get("has_any", false))
+	if not has_positional and not has_economical:
 		return [{
-			"text": "No positional trinkets",
+			"text": "No trinket bonuses",
 			"kind": "muted",
 			"color": LABEL_COLOR,
 			"font_size": FONT_SIZE,
 		}]
 
 	var rows: Array = []
-	var first_section := true
-	for position in SECTION_ORDER:
-		var section: Dictionary = _summary.get(position, {})
+	var first_group := true
+	if has_positional:
 		rows.append({
-			"text": SECTION_LABELS[position],
-			"kind": "heading",
+			"text": "Positional Trinkets",
+			"kind": "group",
 			"color": VALUE_COLOR,
-			"font_size": SECTION_FONT_SIZE,
-			"gap_before": 0.0 if first_section else SECTION_GAP,
+			"font_size": GROUP_FONT_SIZE,
+			"gap_before": 0.0,
 		})
-		first_section = false
-		var ordered := PositionalTrinkets.ordered_effects(section)
-		if ordered.is_empty():
+		first_group = false
+		var first_section := true
+		for position in SECTION_ORDER:
+			var section: Dictionary = positional.get(position, {})
 			rows.append({
-				"text": "No bonuses",
-				"kind": "muted",
-				"color": LABEL_COLOR,
-				"font_size": FONT_SIZE,
+				"text": SECTION_LABELS[position],
+				"kind": "heading",
+				"color": VALUE_COLOR,
+				"font_size": SECTION_FONT_SIZE,
+				"gap_before": 0.0 if first_section else SECTION_GAP,
 			})
-		else:
-			for entry in ordered:
-				var effect: Dictionary = entry["effect"]
-				var timing := str(entry["timing"])
+			first_section = false
+			var ordered := PositionalTrinkets.ordered_effects(section)
+			if ordered.is_empty():
 				rows.append({
-					"text": PositionalTrinkets.format_effect(effect),
-					"tag": PositionalTrinkets.TAG_LABELS.get(timing, timing),
-					"kind": "bonus",
-					"color": VALUE_COLOR,
+					"text": "No bonuses",
+					"kind": "muted",
+					"color": LABEL_COLOR,
 					"font_size": FONT_SIZE,
 				})
+			else:
+				for entry in ordered:
+					var effect: Dictionary = entry["effect"]
+					var timing := str(entry["timing"])
+					rows.append({
+						"text": PositionalTrinkets.format_effect(effect),
+						"tag": PositionalTrinkets.TAG_LABELS.get(timing, timing),
+						"kind": "bonus",
+						"color": VALUE_COLOR,
+						"font_size": FONT_SIZE,
+					})
+	if has_economical:
+		rows.append({
+			"text": "Economical Trinkets",
+			"kind": "group",
+			"color": VALUE_COLOR,
+			"font_size": GROUP_FONT_SIZE,
+			"gap_before": 0.0 if first_group else SECTION_GAP,
+		})
+		first_group = false
+		for entry in EconomicalTrinkets.ordered_effects(economical):
+			var effect: Dictionary = entry["effect"]
+			var timing := str(entry["timing"])
+			rows.append({
+				"text": EconomicalTrinkets.format_effect(effect),
+				"tag": EconomicalTrinkets.TAG_LABELS.get(timing, timing),
+				"kind": "bonus",
+				"color": VALUE_COLOR,
+				"font_size": FONT_SIZE,
+			})
 	return rows
 
 
@@ -198,7 +237,10 @@ func _tag_column_width() -> float:
 	if _text_font == null:
 		return 0.0
 	var width := 0.0
-	for tag in ["Battle Start", "Passive"]:
+	for row in _build_rows():
+		var tag := str(row.get("tag", ""))
+		if tag.is_empty():
+			continue
 		width = maxf(width, _text_font.get_string_size(tag, HORIZONTAL_ALIGNMENT_LEFT, -1, TAG_FONT_SIZE).x)
 	return width + TAG_GAP
 
@@ -290,4 +332,13 @@ func _draw_body(_width: float) -> void:
 					)
 		else:
 			_draw_text_shadow(Vector2(x, baseline), str(row.get("text", "")), color, font_size)
+			if kind == "group":
+				# Underline the group title so it reads above the section headings.
+				var line_y := cursor_y + float(row.get("height", LINE_HEIGHT)) - 1.0
+				draw_line(
+					Vector2(x, line_y),
+					Vector2(right_edge, line_y),
+					Color(BORDER_COLOR.r, BORDER_COLOR.g, BORDER_COLOR.b, SEPARATOR_ALPHA),
+					1.0
+				)
 		cursor_y += float(row.get("height", LINE_HEIGHT))

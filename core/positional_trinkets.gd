@@ -101,9 +101,6 @@ const TAG_LABELS := {
 	"passive": "Temporary",
 }
 
-## The summary is only shown once the player holds at least this many trinkets.
-const MIN_TRINKETS := 10
-
 ## Display order inside a subdivision. Text-only effects sort after numeric ones.
 const STAT_ORDER := [
 	"damage", "heal", "shield", "burn", "poison", "shock",
@@ -121,11 +118,6 @@ const STAT_LABELS := {
 	"multicast": "Multicast",
 	"stats": "Stats",
 }
-
-
-## True when the held trinket list is large enough to show the summary.
-static func meets_threshold(held_ids) -> bool:
-	return held_ids != null and held_ids.size() >= MIN_TRINKETS
 
 
 ## Build the positional summary for the held trinket ids.

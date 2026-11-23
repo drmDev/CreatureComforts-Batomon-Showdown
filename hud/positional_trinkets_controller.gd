@@ -1,12 +1,13 @@
 extends RefCounted
-## Feeds the positional trinket summary panel.
+## Feeds the trinket summary panel.
 ##
-## Reads the held trinket ids from the run, builds the summed positional
-## summary, and hands it to the panel. The panel itself preserves the player's
-## collapsed/expanded choice and drag position across shop visits.
+## Reads the held trinket ids from the run, builds the summed positional and
+## economical summaries, and hands both to the panel. The panel itself preserves
+## the player's collapsed/expanded choice and drag position across shop visits.
 
 const NodeUtils = preload("../core/node_utils.gd")
 const PositionalTrinkets = preload("../core/positional_trinkets.gd")
+const EconomicalTrinkets = preload("../core/economical_trinkets.gd")
 const ModConfig = preload("../core/mod_config.gd")
 
 var _panel = null
@@ -30,12 +31,15 @@ func update(run) -> void:
 	var held = run.get("trinket_ids") if NodeUtils.has_property(run, "trinket_ids") else []
 	if held == null:
 		held = []
-	# The summary is a beta feature for late runs; keep it hidden until the
-	# player holds enough trinkets for the positional breakdown to matter.
-	if not PositionalTrinkets.meets_threshold(held):
+	var gold := int(run.get("gold")) if NodeUtils.has_property(run, "gold") else 0
+
+	var positional := PositionalTrinkets.summarize(held)
+	var economical := EconomicalTrinkets.summarize(held, gold)
+	# Show the panel as soon as the player holds a trinket from either category.
+	if not bool(positional.get("has_any", false)) and not bool(economical.get("has_any", false)):
 		_panel.hide_panel()
 		return
-	_panel.show_summary(PositionalTrinkets.summarize(held))
+	_panel.show_summary({"positional": positional, "economical": economical})
 
 
 func on_trainer_changed() -> void:
