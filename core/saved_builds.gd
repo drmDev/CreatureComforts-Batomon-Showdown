@@ -13,6 +13,8 @@ extends RefCounted
 ## Everything here is static and side-effect free apart from `load_store` /
 ## `save_store`, so the ordering and naming rules are unit-testable.
 
+const FileStore = preload("file_store.gd")
+
 const PATH := "user://creature_comforts/saved_builds.json"
 const PREVIEW_LIMIT := 10
 ## Unresolved catalog ids sort after every real Batomon (tiers are 1..6).
@@ -169,17 +171,10 @@ static func load_store() -> Dictionary:
 static func save_store(store: Dictionary) -> bool:
 	# The mod's user directory is created later in mod_main, so make sure it
 	# exists before the first save (same pattern as the watchlist config).
-	var abs_dir := ProjectSettings.globalize_path(PATH.get_base_dir())
-	var dir_err := DirAccess.make_dir_recursive_absolute(abs_dir)
-	if dir_err != OK and dir_err != ERR_ALREADY_EXISTS:
-		push_warning("Creature Comforts: cannot create saved-builds directory %s: %s" % [abs_dir, error_string(dir_err)])
+	var error := FileStore.write_text(PATH, serialize(store))
+	if error != OK:
+		push_warning("Creature Comforts: cannot write saved builds to %s: %s" % [PATH, error_string(error)])
 		return false
-	var file := FileAccess.open(PATH, FileAccess.WRITE)
-	if file == null:
-		push_warning("Creature Comforts: cannot write saved builds to %s: %s" % [PATH, error_string(FileAccess.get_open_error())])
-		return false
-	file.store_string(serialize(store))
-	file.close()
 	return true
 
 

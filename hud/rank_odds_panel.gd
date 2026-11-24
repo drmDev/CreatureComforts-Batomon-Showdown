@@ -53,10 +53,9 @@ const RANK_ODDS := [
 ]
 
 var _rank := 1
-var _trinket_states: Array = []
 var _trinket_checks: Array = []
 var _trinket_icons: Array = []
-var _blank_style: StyleBoxEmpty
+var _draw_states: Array = []
 var _held_trinket_ids: Array = []
 var _trinket_icons_provider = null
 
@@ -130,10 +129,8 @@ static func _owns_trinket(held_ids: Array, id: String) -> bool:
 
 func _ready() -> void:
 	super._ready()
-	_blank_style = StyleBoxEmpty.new()
 	for i in range(TRINKET_DEFS.size()):
 		var def: Dictionary = TRINKET_DEFS[i]
-		_trinket_states.append(false)
 		_trinket_icons.append(_build_trinket_icon())
 		_trinket_checks.append(_build_modifier_check(def["label"], def["tooltip"], _on_trinket_toggled.bind(i)))
 
@@ -142,13 +139,7 @@ func _build_modifier_check(text: String, tooltip: String, handler: Callable) -> 
 	var check := CheckBox.new()
 	check.text = text
 	check.tooltip_text = tooltip
-	check.focus_mode = Control.FOCUS_NONE
-	check.add_theme_constant_override("icon_max_width", 12)
-	for state in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
-		check.add_theme_stylebox_override(state, _blank_style)
-	if _text_font != null:
-		check.add_theme_font_override("font", _text_font)
-	check.add_theme_font_size_override("font_size", BODY_FONT_SIZE)
+	Style.blank_checkbox(check, _text_font, BODY_FONT_SIZE)
 	check.toggled.connect(handler)
 	check.visible = false
 	add_child(check)
@@ -172,11 +163,17 @@ func _build_trinket_icon() -> TextureRect:
 
 func _open_popup() -> void:
 	for i in range(TRINKET_DEFS.size()):
-		_trinket_states[i] = _owns_trinket(_held_trinket_ids, TRINKET_DEFS[i]["id"])
 		if _trinket_checks[i] != null:
-			_trinket_checks[i].set_pressed_no_signal(_trinket_states[i])
+			_trinket_checks[i].set_pressed_no_signal(_owns_trinket(_held_trinket_ids, TRINKET_DEFS[i]["id"]))
 	_apply_trinket_icons()
 	super._open_popup()
+	_position_modifier_checks(_popup_rect())
+
+
+func _on_viewport_resized() -> void:
+	super._on_viewport_resized()
+	if is_popup_open():
+		_position_modifier_checks(_popup_rect())
 
 
 func _close_popup() -> void:
@@ -188,9 +185,16 @@ func _close_popup() -> void:
 			_trinket_icons[i].visible = false
 
 
-func _on_trinket_toggled(on: bool, index: int) -> void:
-	_trinket_states[index] = on
+func _on_trinket_toggled(_on: bool, _index: int) -> void:
 	queue_redraw()
+
+
+## The checkbox states, read from the controls themselves.
+func _current_trinket_states() -> Array:
+	var states: Array = []
+	for check in _trinket_checks:
+		states.append(check != null and check.button_pressed)
+	return states
 
 
 func _apply_trinket_icons() -> void:
@@ -225,7 +229,7 @@ func _popup_height() -> float:
 
 
 func _draw_content(rect: Rect2) -> void:
-	_position_modifier_checks(rect)
+	_draw_states = _current_trinket_states()
 	var offset := _modifier_rows_height() + CHECK_GAP
 	var table_rect := Rect2(
 		rect.position + Vector2(0.0, offset),
@@ -263,6 +267,6 @@ func _table_cell_text(row_index: int, column: int) -> String:
 	var row: Array = RANK_ODDS[row_index]
 	if column == 0:
 		return "14+" if int(row[0]) == 14 else str(int(row[0]))
-	var pct: int = _row_percentages(row, _trinket_states)[column - 1]
+	var pct: int = _row_percentages(row, _draw_states)[column - 1]
 	# \u2014 keeps the source plain ASCII (the auto-updater rejects non-ASCII scripts).
 	return "\u2014" if pct == 0 else "%d%%" % pct

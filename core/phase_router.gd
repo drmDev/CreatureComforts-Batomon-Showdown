@@ -37,8 +37,7 @@ func poll() -> void:
 
 
 func _inspect_current_phase() -> void:
-	var main = _host.get_tree().current_scene
-	var state = main.get("current_state") if NodeUtils.has_property(main, "current_state") else null
+	var state = NodeUtils.current_state(_host.get_tree())
 
 	var is_battle := NodeUtils.script_is(state, BATTLE_SCRIPT)
 	_ui.update_player_hud(state, is_battle)
@@ -69,18 +68,17 @@ func _inspect_current_phase() -> void:
 		var phase_changed := _last_phase != "battle"
 		if _battle.handle(state, phase_changed):
 			if phase_changed:
-				_reset_transient_state(false, true, true)
+				_reset_transient_state(false)
 			_last_phase = "battle"
 	else:
 		if _last_phase != "":
 			_last_phase = ""
 			_battle.reset_log_guard()
-			_reset_transient_state(true, true, true)  # Drop stale chimes when leaving the shop
+			_reset_transient_state(true)  # Drop stale chimes when leaving the shop
 
 
-func _reset_transient_state(clear_suppression: bool, clear_reminders: bool, clear_chimes: bool) -> void:
+func _reset_transient_state(clear_suppression: bool) -> void:
 	# The trinket gains panel is shop-gated and only cleared on a battle start or a
 	# trainer/run change, so this per-phase reset leaves it alone.
-	_shop.reset_transient(clear_suppression, clear_reminders)
-	if clear_chimes:
-		_context.chimes.clear()
+	_shop.reset_transient(clear_suppression, true)
+	_context.chimes.clear()

@@ -56,10 +56,10 @@ static func build_region_map(db = null) -> Dictionary:
 	var regions := {}
 	for collection in REGION_COLLECTIONS:
 		for entry in _collection_entries(db, collection):
-			var id := _string_field(entry, "id")
-			var display := _string_field(entry, "name")
+			var id := NodeUtils.string_field(entry, "id")
+			var display := NodeUtils.string_field(entry, "name")
 			if display.is_empty():
-				display = _string_field(entry, "name_key")
+				display = NodeUtils.string_field(entry, "name_key")
 			if id.is_empty() or display.is_empty():
 				continue
 			regions[id.to_lower()] = display
@@ -98,7 +98,7 @@ static func build_species_region_map(db = null) -> Dictionary:
 static func _set_ids(db, regions: Dictionary) -> Array:
 	var ids: Array = []
 	for set_entry in _collection_entries(db, "sets_db"):
-		var set_id := _string_field(set_entry, "id")
+		var set_id := NodeUtils.string_field(set_entry, "id")
 		if not set_id.is_empty() and not ids.has(set_id):
 			ids.append(set_id)
 	if ids.is_empty():
@@ -112,7 +112,7 @@ static func _species_id(entry) -> String:
 	if entry is String or entry is StringName:
 		return str(entry).strip_edges().to_lower()
 	for field in ["id", "name_key"]:
-		var value := _string_field(entry, field).to_lower()
+		var value := NodeUtils.string_field(entry, field).to_lower()
 		if not value.is_empty():
 			return value
 	return ""
@@ -189,7 +189,7 @@ static func describe_properties(obj) -> String:
 
 static func _scan_object(obj, aliases: Dictionary, report: Array, label: String) -> String:
 	for key in CANDIDATE_KEYS:
-		if not _has(obj, key):
+		if not NodeUtils.has_field(obj, key):
 			continue
 		var value = obj.get(key)
 		var normalized := normalize_value(value, aliases)
@@ -198,22 +198,6 @@ static func _scan_object(obj, aliases: Dictionary, report: Array, label: String)
 			normalized if not normalized.is_empty() else "(no match)"])
 		if not normalized.is_empty():
 			return normalized
-	return ""
-
-
-static func _has(obj, key: String) -> bool:
-	if obj is Dictionary:
-		return obj.has(key)
-	return obj is Object and key in obj
-
-
-static func _string_field(obj, field: String) -> String:
-	if obj == null:
-		return ""
-	if obj is Dictionary:
-		return str(obj.get(field, "")).strip_edges()
-	if obj is Object and field in obj:
-		return str(obj.get(field)).strip_edges()
 	return ""
 
 

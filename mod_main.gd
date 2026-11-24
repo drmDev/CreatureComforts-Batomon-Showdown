@@ -20,6 +20,7 @@ const ShopController = preload("core/shop_controller.gd")
 const BattleCoordinator = preload("core/battle_coordinator.gd")
 const PhaseRouter = preload("core/phase_router.gd")
 const Hotkeys = preload("core/hotkeys.gd")
+const TreeWatcher = preload("core/tree_watcher.gd")
 
 var _initialization_started := false
 var _initialized := false
@@ -48,6 +49,8 @@ var _router = null
 # Owns the CanvasLayers and panels (hud/comfort_ui.gd).
 var _ui = null
 var _shop_overlay_gate = null
+# One node_added watcher shared by the overlay gate and the shop highlighter.
+var _tree_watcher = null
 
 # Self-updater: checks the GitHub release manifest and swaps files (core/auto_updater.gd).
 var _updater = null
@@ -74,6 +77,8 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	# Drop the loader subscription so a freed mod node is never called back.
+	if _tree_watcher != null:
+		_tree_watcher.teardown()
 	if _context != null and _context.config != null:
 		_context.config.teardown()
 	if _context != null and _context.logger != null:
@@ -100,16 +105,20 @@ func _initialize_mod() -> void:
 	_context = RuntimeContext.new(formatter, logger, config, chimes, trinket_icons)
 	chimes.setup(self, _context.sounds_enabled, _context.mod_volume)
 
+	_tree_watcher = TreeWatcher.new()
+	_tree_watcher.setup(get_tree())
+
 	_ui = ComfortUi.new()
 	_ui.name = "ComfortUi"
 	add_child(_ui)
-	_ui.setup(_context)
+	_ui.setup(_context, _tree_watcher, func(): return _replay != null and _replay.is_active())
 	_ui.replay_requested.connect(_on_replay_requested)
 
 	_setup_shop_overlay_gate()
 
 	_battle = BattleCoordinator.new()
 	_battle.setup(_context, _ui)
+	_shop_overlay_gate.transition_requested.connect(_battle.on_transition)
 
 	_replay = BattleReplayController.new()
 	_replay.name = "BattleReplayController"
@@ -123,13 +132,12 @@ func _initialize_mod() -> void:
 	_hotkeys.setup(_context, _replay)
 
 	_shop = ShopController.new()
-	_shop.setup(_context, _ui, _shop_overlay_gate, _dev_tools, _on_shop_entered, _on_shop_run_changed, _battle.has_replay)
+	_shop.setup(_context, _ui, _shop_overlay_gate, _dev_tools, _battle, _battle.has_replay)
 
 	_router = PhaseRouter.new()
 	_router.setup(self, _context, _ui, _shop, _battle)
 
 	_setup_auto_updater()
-	_setup_transition_capture()
 
 	# The UI is live and the overlay gate must run even if the log file cannot be
 	# opened; the logger no-ops when its file handle is null.
@@ -155,7 +163,7 @@ func _setup_shop_overlay_gate() -> void:
 	_shop_overlay_gate.name = "ShopOverlayGate"
 	add_child(_shop_overlay_gate)
 	_shop_overlay_gate.visibility_changed.connect(_on_shop_visibility_changed)
-	_shop_overlay_gate.setup(NodeUtils.has_property, NodeUtils.script_is)
+	_shop_overlay_gate.setup(NodeUtils.has_property, NodeUtils.script_is, _tree_watcher)
 
 
 ## The updater lives next to the mod and edits the mod's own folder, so it gets the folder of the
@@ -173,32 +181,13 @@ func _on_shop_visibility_changed(allowed: bool, _reason: String) -> void:
 		_context.chimes.try_play(_shop_overlay_gate)
 
 
-## The battle transition signal carries the opponent RunData (MMR / bot flags).
-## The shop overlay gate owns the game subscription and forwards it here, so
-## there is only one transition listener in the mod.
-func _setup_transition_capture() -> void:
-	if _shop_overlay_gate != null:
-		_shop_overlay_gate.transition_requested.connect(_battle.on_transition)
-
-
-## A new shop visit begins: reset the once-per-battle log guard.
-func _on_shop_entered() -> void:
-	_battle.reset_log_guard()
-
-
-## A new run (or trainer) starts: drop any battle trinket gains from the previous run.
-func _on_shop_run_changed() -> void:
-	_battle.on_run_changed()
-
-
 ## The shop's Replay Last Battle button: start the read-only overlay.
 func _on_replay_requested() -> void:
 	if _replay == null or _battle == null:
 		return
 	var payload = _battle.replay_payload()
 	if _replay.start(payload):
-		_ui.set_replay_opponent(str(payload.get("opponent_name", "?")), str(payload.get("opponent_mmr", "-")))
-		_ui.set_replay_active(true)
+		_ui.set_replay_active(true, str(payload.get("opponent_name", "?")), str(payload.get("opponent_mmr", "-")))
 
 
 ## The replay overlay closed: let the mod's shop HUD come back.
@@ -273,13 +262,6 @@ func _read_mod_volume() -> int:
 	if _context != null and _context.config != null:
 		return _context.config.mod_volume()
 	return ModConfig.DEFAULT_MOD_VOLUME
-
-
-## Written through the normal logger so a user can confirm the custom row was
-## handed to the Mod Loader if it ever looks missing in-game.
-func _log_settings(message: String) -> void:
-	if _context != null and _context.logger != null:
-		_context.logger.log_event("SETTINGS %s" % message)
 
 
 ## Released, focus-out, and tree-exit all commit; set_mod_volume() clamps and

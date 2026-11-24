@@ -350,9 +350,7 @@ func _build_layer() -> void:
 	close.theme = Style.tooltip_theme(null, close.get_theme_font_size("font_size", "TooltipLabel"))
 	_close_button = close
 	_position_close_button()
-	var viewport := get_viewport()
-	if viewport != null and not viewport.size_changed.is_connected(_position_close_button):
-		viewport.size_changed.connect(_position_close_button)
+	NodeUtils.connect_viewport_resize(self, _position_close_button)
 
 
 ## Keep the close button 10% of the viewport height down from the top, plus the
@@ -394,10 +392,7 @@ func _hide_shop_view() -> void:
 	var tree := get_tree()
 	if tree == null:
 		return
-	var main = tree.current_scene
-	if main == null:
-		return
-	var state = main.get("current_state")
+	var state = NodeUtils.current_state(tree)
 	if not NodeUtils.script_is(state, SHOP_SCRIPT):
 		return
 	var view = state.get("view") if NodeUtils.has_property(state, "view") else null
@@ -537,9 +532,7 @@ func _teardown() -> void:
 	if _ui_layer != null and is_instance_valid(_ui_layer):
 		_ui_layer.queue_free()
 	_ui_layer = null
-	var viewport := get_viewport()
-	if viewport != null and viewport.size_changed.is_connected(_position_close_button):
-		viewport.size_changed.disconnect(_position_close_button)
+	NodeUtils.disconnect_viewport_resize(self, _position_close_button)
 	_close_button = null
 	Input.set_mouse_mode(_mouse_mode_before)
 	Engine.time_scale = 1.0
@@ -579,7 +572,7 @@ func _offset_battle_layers() -> void:
 func _process(_delta: float) -> void:
 	if not _active:
 		return
-	call_deferred("_ensure_cursor_visible")
+	_ensure_cursor_visible()
 	_layer_scan_frames += 1
 	if _layer_scan_frames >= LAYER_SCAN_INTERVAL:
 		_layer_scan_frames = 0

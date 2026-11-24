@@ -13,6 +13,7 @@ signal visibility_changed(allowed: bool, reason: String)
 ## need a second subscription of its own.
 signal transition_requested(target: String, data)
 
+const NodeUtils = preload("../core/node_utils.gd")
 const SHOP_SCRIPT := "res://game/states/shop_state.gd"
 
 # Overlay gate: hides reminders while the shop is not on screen or not interactive
@@ -44,15 +45,17 @@ var _gate_hold_until_ms := 0  # Transition signal hold: keep the overlay hidden 
 var _search_end_hold_until_ms := 0  # Brief hold after search ends, before the battle transition fires
 var _view_member_cache: Dictionary = {}
 var _transition_nodes: Dictionary = {}
+var _watcher = null
 # The overlay probe allocates child arrays, so it runs at ~10 Hz instead of
 # every frame. The cheap checks above still run per frame.
 var _overlay_probe_cache := ""
 var _overlay_probe_next_ms := 0
 
 
-func setup(has_prop: Callable, is_script: Callable) -> void:
+func setup(has_prop: Callable, is_script: Callable, watcher = null) -> void:
 	_has_prop = has_prop
 	_is_script = is_script
+	_watcher = watcher
 	_setup_transition_listener()
 
 
@@ -67,8 +70,7 @@ func reset_for_shop() -> void:
 
 
 func update() -> void:
-	var main = get_tree().current_scene if get_tree() != null else null
-	var state = main.get("current_state") if main != null else null
+	var state = NodeUtils.current_state(get_tree())
 	# The transition hold only needs to survive the shop->battle fade. Once the
 	# phase actually leaves the shop, clear it so a later shop visit is unaffected.
 	if not _is_script.call(state, SHOP_SCRIPT):
@@ -100,7 +102,7 @@ func _compute_overlay_gate_reason() -> String:
 	if main == null:
 		_shop_since_ms = 0
 		return GATE_NOT_SHOP
-	var state = main.get("current_state")
+	var state = NodeUtils.current_state(get_tree())
 	if not _is_script.call(state, SHOP_SCRIPT):
 		_shop_since_ms = 0
 		return GATE_NOT_SHOP
@@ -261,6 +263,9 @@ func _get_view_member(view, property_names: Array, node_name: String):
 ## Connect to the game's transition signal (verified in examples/MyBattleStats) so
 ## battle start hides the overlay immediately, independent of button visibility.
 func _setup_transition_listener() -> void:
+	if _watcher != null:
+		_watcher.subscribe(_on_node_added_transition)
+		return
 	if get_tree() == null:
 		return
 	if not get_tree().node_added.is_connected(_on_node_added_transition):
@@ -310,5 +315,7 @@ func _on_transition_requested(target: String, data) -> void:
 
 
 func _exit_tree() -> void:
+	if _watcher != null:
+		_watcher.unsubscribe(_on_node_added_transition)
 	if get_tree() != null and get_tree().node_added.is_connected(_on_node_added_transition):
 		get_tree().node_added.disconnect(_on_node_added_transition)

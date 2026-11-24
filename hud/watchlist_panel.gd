@@ -45,6 +45,7 @@ const EXCLUDED_TYPES := ["all", "null"]
 # Known regions. The run's own region is appended at runtime when it is not
 # listed here.
 const REGION_NAMES := ["Jinto", "Pantra"]
+const FileStore = preload("../core/file_store.gd")
 const RunRegion = preload("../core/run_region.gd")
 const RunData = preload("../core/run_data.gd")
 const SavedBuilds = preload("../core/saved_builds.gd")
@@ -156,6 +157,16 @@ func _apply_font(control: Control, size: int) -> void:
 	control.add_theme_font_size_override("font_size", size)
 
 
+## A compact HUD button with the shared font and focus settings.
+func _make_button(text: String, min_size: Vector2 = Vector2(0, 8)) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = min_size
+	_apply_font(b, BODY_FONT_SIZE)
+	return b
+
+
 ## Compact OptionButton at the HUD scale, including its dropdown popup (the
 ## theme default is far too large at this size).
 func _style_option(option: OptionButton) -> void:
@@ -173,11 +184,27 @@ func _style_option(option: OptionButton) -> void:
 
 func _build_ui() -> void:
 	_ensure_row_styles()
+	_build_sounds()
+	_build_popup()
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 2)
+	_panel.add_child(vbox)
+	_build_header(vbox)
+	_build_tabs(vbox)
+	_build_filters(vbox)
+	_build_toolbar(vbox)
+	_build_list(vbox)
+	_sync_initial_state()
+
+
+func _build_sounds() -> void:
 	_click_sound = UiSound.new()
 	_click_sound.setup(self, "click.ogg", _sounds_enabled, _sound_volume)
 	_save_sound = UiSound.new()
 	_save_sound.setup(self, "save.ogg", _sounds_enabled, _sound_volume)
 
+
+func _build_popup() -> void:
 	_popup = Control.new()
 	_popup.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_popup.visible = false
@@ -205,10 +232,8 @@ func _build_ui() -> void:
 	_builds_panel.load_requested.connect(_on_build_load_requested)
 	_popup.add_child(_builds_panel)
 
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 2)
-	_panel.add_child(vbox)
 
+func _build_header(vbox: VBoxContainer) -> void:
 	# Header: centered title + top-right close (X).
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 2)
@@ -227,17 +252,14 @@ func _build_ui() -> void:
 	close_x.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	header.add_child(close_x)
 
-	# Tabs
+
+func _build_tabs(vbox: VBoxContainer) -> void:
 	var tab_row := HBoxContainer.new()
 	tab_row.add_theme_constant_override("separation", 2)
 	vbox.add_child(tab_row)
 	for tab in [TAB_MONSTER, TAB_ITEM]:
-		var b := Button.new()
-		b.text = "Batomon" if tab == TAB_MONSTER else "Items"
+		var b := _make_button("Batomon" if tab == TAB_MONSTER else "Items", Vector2(35, 8))
 		b.toggle_mode = true
-		b.focus_mode = Control.FOCUS_NONE
-		b.custom_minimum_size = Vector2(35, 8)
-		_apply_font(b, BODY_FONT_SIZE)
 		Style.compact_button(b)
 		b.pressed.connect(_on_tab_pressed.bind(tab))
 		var dot := TrackedDot.new()
@@ -271,6 +293,8 @@ func _build_ui() -> void:
 	_region_option.item_selected.connect(_on_region_selected)
 	tab_row.add_child(_region_option)
 
+
+func _build_filters(vbox: VBoxContainer) -> void:
 	# Batomon-only filters (hidden on the Items tab).
 	_filters_box = VBoxContainer.new()
 	_filters_box.add_theme_constant_override("separation", 1)
@@ -301,6 +325,8 @@ func _build_ui() -> void:
 	_filters_box.add_child(_type_flow)
 	_add_filter_button(_type_flow, "All", "", _type_buttons, _on_type_pressed)
 
+
+func _build_toolbar(vbox: VBoxContainer) -> void:
 	# Subtle boundary between the filters and the toolbar, matching the one
 	# above the list.
 	var toolbar_divider := ColorRect.new()
@@ -311,6 +337,8 @@ func _build_ui() -> void:
 	# Toolbar: one-time team snapshot, tracked count, and the Tracked Only view.
 	_toolbar_box(vbox)
 
+
+func _build_list(vbox: VBoxContainer) -> void:
 	# Subtle boundary between the toolbar and the scrollable list.
 	var divider := ColorRect.new()
 	divider.color = Color(1, 1, 1, 0.12)
@@ -329,6 +357,8 @@ func _build_ui() -> void:
 	_rows_box.add_theme_constant_override("v_separation", 1)
 	_scroll.add_child(_rows_box)
 
+
+func _sync_initial_state() -> void:
 	# Initial state: Batomon tab, "All" filters.
 	_sync_tab_buttons()
 	_sync_tab_visibility()
@@ -347,12 +377,8 @@ func _toolbar_box(parent: Control) -> void:
 	toolbar.add_theme_constant_override("separation", 4)
 	parent.add_child(toolbar)
 
-	_snapshot_button = Button.new()
-	_snapshot_button.text = "Snapshot Team"
+	_snapshot_button = _make_button("Snapshot Team")
 	_snapshot_button.tooltip_text = "Replaces your tracked Batomon with the ones currently fielded. Tracked items are kept."
-	_snapshot_button.focus_mode = Control.FOCUS_NONE
-	_snapshot_button.custom_minimum_size = Vector2(0, 8)
-	_apply_font(_snapshot_button, BODY_FONT_SIZE)
 	Style.action_button(_snapshot_button, Style.ACTION_BG, Style.ACTION_BG_HOVER, Style.ACTION_BORDER, VALUE_COLOR)
 	_snapshot_button.pressed.connect(_on_snapshot_pressed)
 	toolbar.add_child(_snapshot_button)
@@ -363,32 +389,22 @@ func _toolbar_box(parent: Control) -> void:
 
 	# Icon-only Clear All worn beside the tracked count. The trash icon and the
 	# muted-destructive action palette read as "remove", not as another filter.
-	_clear_button = Button.new()
+	_clear_button = _make_button("", Vector2(12, 12))
 	_clear_button.icon = _load_texture("../assets/icons/trash.png")
 	_clear_button.expand_icon = true
 	_clear_button.tooltip_text = _clear_tooltip()
-	_clear_button.focus_mode = Control.FOCUS_NONE
-	_clear_button.custom_minimum_size = Vector2(12, 12)
 	Style.action_button(_clear_button, Style.ACTION_BG, Style.ACTION_BG_HOVER, Style.ACTION_BORDER, Color.WHITE)
 	_clear_button.pressed.connect(_on_clear_pressed)
 	toolbar.add_child(_clear_button)
 
-	_builds_button = Button.new()
-	_builds_button.text = "Builds"
+	_builds_button = _make_button("Builds")
 	_builds_button.tooltip_text = "Open your saved watchlist builds"
-	_builds_button.focus_mode = Control.FOCUS_NONE
-	_builds_button.custom_minimum_size = Vector2(0, 8)
-	_apply_font(_builds_button, BODY_FONT_SIZE)
 	Style.compact_button(_builds_button)
 	_builds_button.pressed.connect(_on_builds_pressed)
 	toolbar.add_child(_builds_button)
 
-	_save_button = Button.new()
-	_save_button.text = "Save"
+	_save_button = _make_button("Save")
 	_save_button.tooltip_text = "Save the current watchlist as a new build"
-	_save_button.focus_mode = Control.FOCUS_NONE
-	_save_button.custom_minimum_size = Vector2(0, 8)
-	_apply_font(_save_button, BODY_FONT_SIZE)
 	Style.action_button(_save_button, Style.SAVE_BG, Style.SAVE_BG_HOVER, Style.SAVE_BORDER, Color.WHITE, Style.SAVE_BG_DISABLED)
 	_save_button.pressed.connect(_on_save_pressed)
 	toolbar.add_child(_save_button)
@@ -421,11 +437,9 @@ func _toolbar_box(parent: Control) -> void:
 	# points down for ascending and up for descending.
 	_sort_asc_icon = _load_texture("../assets/icons/sort.png")
 	_sort_desc_icon = _flip_texture_vertically(_sort_asc_icon)
-	_sort_dir_button = Button.new()
+	_sort_dir_button = _make_button("", Vector2(12, 12))
 	_sort_dir_button.icon = _sort_asc_icon
 	_sort_dir_button.expand_icon = true
-	_sort_dir_button.focus_mode = Control.FOCUS_NONE
-	_sort_dir_button.custom_minimum_size = Vector2(12, 12)
 	Style.compact_button(_sort_dir_button)
 	_sort_dir_button.pressed.connect(_on_sort_direction_pressed)
 	toolbar.add_child(_sort_dir_button)
@@ -463,12 +477,8 @@ func _toolbar_box(parent: Control) -> void:
 
 
 func _add_filter_button(parent: Control, text: String, value: String, store: Array, handler: Callable, color: Color = Color.TRANSPARENT) -> void:
-	var b := Button.new()
-	b.text = text
+	var b := _make_button(text, Vector2(0, 7))
 	b.toggle_mode = true
-	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(0, 7)
-	_apply_font(b, BODY_FONT_SIZE)
 	Style.compact_button(b, color)
 	b.pressed.connect(handler.bind(value))
 	parent.add_child(b)
@@ -504,12 +514,7 @@ func _sync_tab_visibility() -> void:
 ## the label on hover and whenever a toggled checkbox draws with `pressed`
 ## instead of `normal`.
 func _style_checkbox(check: CheckBox) -> void:
-	_ensure_row_styles()
-	check.focus_mode = Control.FOCUS_NONE
-	check.add_theme_constant_override("icon_max_width", 12)
-	for state in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
-		check.add_theme_stylebox_override(state, _blank_style)
-	_apply_font(check, BODY_FONT_SIZE)
+	Style.blank_checkbox(check, _text_font, BODY_FONT_SIZE)
 
 
 ## Build the shared row styleboxes once. A full catalog rebuild would otherwise
@@ -652,6 +657,16 @@ static func toggled_filter_value(current: String, value: String) -> String:
 	return "" if value == current else value
 
 
+## Apply a filter change: leave Tracked Only, sync the buttons, and rebuild only
+## when the value actually changed (or Tracked Only was active).
+func _apply_filter_change(buttons: Array, current: String, next: String, was_tracked_only: bool, setter: Callable) -> void:
+	_sync_filter_buttons(buttons, next)
+	if next == current and not was_tracked_only:
+		return
+	setter.call(next)
+	_rebuild_rows()
+
+
 func _on_rarity_pressed(value: String) -> void:
 	var was_tracked_only := _tracked_only
 	_exit_tracked_only()
@@ -659,22 +674,14 @@ func _on_rarity_pressed(value: String) -> void:
 	var next := toggled_filter_value(current, value)
 	# Re-clicking the active filter (or "All" while it is active) changes
 	# nothing, so only the button state needs re-syncing.
-	_sync_filter_buttons(_rarity_buttons, next)
-	if next == current and not was_tracked_only:
-		return
-	_rarity_filters[_tab] = next
-	_rebuild_rows()
+	_apply_filter_change(_rarity_buttons, current, next, was_tracked_only, func(v): _rarity_filters[_tab] = v)
 
 
 func _on_type_pressed(value: String) -> void:
 	var was_tracked_only := _tracked_only
 	_exit_tracked_only()
 	var next := toggled_filter_value(_type_filter, value)
-	_sync_filter_buttons(_type_buttons, next)
-	if next == _type_filter and not was_tracked_only:
-		return
-	_type_filter = next
-	_rebuild_rows()
+	_apply_filter_change(_type_buttons, _type_filter, next, was_tracked_only, func(v): _type_filter = v)
 
 
 ## Tracked Only is an independent viewing mode: it shows every tracked entry for
@@ -733,10 +740,10 @@ func _on_snapshot_pressed() -> void:
 static func team_species_keys(team: Array) -> Array:
 	var keys: Array = []
 	for monster in team:
-		var data = _entry_field(monster, "data")
+		var data = NodeUtils.field_or(monster, "data", null)
 		if data == null:
 			continue
-		var raw_key = _entry_field(data, "name_key")
+		var raw_key = NodeUtils.field_or(data, "name_key", null)
 		if raw_key == null:
 			continue
 		var key := str(raw_key).strip_edges()
@@ -744,17 +751,6 @@ static func team_species_keys(team: Array) -> Array:
 			continue
 		keys.append(key)
 	return keys
-
-
-## Field lookup for game objects or dictionaries; null when missing or freed.
-static func _entry_field(obj, field: String):
-	if obj == null or not (obj is Object or obj is Dictionary):
-		return null
-	if obj is Object and not is_instance_valid(obj):
-		return null
-	if not (field in obj):
-		return null
-	return obj.get(field)
 
 
 func _update_tracked_count() -> void:
@@ -1105,13 +1101,7 @@ func _is_excluded_key(key: String) -> bool:
 func _is_excluded_species(species, key: String, display: String) -> bool:
 	if _is_excluded_key(key) or _is_excluded_key(display):
 		return true
-	return _flag(species, "exclude_from_dex")
-
-
-static func _flag(obj, field: String) -> bool:
-	if obj == null or not (field in obj):
-		return false
-	return bool(obj.get(field))
+	return bool(NodeUtils.field_or(species, "exclude_from_dex", false))
 
 
 func _display_name(kind: String, key: String) -> String:
@@ -1322,8 +1312,8 @@ func is_watched(kind: String, key: String) -> bool:
 
 
 func _load_selection() -> void:
-	var cfg := ConfigFile.new()
-	if cfg.load(CFG_PATH) != OK:
+	var cfg := FileStore.load_config(CFG_PATH)
+	if cfg == null:
 		return
 	selection["monster"] = _parse_ids(str(cfg.get_value("watchlist", "monsters", "")))
 	selection["item"] = _parse_ids(str(cfg.get_value("watchlist", "items", "")))
@@ -1340,12 +1330,7 @@ func _save_selection() -> void:
 	cfg.set_value("watchlist", "sort_desc", _sort_descending)
 	# The mod's user directory is created later in mod_main, so make sure it
 	# exists before the first save (e.g. a toggle before the first shop poll).
-	var abs_dir := ProjectSettings.globalize_path(CFG_PATH.get_base_dir())
-	var dir_err := DirAccess.make_dir_recursive_absolute(abs_dir)
-	if dir_err != OK and dir_err != ERR_ALREADY_EXISTS:
-		push_warning("Creature Comforts: cannot create watchlist directory %s: %s" % [abs_dir, error_string(dir_err)])
-		return
-	var save_err := cfg.save(CFG_PATH)
+	var save_err := FileStore.save_config(CFG_PATH, cfg)
 	if save_err != OK:
 		push_warning("Creature Comforts: cannot save watchlist to %s: %s" % [CFG_PATH, error_string(save_err)])
 

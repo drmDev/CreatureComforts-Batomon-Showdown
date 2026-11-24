@@ -13,12 +13,17 @@ const OVERLAY_GROUP := "cc_highlight_overlay"
 
 var _watchlist = null
 var _enabled := true
+var _watcher = null
 
 
 ## `watchlist` is the panel's selection dictionary, shared by reference so
 ## selection changes apply on the next frame without extra wiring.
-func setup(watchlist) -> void:
+func setup(watchlist, watcher = null) -> void:
 	_watchlist = watchlist
+	_watcher = watcher
+	if _watcher != null:
+		_watcher.subscribe(_on_node_added)
+		return
 	var tree := get_tree()
 	if tree == null:
 		return
@@ -36,6 +41,8 @@ func set_enabled(on: bool) -> void:
 
 
 func _exit_tree() -> void:
+	if _watcher != null:
+		_watcher.unsubscribe(_on_node_added)
 	if get_tree() != null and get_tree().node_added.is_connected(_on_node_added):
 		get_tree().node_added.disconnect(_on_node_added)
 

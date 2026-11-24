@@ -194,9 +194,8 @@ func _check_battle_completion(state) -> void:
 	# Log the result once per battle; a replay only refreshes the elapsed readout.
 	if _battle_completion.is_first_completion():
 		_log_battle_result(info)
-	_ui.show_battle_elapsed(BattleMonitor.format_seconds(BattleMonitor.time_elapsed(battle_data)))
 	# The elapsed readout sits over the lives/wins/day HUD; show only one of them.
-	_ui.hide_player_hud()
+	_ui.show_battle_elapsed_and_hide_hud(BattleMonitor.format_seconds(BattleMonitor.time_elapsed(battle_data)))
 	# Post-battle combat statistics (merged from BatoStats++). Captured from the
 	# same battle_data, so the panel and the result log always agree.
 	var snapshot: Dictionary = CombatStats.capture(battle_data, _snapshot_meta(state))
@@ -210,25 +209,16 @@ func _check_battle_completion(state) -> void:
 func _capture_replay(state, player, opponent) -> void:
 	if _replay_store == null:
 		return
-	var round := _int_prop(player, "current_round", 0)
+	var round := NodeUtils.int_or(player, "current_round", 0)
 	var loss_cost := 1
 	if state.has_method("_calculate_lives_loss"):
 		loss_cost = int(state.call("_calculate_lives_loss", round))
 	_replay_store.capture(player, opponent, {
 		"battle_id": state.get_instance_id(),
-		"wins": _int_prop(player, "current_wins", 0),
-		"lives": _int_prop(player, "lives", 0),
+		"wins": NodeUtils.int_or(player, "current_wins", 0),
+		"lives": NodeUtils.int_or(player, "lives", 0),
 		"loss_cost": loss_cost,
 	})
-
-
-func _int_prop(obj, property: String, fallback: int) -> int:
-	if not NodeUtils.has_property(obj, property):
-		return fallback
-	var value = obj.get(property)
-	if value == null:
-		return fallback
-	return int(value)
 
 
 ## True when a previous battle can be replayed from the shop.

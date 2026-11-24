@@ -11,6 +11,14 @@ func _init(has_property_fn: Callable) -> void:
 	_has_prop = has_property_fn
 
 
+## `obj.get(property)` when the injected reflection helper reports it, else
+## `fallback`. Keeps the many guarded reads in one place.
+func _prop(obj, property: String, fallback = null):
+	if not _has_prop.call(obj, property):
+		return fallback
+	return obj.get(property)
+
+
 func format_monster_name(monster) -> String:
 	if not _has_prop.call(monster, "data"):
 		return "Unknown"
@@ -164,12 +172,12 @@ func _timestamp_prefix(debug_logging: bool) -> String:
 
 
 func format_phase_entry(phase: String, run) -> String:
-	var trainer: Variant = run.get("trainer_id") if _has_prop.call(run, "trainer_id") else "?"
-	var day: Variant = run.get("current_round") if _has_prop.call(run, "current_round") else "?"
+	var trainer = _prop(run, "trainer_id", "?")
+	var day = _prop(run, "current_round", "?")
 	if phase == "SHOP":
-		var gold: Variant = run.get("gold") if _has_prop.call(run, "gold") else "?"
-		var lives: Variant = run.get("lives") if _has_prop.call(run, "lives") else "?"
-		var wins: Variant = run.get("current_wins") if _has_prop.call(run, "current_wins") else "?"
+		var gold = _prop(run, "gold", "?")
+		var lives = _prop(run, "lives", "?")
+		var wins = _prop(run, "current_wins", "?")
 		return "SHOP | %s | Day %s | Gold %s | Lives %s | Wins %s" % [trainer, day, gold, lives, wins]
 	return "BATTLE | Day %s" % day
 
@@ -177,12 +185,12 @@ func format_phase_entry(phase: String, run) -> String:
 ## Full run/shop/team/bench snapshot, used only under Deep Inspection.
 func format_phase_snapshot(phase: String, run, manager) -> Array[String]:
 	var lines: Array[String] = []
-	var day: Variant = run.get("current_round") if _has_prop.call(run, "current_round") else "?"
-	var wins: Variant = run.get("current_wins") if _has_prop.call(run, "current_wins") else "?"
-	var lives: Variant = run.get("lives") if _has_prop.call(run, "lives") else "?"
-	var gold: Variant = run.get("gold") if _has_prop.call(run, "gold") else "?"
-	var rank: Variant = run.get("shop_rank") if _has_prop.call(run, "shop_rank") else "?"
-	var battle_hp: Variant = run.get("player_hp") if _has_prop.call(run, "player_hp") else "?"
+	var day = _prop(run, "current_round", "?")
+	var wins = _prop(run, "current_wins", "?")
+	var lives = _prop(run, "lives", "?")
+	var gold = _prop(run, "gold", "?")
+	var rank = _prop(run, "shop_rank", "?")
+	var battle_hp = _prop(run, "player_hp", "?")
 	lines.append("  Day %s | Rank %s | Lives %s | Battle HP %s | Wins %s | Gold %s" % [day, rank, lives, battle_hp, wins, gold])
 	if phase == "SHOP" and manager != null:
 		lines.append_array(format_shop_offers(manager, run, false))
@@ -201,8 +209,8 @@ func format_shop_offers(manager, run, include_context: bool) -> Array[String]:
 	var items: Array = manager.current_shop_items
 
 	if include_context:
-		var gold: Variant = run.get("gold") if _has_prop.call(run, "gold") else "?"
-		var day: Variant = run.get("current_round") if _has_prop.call(run, "current_round") else "?"
+		var gold = _prop(run, "gold", "?")
+		var day = _prop(run, "current_round", "?")
 		lines.append("  Day %s | Gold %s" % [day, gold])
 
 	lines.append("\n  SHOP:")

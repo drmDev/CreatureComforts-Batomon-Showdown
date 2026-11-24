@@ -26,6 +26,8 @@ extends Node
 
 signal finished(state: String)  # current | available | installed | no_release | offline | error
 
+const FileStore = preload("file_store.gd")
+
 const MOD_ID := "creature_comforts"
 const REPO_URL := "https://github.com/drmDev/CreatureComforts-Batomon-Showdown"
 const MANIFEST_URL := REPO_URL + "/releases/latest/download/update.json"
@@ -78,7 +80,7 @@ var _shown := {}                      # notices already shown this session
 func setup(p_version: String, p_mod_dir: String) -> void:
 	version = p_version
 	mod_dir = p_mod_dir
-	DirAccess.make_dir_recursive_absolute(CFG_PATH.get_base_dir())
+	FileStore.ensure_parent_dir(CFG_PATH)
 	cfg = ConfigFile.new()
 	cfg.load(CFG_PATH)  # a missing / unreadable file just leaves the defaults
 	if OS.has_feature("editor"):
@@ -111,7 +113,7 @@ func start() -> void:
 	if str(cfg.get_value("update", "installed_version", "")) == version \
 			and not bool(cfg.get_value("update", "announced", true)):
 		cfg.set_value("update", "announced", true)
-		cfg.save(CFG_PATH)
+		FileStore.save_config(CFG_PATH, cfg)
 		var notes := str(cfg.get_value("update", "notes", ""))
 		notice("Creature Comforts updated to %s" % version,
 			notes if notes != "" else "The new version is running.")
@@ -168,7 +170,7 @@ func _install(m: Dictionary) -> void:
 	cfg.set_value("update", "installed_version", v)
 	cfg.set_value("update", "announced", false)
 	cfg.set_value("update", "notes", str(m.get("notes", "")).left(200))
-	cfg.save(CFG_PATH)
+	FileStore.save_config(CFG_PATH, cfg)
 	notice("Creature Comforts %s downloaded" % v, "Restart the game to use the new version.")
 	_finish("installed", v)
 

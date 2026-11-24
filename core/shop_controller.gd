@@ -21,8 +21,7 @@ var _context = null
 var _ui = null
 var _shop_overlay_gate = null
 var _dev_tools = null
-var _on_shop_entered: Callable
-var _on_run_changed: Callable
+var _battle = null
 var _has_replay: Callable
 
 var _snapshot_builder = null
@@ -36,13 +35,12 @@ var _positional_trinkets = null
 var _purchase_reminders = null
 
 
-func setup(context, ui, shop_overlay_gate, dev_tools, on_shop_entered: Callable, on_run_changed: Callable, has_replay: Callable = Callable()) -> void:
+func setup(context, ui, shop_overlay_gate, dev_tools, battle, has_replay: Callable = Callable()) -> void:
 	_context = context
 	_ui = ui
 	_shop_overlay_gate = shop_overlay_gate
 	_dev_tools = dev_tools
-	_on_shop_entered = on_shop_entered
-	_on_run_changed = on_run_changed
+	_battle = battle
 	_has_replay = has_replay
 
 	_snapshot_builder = ShopSnapshot.new()
@@ -81,7 +79,7 @@ func handle(state, phase_changed: bool) -> bool:
 		trainer_changed = _last_snapshot.trainer_id != current_snapshot.trainer_id
 
 	if phase_changed:
-		_on_shop_entered.call()
+		_battle.reset_log_guard()
 		_ui.hide_battle_elapsed()
 		if _shop_overlay_gate != null:
 			_shop_overlay_gate.reset_for_shop()
@@ -105,7 +103,7 @@ func handle(state, phase_changed: bool) -> bool:
 
 	if run_changed or trainer_changed:
 		_advice.on_trainer_changed()
-		_on_run_changed.call()  # Clear run-scoped state (gains panel, tracking)
+		_battle.on_run_changed()  # Clear run-scoped state (gains panel, tracking)
 		_trinket_reminders.on_trainer_changed()
 		_positional_trinkets.on_trainer_changed()
 

@@ -15,6 +15,8 @@ extends RefCounted
 ## in mod.json. mod_main draws it as a slider and this module persists it in the
 ## mod's own file (STORE_PATH).
 
+const FileStore = preload("file_store.gd")
+
 const MOD_ID := "creature_comforts"
 ## The mod's own store for Mod Volume; a missing key uses DEFAULT_MOD_VOLUME.
 const STORE_PATH := "user://creature_comforts/settings.cfg"
@@ -152,8 +154,7 @@ func _save_store() -> void:
 	var file := ConfigFile.new()
 	file.load(_store_path)
 	file.set_value(STORE_SECTION, KEY_MOD_VOLUME, _mod_volume)
-	DirAccess.make_dir_recursive_absolute(_store_path.get_base_dir())
-	var error := file.save(_store_path)
+	var error := FileStore.save_config(_store_path, file)
 	if error != OK:
 		push_warning("Creature Comforts: cannot save settings (%s): %s" % [_store_path, error_string(error)])
 

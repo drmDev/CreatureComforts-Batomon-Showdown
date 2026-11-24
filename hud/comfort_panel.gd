@@ -1,6 +1,7 @@
 extends Control
 
 const Style = preload("../core/style.gd")
+const NodeUtils = preload("../core/node_utils.gd")
 const PanelIcons = preload("panel_icons.gd")
 
 # Shared palette (single source: core/style.gd)
@@ -101,9 +102,7 @@ func _flip_texture_vertically(tex: Texture2D) -> Texture2D:
 
 
 func _connect_viewport_resize(handler: Callable) -> void:
-	var viewport := get_viewport()
-	if viewport != null and not viewport.size_changed.is_connected(handler):
-		viewport.size_changed.connect(handler)
+	NodeUtils.connect_viewport_resize(self, handler)
 
 
 ## Tooltips are drawn with the TooltipLabel theme type, which per-control theme

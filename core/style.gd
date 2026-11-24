@@ -115,6 +115,20 @@ static func compact_button(b: Button, color: Color = Color.TRANSPARENT) -> void:
 	b.add_theme_color_override("font_hover_pressed_color", BG_COLOR)
 
 
+## Give a CheckBox one empty stylebox in every state, so its tick and label do
+## not shift between states. `font` and `font_size` are optional.
+static func blank_checkbox(check: CheckBox, font: Font = null, font_size: int = 0) -> void:
+	var blank := StyleBoxEmpty.new()
+	for state in ["normal", "hover", "pressed", "hover_pressed", "focus", "disabled"]:
+		check.add_theme_stylebox_override(state, blank)
+	check.focus_mode = Control.FOCUS_NONE
+	check.add_theme_constant_override("icon_max_width", 12)
+	if font != null:
+		check.add_theme_font_override("font", font)
+	if font_size > 0:
+		check.add_theme_font_size_override("font_size", font_size)
+
+
 ## Action-button styling: a filled box with a brighter border, so it reads as an
 ## action rather than as another filter toggle. `disabled_bg` is optional; when
 ## set, the disabled state is dimmed instead of reusing the normal box.

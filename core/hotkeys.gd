@@ -144,13 +144,7 @@ func _active_shop_view():
 
 
 func _current_state():
-	var tree := get_tree()
-	if tree == null:
-		return null
-	var main = tree.current_scene
-	if main == null:
-		return null
-	return main.get("current_state") if NodeUtils.has_property(main, "current_state") else null
+	return NodeUtils.current_state(get_tree())
 
 
 func _battle_modal_open(view) -> bool:

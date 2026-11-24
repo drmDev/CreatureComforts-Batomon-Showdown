@@ -126,6 +126,11 @@ func open_popup() -> void:
 	_open_popup()
 
 
+## True while the modal popup is open.
+func is_popup_open() -> bool:
+	return _popup_open
+
+
 # --- Lifecycle ----------------------------------------------------------------------------------
 
 ## Called by subclass setters after updating their state.
