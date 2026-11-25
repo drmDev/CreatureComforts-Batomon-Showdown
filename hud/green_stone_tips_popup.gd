@@ -22,13 +22,11 @@ const SECTIONS := [
 	{"heading": "GREEN STONE ELIGIBILITY"},
 	{"bullet": "After Day 2: at least one Common in your team, and no Common may have permanent buffs."},
 	{"bullet": "Permanent buffs on higher tiers do not matter."},
-	{"bullet": "A freshly evolved Ratacomb has no permanent buffs, so Green Stone can still appear. It only counts as buffed once it gains Multicast from knockouts, so lock Green Stone first."},
 	{"heading": "RATACOMB STRATEGY"},
-	{"bullet": "On the Ratacomb day, avoid using items."},
-	{"bullet": "Roll the shop until Green Stone appears."},
-	{"bullet": "Lock Green Stone before entering battle."},
-	{"bullet": "Battle and relock Green Stone while Ratacomb builds Multicast."},
-	{"bullet": "Use Green Stone at x7 Multicast (x5 may be enough when facing elimination)."},
+	{"bullet": "Newly evolved Ratacomb has no permanent buffs. Its Multicast from knockouts counts as a permanent buff, so find Green Stone before its first knockout."},
+	{"bullet": "On Ratacomb's evolution day, avoid using items and roll until Green Stone appears, then lock the shop."},
+	{"bullet": "Keep Green Stone locked between battles while building Multicast."},
+	{"bullet": "Let's go gambling! Cash in that Green Stone when you reach the multicast amount you want."},
 ]
 
 var _lines: Array = []
