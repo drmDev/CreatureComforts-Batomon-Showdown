@@ -48,6 +48,7 @@ const REGION_NAMES := ["Jinto", "Pantra"]
 const FileStore = preload("../core/file_store.gd")
 const RunRegion = preload("../core/run_region.gd")
 const RunData = preload("../core/run_data.gd")
+const SpeciesIcons = preload("../core/species_icons.gd")
 const SavedBuilds = preload("../core/saved_builds.gd")
 const SavedBuildsPanel = preload("saved_builds_panel.gd")
 const CloseButton = preload("close_button.gd")
@@ -331,10 +332,7 @@ func _build_filters(vbox: VBoxContainer) -> void:
 func _build_toolbar(vbox: VBoxContainer) -> void:
 	# Subtle boundary between the filters and the toolbar, matching the one
 	# above the list.
-	var toolbar_divider := ColorRect.new()
-	toolbar_divider.color = Color(1, 1, 1, 0.12)
-	toolbar_divider.custom_minimum_size.y = 1
-	vbox.add_child(toolbar_divider)
+	_build_horizontal_rule(vbox)
 
 	# Toolbar: one-time team snapshot, tracked count, and the Tracked Only view.
 	_toolbar_box(vbox)
@@ -342,10 +340,7 @@ func _build_toolbar(vbox: VBoxContainer) -> void:
 
 func _build_list(vbox: VBoxContainer) -> void:
 	# Subtle boundary between the toolbar and the scrollable list.
-	var divider := ColorRect.new()
-	divider.color = Color(1, 1, 1, 0.12)
-	divider.custom_minimum_size.y = 1
-	vbox.add_child(divider)
+	_build_horizontal_rule(vbox)
 
 	_scroll = ScrollContainer.new()
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -647,9 +642,10 @@ func _sync_sort_direction() -> void:
 ## Thin vertical rule between toolbar groups (actions | sort | view).
 func _toolbar_separator(parent: Control) -> void:
 	var sep := ColorRect.new()
-	sep.color = Color(1, 1, 1, 0.12)
+	sep.color = Style.DIVIDER_COLOR
 	sep.custom_minimum_size = Vector2(1, 8)
 	sep.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	sep.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(sep)
 
 
@@ -952,11 +948,10 @@ func _load_catalog() -> void:
 						if not types.has(tname):
 							types.append(tname)
 							type_set[tname] = true
-			var icon = species.get("texture") if "texture" in species else null
 			var entry := {
 				"kind": "monster", "key": key, "name": display,
 				"tier": tier, "types": types,
-				"icon": icon if icon is Texture2D else null,
+				"icon": SpeciesIcons.icon_for(key),
 				"regions": _regions_for_species(species, key),
 			}
 			_catalog.append(entry)

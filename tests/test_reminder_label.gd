@@ -30,3 +30,19 @@ func test_hides_when_no_reminders() -> void:
 	assert_false(panel.visible)
 	assert_eq(_label_text(panel), "")
 	panel.free()
+
+
+func test_sources_merge_and_clear_independently() -> void:
+	var panel = ReminderLabel.new()
+	panel.set_reminders({"a": "Advice"})
+	panel.set_reminders({"strategy": "Strategy"}, "ratacomb_stoner")
+	assert_eq(_label_text(panel), "Advice\nStrategy")
+	# Replacing one source leaves the other visible.
+	panel.set_reminders({"a": "Advice"}, ReminderLabel.SOURCE_ADVICE)
+	assert_eq(_label_text(panel), "Advice\nStrategy")
+	panel.clear_source("ratacomb_stoner")
+	assert_true(panel.visible)
+	assert_eq(_label_text(panel), "Advice")
+	panel.clear_source(ReminderLabel.SOURCE_ADVICE)
+	assert_false(panel.visible)
+	panel.free()

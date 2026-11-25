@@ -14,6 +14,7 @@ const SellValueIndicators = preload("sell_value_indicators.gd")
 const ReminderLabel = preload("reminder_label.gd")
 const TrinketsPanel = preload("trinkets_panel.gd")
 const ItemsUsedPanel = preload("items_used_panel.gd")
+const GreenStoneTipsPopup = preload("green_stone_tips_popup.gd")
 const RankOddsPanel = preload("rank_odds_panel.gd")
 const BaseHpPanel = preload("base_hp_panel.gd")
 const WatchlistPanel = preload("watchlist_panel.gd")
@@ -38,6 +39,8 @@ var reminder_label = null
 var trinkets_panel = null
 ## Standalone Items Used panel (daily + per-run item usage).
 var items_used_panel = null
+## Green Stone / Ratacomb strategy help, opened from the Items Used panel.
+var green_stone_tips = null
 var rank_odds_panel = null
 var base_hp_panel = null
 var watchlist_panel = null
@@ -113,6 +116,7 @@ func _build_reminder_layer() -> void:
 	# controller pushes its content on every poll.
 	items_used_panel = ItemsUsedPanel.new()
 	items_used_panel.name = "ItemsUsedPanel"
+	items_used_panel.setup(_context.config, _context.item_icons)
 	reminder_layer.add_child(items_used_panel)
 
 	rank_odds_panel = RankOddsPanel.new()
@@ -139,6 +143,14 @@ func _build_reminder_layer() -> void:
 	purchase_reminder_hint = HotkeyHint.new()
 	purchase_reminder_hint.name = "PurchaseReminderHint"
 	reminder_layer.add_child(purchase_reminder_hint)
+
+	# Green Stone tips modal. Added last so its dim backdrop covers the rest of
+	# the reminder layer; it must be a sibling of the Items Used panel because
+	# that panel clips its children.
+	green_stone_tips = GreenStoneTipsPopup.new()
+	green_stone_tips.name = "GreenStoneTipsPopup"
+	reminder_layer.add_child(green_stone_tips)
+	items_used_panel.set_tips_popup(green_stone_tips)
 
 	# Replay Last Battle is created on demand and attached to the game's shop
 	# HudButtons bar (see attach_to_shop_view) so the game owns its layout and
@@ -379,6 +391,7 @@ func apply_gate(allowed: bool) -> bool:
 ## HUD is hidden, either by the overlay gate or by the replay overlay.
 func _close_shop_popups() -> void:
 	watchlist_panel.close_popup()
+	green_stone_tips.hide_panel()
 	rank_odds_panel.reset_for_shop()
 	base_hp_panel.reset_for_shop()
 	sell_value_indicators.hide_all()
@@ -422,6 +435,7 @@ func hide_shop_panels() -> void:
 	# next shop poll re-shows the panels.
 	trinkets_panel.hide_panel()
 	items_used_panel.hide_panel()
+	green_stone_tips.hide_panel()
 	rank_odds_panel.hide_panel()
 	base_hp_panel.hide_panel()
 	watchlist_panel.close_popup()

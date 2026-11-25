@@ -21,6 +21,7 @@ var _context = null
 var _tracker = null
 var _manager = null
 var _run_id := ""
+var _icon_cache := {}  # item id -> Texture2D (or null), avoids per-poll DB scans
 
 
 func setup(panel, context) -> void:
@@ -42,7 +43,7 @@ func update(run, manager) -> void:
 
 
 ## Daily used and allowance straight from the game state.
-## Items consumed this round covers items bought (and applied) in the shop; the
+## `items_bought_this_round` counts items bought (and applied) in the shop; the
 ## allowance includes Membership Card and similar trinket bonuses.
 static func daily_counts(run) -> Dictionary:
 	var used := 0
@@ -114,11 +115,23 @@ func _item_at(index: int):
 func _snapshot(run) -> Dictionary:
 	var daily := daily_counts(run)
 	var entries = _tracker.entries(_context.formatter)
-	if _context.item_icons != null:
-		for entry in entries:
-			entry["icon"] = _context.item_icons.icon(str(entry.get("id", "")))
+	for entry in entries:
+		entry["icon"] = _icon_for(str(entry.get("id", "")))
 	return {
 		"day_used": int(daily["used"]),
 		"day_allowance": int(daily["allowance"]),
 		"entries": entries,
 	}
+
+
+func _icon_for(item_id: String) -> Texture2D:
+	if _context == null or _context.item_icons == null:
+		return null
+	# Cache hits only: a null means the database was not ready yet, so retry.
+	var cached = _icon_cache.get(item_id)
+	if cached != null:
+		return cached
+	var texture: Texture2D = _context.item_icons.icon(item_id)
+	if texture != null:
+		_icon_cache[item_id] = texture
+	return texture

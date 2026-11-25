@@ -28,6 +28,8 @@ Hover a shop monster to see which next-purchase trinkets will affect it, such as
 ### Items Used
 A movable panel tracks your item usage: today's count against your daily allowance (including Membership Card bonuses) and every item used during the run. Usage is saved per run, so it survives Save + Quit and restarts.
 
+Expand the panel for the optional Ratacomb Stoner reminders: contextual Green Stone guidance for the Pipskull into Ratacomb strategy, shown in the same top-left reminder area as the other reminders. The "?" button opens a compact Green Stone tips summary.
+
 ### Battle Status Display
 View your current day, remaining lives, and wins during combat.
 

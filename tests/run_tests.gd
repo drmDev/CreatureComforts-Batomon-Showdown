@@ -37,6 +37,8 @@ var _test_scripts := {
 	"hotkeys": preload("test_hotkeys.gd"),
 	"purchase_reminders": preload("test_purchase_reminders.gd"),
 	"item_usage_tracker": preload("test_item_usage_tracker.gd"),
+	"ratacomb_stoner": preload("test_ratacomb_stoner.gd"),
+	"text_wrap": preload("test_text_wrap.gd"),
 }
 
 

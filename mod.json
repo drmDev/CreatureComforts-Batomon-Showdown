@@ -26,7 +26,7 @@
 		{"key": "purchase_reminders", "label": "Purchase Reminders", "type": "bool", "default": true,
 		 "description": "Show a hover reminder on shop monsters for next-purchase trinkets."},
 		{"key": "item_usage_tracker", "label": "Item Usage Tracker", "type": "bool", "default": true,
-		 "description": "Show a movable panel tracking item uses per day and per run."},
+		 "description": "Show a movable panel tracking item uses per day and per run. Expanding it also offers the optional Ratacomb Stoner reminders and Green Stone tips."},
 		{"key": "notification_sounds", "label": "Notification Sounds", "type": "bool", "default": true,
 		 "description": "Play reminder and UI sound effects. The Mod Volume slider below sets how loud they are."}
 	]

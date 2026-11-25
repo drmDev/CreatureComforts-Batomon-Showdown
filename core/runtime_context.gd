@@ -38,6 +38,11 @@ func sounds_enabled() -> bool:
 	return feature_enabled(ModConfig.KEY_NOTIFICATION_SOUNDS)
 
 
+## Persisted Ratacomb Stoner preference (off when the config is unavailable).
+func ratacomb_stoner_enabled() -> bool:
+	return config != null and config.ratacomb_stoner_enabled()
+
+
 ## Shared 0-100 volume for the same sounds; the one Mod Volume slider sets how
 ## loud they are.
 func mod_volume() -> int:

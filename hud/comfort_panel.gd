@@ -38,6 +38,17 @@ func _build_panel_font() -> Font:
 	return font
 
 
+## Thin horizontal rule between HUD sections (watchlist divider, Items Used
+## separator). Shared so the rule colour and click-through behaviour match.
+func _build_horizontal_rule(parent: Control, height := 1) -> ColorRect:
+	var rule := ColorRect.new()
+	rule.color = Style.DIVIDER_COLOR
+	rule.custom_minimum_size.y = height
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(rule)
+	return rule
+
+
 ## Shared HUD box: navy fill, gold 1px border, rounded corners. Used by the
 ## rank-odds button, the income widget and the watchlist button so small
 ## clickable HUD elements look identical.

@@ -10,6 +10,9 @@ var _pika = null
 var _poke = null
 var _pending_day: Dictionary = {}
 var _pending_trinket := false
+## Strategy reminders (Ratacomb Stoner) keep their own slot so clearing one
+## reminder type never drops a queued sound from another.
+var _pending_strategy := false
 
 
 ## `host` is the Node the AudioStreamPlayers are added to; `sounds_enabled` is
@@ -30,9 +33,14 @@ func queue_trinket() -> void:
 	_pending_trinket = true
 
 
+func queue_strategy() -> void:
+	_pending_strategy = true
+
+
 func clear() -> void:
 	_pending_day.clear()
 	_pending_trinket = false
+	_pending_strategy = false
 
 
 func clear_day() -> void:
@@ -44,7 +52,7 @@ func clear_trinket() -> void:
 
 
 func has_pending() -> bool:
-	return not _pending_day.is_empty() or _pending_trinket
+	return not _pending_day.is_empty() or _pending_trinket or _pending_strategy
 
 
 ## Play queued sounds when the gate allows it. `gate` may be null (always allowed).
@@ -53,10 +61,12 @@ func try_play(gate) -> void:
 		return
 	if gate != null and not gate.is_allowed():
 		return
-	if not _pending_day.is_empty():
+	# Day and strategy reminders share the "pika" cue; play it at most once.
+	if not _pending_day.is_empty() or _pending_strategy:
 		if _pika != null:
 			_pika.play()
 		_pending_day.clear()
+		_pending_strategy = false
 	if _pending_trinket:
 		if _poke != null:
 			_poke.play()

@@ -10,6 +10,7 @@ const RuleFactory = preload("rule_factory.gd")
 const AdviceContext = preload("advice_context.gd")
 const TrainerRules = preload("trainer_rules.gd")
 const ModConfig = preload("../core/mod_config.gd")
+const ReminderLabel = preload("../hud/reminder_label.gd")
 
 var _advisor = null
 var _advice_context_builder = null
@@ -93,11 +94,12 @@ func reset_suppression() -> void:
 		_advisor.reset_suppression()
 
 
-## Clear the reminder label and/or rule suppression when leaving a phase.
+## Clear this source's reminders and/or rule suppression when leaving a phase.
+## Other reminder sources (e.g. the Ratacomb strategy) are left alone.
 func reset_transient(clear_suppression: bool, clear_reminders: bool) -> void:
 	if clear_reminders:
 		if _reminder_label != null:
-			_reminder_label.hide_all_reminders()
+			_reminder_label.clear_source(ReminderLabel.SOURCE_ADVICE)
 		_last_reminder_rule_ids.clear()
 	if clear_suppression:
 		reset_suppression()
@@ -114,7 +116,7 @@ func on_feature_toggled(key: String, value: bool) -> void:
 		return
 	if key == ModConfig.KEY_DAY_REMINDERS:
 		if _reminder_label != null:
-			_reminder_label.hide_all_reminders()
+			_reminder_label.clear_source(ReminderLabel.SOURCE_ADVICE)
 		_last_reminder_rule_ids.clear()
 		_context.chimes.clear_day()
 

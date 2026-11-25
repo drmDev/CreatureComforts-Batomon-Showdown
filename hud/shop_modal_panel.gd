@@ -72,6 +72,11 @@ func _popup_height() -> float:
 	return TITLE_H + POPUP_PADDING * 2.0
 
 
+## Popup width. Subclasses with longer text widen their content here.
+func _popup_width() -> float:
+	return POPUP_WIDTH
+
+
 func _draw_content(_rect: Rect2) -> void:
 	pass
 
@@ -124,6 +129,15 @@ func make_external_button() -> Button:
 ## Open the popup programmatically (used by an external button).
 func open_popup() -> void:
 	_open_popup()
+
+
+## Toggle the popup; used by an external "?" button so it both opens and
+## dismisses the popup.
+func toggle_popup() -> void:
+	if _popup_open:
+		_close_popup()
+	else:
+		_open_popup()
 
 
 ## True while the modal popup is open.
@@ -202,6 +216,9 @@ func _open_popup() -> void:
 	if _popup_open:
 		return
 	_popup_open = true
+	# The panel is created hidden and setters are what normally reveal it. A
+	# popup opened directly (the external "?" button) must reveal itself too.
+	_ensure_visible()
 	_anchor()
 	grab_focus()
 	_emit_log("popup opened")
@@ -232,7 +249,7 @@ func _button_rect() -> Rect2:
 
 func _popup_rect() -> Rect2:
 	var viewport_size := _viewport_size()
-	var w := minf(POPUP_WIDTH, viewport_size.x - VIEWPORT_MARGIN * 2.0)
+	var w := minf(_popup_width(), viewport_size.x - VIEWPORT_MARGIN * 2.0)
 	var h := minf(_popup_height(), viewport_size.y - VIEWPORT_MARGIN * 2.0)
 	var x := roundf((viewport_size.x - w) * 0.5)
 	var y := roundf((viewport_size.y - h) * 0.5)

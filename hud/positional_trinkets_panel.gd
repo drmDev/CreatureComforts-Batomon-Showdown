@@ -10,6 +10,7 @@ extends "collapsible_panel.gd"
 
 const PositionalTrinkets = preload("../core/positional_trinkets.gd")
 const EconomicalTrinkets = preload("../core/economical_trinkets.gd")
+const TextWrap = preload("../core/text_wrap.gd")
 
 const CONTENT_PADDING := 3.0
 const BODY_TOP_PADDING := 2.0
@@ -181,24 +182,6 @@ func _tag_column_width() -> float:
 	return width + TAG_GAP
 
 
-func _wrap_text(text: String, max_width: float, font_size: int) -> Array:
-	if max_width <= 0.0 or text.is_empty():
-		return [text]
-	var lines: Array = []
-	var current := ""
-	for word in text.split(" "):
-		var candidate := word if current.is_empty() else current + " " + word
-		if _text_font.get_string_size(candidate, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x <= max_width:
-			current = candidate
-		else:
-			if not current.is_empty():
-				lines.append(current)
-			current = word
-	if not current.is_empty():
-		lines.append(current)
-	return lines
-
-
 func _layout() -> Array:
 	if _layout_key == _content_key and not _layout_cache.is_empty():
 		return _layout_cache
@@ -216,10 +199,10 @@ func _layout() -> Array:
 		var lines: Array = [text]
 		var height := LINE_HEIGHT
 		if kind == "bonus":
-			lines = _wrap_text(text, text_col, font_size)
+			lines = TextWrap.wrap(_text_font, text, font_size, text_col)
 			height = float(lines.size()) * LINE_HEIGHT
 		elif kind == "secondary":
-			lines = _wrap_text(text, full_col, font_size)
+			lines = TextWrap.wrap(_text_font, text, font_size, full_col)
 			height = float(lines.size()) * LINE_HEIGHT
 		_layout_cache.append({
 			"kind": kind,

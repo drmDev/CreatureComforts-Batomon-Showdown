@@ -1,4 +1,7 @@
 extends PanelContainer
+## Top-left reminder text. Reminders come from independent sources (trainer
+## advice rules, the Ratacomb strategy) and are merged for display, so one
+## source replacing its reminders never clears another source's text.
 
 const Style = preload("../core/style.gd")
 
@@ -15,7 +18,10 @@ const BORDER_COLOR := Style.BORDER_COLOR
 const BORDER_WIDTH := 1
 const PADDING := 3
 
-var _active_reminders: Dictionary = {}
+## Default source for the existing callers (trainer/day advice rules).
+const SOURCE_ADVICE := "advice"
+
+var _sources: Dictionary = {}  # source -> {rule_id: text}
 var _label: Label
 var _panel_style: StyleBoxFlat
 
@@ -47,25 +53,34 @@ func _init() -> void:
 	position = Vector2(LEFT_MARGIN, TOP_BAR_Y)
 
 
-func set_reminders(reminders: Dictionary) -> void:
-	_active_reminders = reminders.duplicate()
+## Replace one source's reminders. Callers that predate sources use the advice
+## default and keep working unchanged.
+func set_reminders(reminders: Dictionary, source := SOURCE_ADVICE) -> void:
+	_sources[source] = reminders.duplicate()
 	_update_display()
 
 
+## Drop one source's reminders, leaving other sources visible.
+func clear_source(source: String) -> void:
+	if _sources.erase(source):
+		_update_display()
+
+
 func hide_all_reminders() -> void:
-	_active_reminders.clear()
+	_sources.clear()
 	_update_display()
 
 
 func _update_display() -> void:
 	var reminder_texts: Array = []
-	for reminder_text in _active_reminders.values():
-		if reminder_text.is_empty():
-			continue
-		# Deduplicate: the same reminder can come from more than one rule.
-		if reminder_text in reminder_texts:
-			continue
-		reminder_texts.append(reminder_text)
+	for source in _sources:
+		for reminder_text in _sources[source].values():
+			if reminder_text.is_empty():
+				continue
+			# Deduplicate: the same reminder can come from more than one rule/source.
+			if reminder_text in reminder_texts:
+				continue
+			reminder_texts.append(reminder_text)
 	
 	if reminder_texts.is_empty():
 		visible = false

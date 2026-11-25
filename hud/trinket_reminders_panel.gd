@@ -5,6 +5,7 @@ extends "collapsible_panel.gd"
 ## visibility. This view only paints rows and reports its natural size.
 
 const TrinketGains = preload("../core/trinket_gains.gd")
+const TextWrap = preload("../core/text_wrap.gd")
 
 const CONTENT_PADDING := 6.0
 const NAME_LINE_H := 14.0
@@ -71,37 +72,7 @@ func _make_content_key(entries: Array) -> String:
 
 
 func _desc_line_count(entry: Dictionary, row_w: float) -> int:
-	return maxi(1, _wrap_text(_text_font, str(entry.get("desc", "")), DESC_FONT_SIZE, row_w).size())
-
-
-func _wrap_text(font: Font, text: String, font_size: int, max_w: float) -> Array[String]:
-	var lines: Array[String] = []
-	if font == null or text.is_empty() or max_w <= 0.0:
-		return lines
-	var current := ""
-	for word in text.split(" ", false):
-		var candidate := word if current.is_empty() else current + " " + word
-		if font.get_string_size(candidate, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x <= max_w:
-			current = candidate
-			continue
-		if not current.is_empty():
-			lines.append(current)
-		if font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x <= max_w:
-			current = word
-			continue
-		# Break a single word that is wider than the row.
-		var chunk := ""
-		for ch in word:
-			var next := chunk + ch
-			if not chunk.is_empty() and font.get_string_size(next, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > max_w:
-				lines.append(chunk)
-				chunk = ch
-			else:
-				chunk = next
-		current = chunk
-	if not current.is_empty():
-		lines.append(current)
-	return lines
+	return maxi(1, TextWrap.wrap(_text_font, str(entry.get("desc", "")), DESC_FONT_SIZE, row_w, true).size())
 
 
 func _draw_body(width: float) -> void:
@@ -123,7 +94,7 @@ func _draw_body(width: float) -> void:
 		var name_line := _fit_text(_text_font, _name_line(entry), NAME_FONT_SIZE, row_w - (cursor_x - text_x))
 		_draw_text_shadow(Vector2(cursor_x, name_baseline), name_line, VALUE_COLOR, NAME_FONT_SIZE)
 		cursor_y += NAME_LINE_H
-		for desc_line in _wrap_text(_text_font, str(entry.get("desc", "")), DESC_FONT_SIZE, row_w):
+		for desc_line in TextWrap.wrap(_text_font, str(entry.get("desc", "")), DESC_FONT_SIZE, row_w, true):
 			var desc_baseline := cursor_y + DESC_LINE_H - 3.0
 			_draw_text_shadow(Vector2(text_x, desc_baseline), desc_line, LABEL_COLOR, DESC_FONT_SIZE)
 			cursor_y += DESC_LINE_H

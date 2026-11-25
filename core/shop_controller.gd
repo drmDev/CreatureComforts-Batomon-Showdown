@@ -15,6 +15,7 @@ const AdviceController = preload("../advice/advice_controller.gd")
 const TrinketRemindersController = preload("../hud/trinket_reminders_controller.gd")
 const PositionalTrinketsController = preload("../hud/positional_trinkets_controller.gd")
 const ItemsUsedController = preload("../hud/items_used_controller.gd")
+const RatacombStonerController = preload("../hud/ratacomb_stoner_controller.gd")
 const ModConfig = preload("mod_config.gd")
 const PurchaseRemindersController = preload("../hud/purchase_reminders_controller.gd")
 
@@ -34,6 +35,7 @@ var _advice = null
 var _trinket_reminders = null
 var _positional_trinkets = null
 var _item_usage = null
+var _ratacomb = null
 var _purchase_reminders = null
 
 
@@ -51,6 +53,9 @@ func setup(context, ui, shop_overlay_gate, dev_tools, battle, has_replay: Callab
 	_advice = AdviceController.new()
 	_advice.setup(_context)
 	_advice.set_reminder_label(_ui.reminder_label)
+
+	_ratacomb = RatacombStonerController.new()
+	_ratacomb.setup(_context, _ui.reminder_label)
 
 	# The two controllers stay independent; they feed tabs of the shared panel.
 	_trinket_reminders = TrinketRemindersController.new()
@@ -112,8 +117,10 @@ func handle(state, phase_changed: bool) -> bool:
 		_battle.on_run_changed()  # Clear run-scoped state (gains panel, tracking)
 		_trinket_reminders.on_trainer_changed()
 		_positional_trinkets.on_trainer_changed()
+		_ratacomb.clear()
 
 	_advice.evaluate(current_snapshot, _shop_overlay_gate)
+	_ratacomb.update(run, manager, _shop_overlay_gate)
 
 	var current_day := int(run.get("current_round")) if NodeUtils.has_property(run, "current_round") else 1
 	_trinket_reminders.update(run, _shop_overlay_gate)
@@ -141,6 +148,8 @@ func handle(state, phase_changed: bool) -> bool:
 ## Clear the advice reminder label and/or rule suppression when leaving a phase.
 func reset_transient(clear_suppression: bool, clear_reminders: bool) -> void:
 	_advice.reset_transient(clear_suppression, clear_reminders)
+	if clear_reminders and _ratacomb != null:
+		_ratacomb.clear()
 
 
 ## Forward a live settings change to the shop-only controllers.

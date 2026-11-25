@@ -250,3 +250,15 @@ func test_setting_the_same_trinkets_tab_is_a_no_op() -> void:
 	config.set_trinkets_tab("")
 	assert_eq(config.trinkets_tab(), "gained", "empty values are ignored")
 	_remove_test_store()
+
+
+func test_ratacomb_stoner_preference_defaults_off_and_persists() -> void:
+	_remove_test_store()
+	var writer = ModConfig.new()
+	writer.use_store(TEST_STORE)
+	assert_false(writer.ratacomb_stoner_enabled())
+	writer.set_ratacomb_stoner_enabled(true)
+	var reader = ModConfig.new()
+	reader.use_store(TEST_STORE)
+	assert_true(reader.ratacomb_stoner_enabled(), "preference survives a restart")
+	_remove_test_store()

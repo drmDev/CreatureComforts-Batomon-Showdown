@@ -78,6 +78,9 @@ const DEFAULTS := {
 ## (STORE_PATH) next to Mod Volume; Alerts is the default.
 const STORE_KEY_TRINKETS_TAB := "trinkets_tab"
 const DEFAULT_TRINKETS_TAB := "alerts"
+## Ratacomb Stoner reminder preference (Items Used panel checkbox). Stored in the
+## same file; off by default.
+const STORE_KEY_RATACOMB_STONER := "ratacomb_stoner"
 
 ## Emitted when a feature toggle changes (loader-driven). Mod Volume is read on
 ## demand by the sound players, so it is not announced here.
@@ -87,6 +90,7 @@ var _loader = null
 var _store_path := ""
 var _mod_volume := DEFAULT_MOD_VOLUME
 var _trinkets_tab := DEFAULT_TRINKETS_TAB
+var _ratacomb_stoner := false
 
 
 ## Bind to the Mod Loader (may be null when running standalone). Subscribes to
@@ -109,6 +113,7 @@ func use_store(path: String) -> void:
 	_store_path = path
 	_mod_volume = DEFAULT_MOD_VOLUME
 	_trinkets_tab = DEFAULT_TRINKETS_TAB
+	_ratacomb_stoner = false
 	if path.is_empty():
 		return
 	var file := ConfigFile.new()
@@ -120,6 +125,7 @@ func use_store(path: String) -> void:
 	var tab = file.get_value(STORE_SECTION, STORE_KEY_TRINKETS_TAB, DEFAULT_TRINKETS_TAB)
 	if tab is String and not str(tab).is_empty():
 		_trinkets_tab = str(tab)
+	_ratacomb_stoner = bool(file.get_value(STORE_SECTION, STORE_KEY_RATACOMB_STONER, false))
 
 
 ## Disconnect from the Mod Loader. Called when the mod node leaves the tree so a
@@ -170,6 +176,19 @@ func set_trinkets_tab(tab: String) -> void:
 	_save_store()
 
 
+## Whether the optional Ratacomb strategy reminders are enabled.
+func ratacomb_stoner_enabled() -> bool:
+	return _ratacomb_stoner
+
+
+## Persist the Ratacomb Stoner checkbox. Setting the current value is a no-op.
+func set_ratacomb_stoner_enabled(enabled: bool) -> void:
+	if enabled == _ratacomb_stoner:
+		return
+	_ratacomb_stoner = enabled
+	_save_store()
+
+
 func _clamp_volume(value: int) -> int:
 	return clampi(value, MOD_VOLUME_MIN, MOD_VOLUME_MAX)
 
@@ -183,6 +202,7 @@ func _save_store() -> void:
 	file.load(_store_path)
 	file.set_value(STORE_SECTION, KEY_MOD_VOLUME, _mod_volume)
 	file.set_value(STORE_SECTION, STORE_KEY_TRINKETS_TAB, _trinkets_tab)
+	file.set_value(STORE_SECTION, STORE_KEY_RATACOMB_STONER, _ratacomb_stoner)
 	var error := FileStore.save_config(_store_path, file)
 	if error != OK:
 		push_warning("Creature Comforts: cannot save settings (%s): %s" % [_store_path, error_string(error)])

@@ -102,8 +102,9 @@ func _build_ui() -> void:
 	header.add_child(close_x)
 
 	var divider := ColorRect.new()
-	divider.color = Color(1, 1, 1, 0.12)
+	divider.color = Style.DIVIDER_COLOR
 	divider.custom_minimum_size.y = 1
+	divider.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vbox.add_child(divider)
 
 	var scroll := ScrollContainer.new()
