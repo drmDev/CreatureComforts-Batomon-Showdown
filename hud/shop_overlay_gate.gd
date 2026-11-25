@@ -38,6 +38,9 @@ const OVERLAY_NODE_NAMES := ["DexUI", "SettingsMenu"]
 # Injected helpers (same pattern as LogFormatterScript.new(_has_property)).
 var _has_prop: Callable
 var _is_script: Callable
+# Shared node_added watcher, required: the gate subscribes through it so one
+# tree scan serves every mod consumer.
+var _watcher = null
 
 var _overlay_gate_reason := ""
 var _shop_since_ms := 0
@@ -45,14 +48,13 @@ var _gate_hold_until_ms := 0  # Transition signal hold: keep the overlay hidden 
 var _search_end_hold_until_ms := 0  # Brief hold after search ends, before the battle transition fires
 var _view_member_cache: Dictionary = {}
 var _transition_nodes: Dictionary = {}
-var _watcher = null
 # The overlay probe allocates child arrays, so it runs at ~10 Hz instead of
 # every frame. The cheap checks above still run per frame.
 var _overlay_probe_cache := ""
 var _overlay_probe_next_ms := 0
 
 
-func setup(has_prop: Callable, is_script: Callable, watcher = null) -> void:
+func setup(has_prop: Callable, is_script: Callable, watcher) -> void:
 	_has_prop = has_prop
 	_is_script = is_script
 	_watcher = watcher
@@ -262,23 +264,11 @@ func _get_view_member(view, property_names: Array, node_name: String):
 
 ## Connect to the game's transition signal (verified in examples/MyBattleStats) so
 ## battle start hides the overlay immediately, independent of button visibility.
+## The shared watcher replays the existing tree on subscribe, so no local scan is
+## needed.
 func _setup_transition_listener() -> void:
 	if _watcher != null:
 		_watcher.subscribe(_on_node_added_transition)
-		return
-	if get_tree() == null:
-		return
-	if not get_tree().node_added.is_connected(_on_node_added_transition):
-		get_tree().node_added.connect(_on_node_added_transition)
-	_scan_transition_nodes(get_tree().root)
-
-
-func _scan_transition_nodes(node: Node) -> void:
-	if node == null or not is_instance_valid(node):
-		return
-	_on_node_added_transition(node)
-	for child in node.get_children():
-		_scan_transition_nodes(child)
 
 
 func _on_node_added_transition(node: Node) -> void:
@@ -317,5 +307,3 @@ func _on_transition_requested(target: String, data) -> void:
 func _exit_tree() -> void:
 	if _watcher != null:
 		_watcher.unsubscribe(_on_node_added_transition)
-	if get_tree() != null and get_tree().node_added.is_connected(_on_node_added_transition):
-		get_tree().node_added.disconnect(_on_node_added_transition)

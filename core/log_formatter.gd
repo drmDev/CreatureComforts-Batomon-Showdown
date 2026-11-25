@@ -1,6 +1,7 @@
 extends RefCounted
 
 const ShopSnapshot = preload("shop_snapshot.gd")
+const NodeUtils = preload("node_utils.gd")
 
 const STAT_NAMES := {1: "Dmg", 2: "Heal", 3: "Shield", 4: "Burn", 5: "Poison", 6: "Shock", 7: "Multi"}
 const JUNK_TRINKET_ID := "junk"  # Junk trinkets are hidden from the trinket-gain panel
@@ -9,14 +10,6 @@ var _has_prop: Callable
 
 func _init(has_property_fn: Callable) -> void:
 	_has_prop = has_property_fn
-
-
-## `obj.get(property)` when the injected reflection helper reports it, else
-## `fallback`. Keeps the many guarded reads in one place.
-func _prop(obj, property: String, fallback = null):
-	if not _has_prop.call(obj, property):
-		return fallback
-	return obj.get(property)
 
 
 func format_monster_name(monster) -> String:
@@ -34,10 +27,9 @@ func format_species_name(species_key: String) -> String:
 	if species_key.is_empty():
 		return "Unknown"
 
-	if TranslationServer.has_method("translate"):
-		var translated := TranslationServer.translate(species_key)
-		if translated != species_key:
-			return translated
+	var translated := TranslationServer.translate(species_key)
+	if translated != species_key:
+		return translated
 
 	var name_key := species_key
 	if "." in name_key:
@@ -104,18 +96,15 @@ func resolve_type_name(type_resource) -> String:
 	if _has_prop.call(type_resource, "type_name"):
 		return str(type_resource.type_name).capitalize()
 
-	if type_resource.has_method("get_path"):
-		var path: String = type_resource.get_path()
-		if path.contains("/type_data/"):
-			var filename := path.get_file().get_basename()
-			return filename.capitalize()
-
-	var script: Script = type_resource.get_script()
-	if script != null:
-		var path := str(type_resource.resource_path)
-		if path.contains("/type_data/"):
-			var filename := path.get_file().get_basename()
-			return filename.capitalize()
+	# Resources expose resource_path; Nodes expose get_path(). Both point at the
+	# same /type_data/ files, so one filename check covers both.
+	var path := ""
+	if _has_prop.call(type_resource, "resource_path"):
+		path = str(type_resource.resource_path)
+	elif type_resource.has_method("get_path"):
+		path = str(type_resource.get_path())
+	if path.contains("/type_data/"):
+		return path.get_file().get_basename().capitalize()
 
 	return "Unknown"
 
@@ -172,12 +161,12 @@ func _timestamp_prefix(debug_logging: bool) -> String:
 
 
 func format_phase_entry(phase: String, run) -> String:
-	var trainer = _prop(run, "trainer_id", "?")
-	var day = _prop(run, "current_round", "?")
+	var trainer = NodeUtils.get_or(run, "trainer_id", "?")
+	var day = NodeUtils.get_or(run, "current_round", "?")
 	if phase == "SHOP":
-		var gold = _prop(run, "gold", "?")
-		var lives = _prop(run, "lives", "?")
-		var wins = _prop(run, "current_wins", "?")
+		var gold = NodeUtils.get_or(run, "gold", "?")
+		var lives = NodeUtils.get_or(run, "lives", "?")
+		var wins = NodeUtils.get_or(run, "current_wins", "?")
 		return "SHOP | %s | Day %s | Gold %s | Lives %s | Wins %s" % [trainer, day, gold, lives, wins]
 	return "BATTLE | Day %s" % day
 
@@ -185,12 +174,12 @@ func format_phase_entry(phase: String, run) -> String:
 ## Full run/shop/team/bench snapshot, used only under Deep Inspection.
 func format_phase_snapshot(phase: String, run, manager) -> Array[String]:
 	var lines: Array[String] = []
-	var day = _prop(run, "current_round", "?")
-	var wins = _prop(run, "current_wins", "?")
-	var lives = _prop(run, "lives", "?")
-	var gold = _prop(run, "gold", "?")
-	var rank = _prop(run, "shop_rank", "?")
-	var battle_hp = _prop(run, "player_hp", "?")
+	var day = NodeUtils.get_or(run, "current_round", "?")
+	var wins = NodeUtils.get_or(run, "current_wins", "?")
+	var lives = NodeUtils.get_or(run, "lives", "?")
+	var gold = NodeUtils.get_or(run, "gold", "?")
+	var rank = NodeUtils.get_or(run, "shop_rank", "?")
+	var battle_hp = NodeUtils.get_or(run, "player_hp", "?")
 	lines.append("  Day %s | Rank %s | Lives %s | Battle HP %s | Wins %s | Gold %s" % [day, rank, lives, battle_hp, wins, gold])
 	if phase == "SHOP" and manager != null:
 		lines.append_array(format_shop_offers(manager, run, false))
@@ -209,8 +198,8 @@ func format_shop_offers(manager, run, include_context: bool) -> Array[String]:
 	var items: Array = manager.current_shop_items
 
 	if include_context:
-		var gold = _prop(run, "gold", "?")
-		var day = _prop(run, "current_round", "?")
+		var gold = NodeUtils.get_or(run, "gold", "?")
+		var day = NodeUtils.get_or(run, "current_round", "?")
 		lines.append("  Day %s | Gold %s" % [day, gold])
 
 	lines.append("\n  SHOP:")

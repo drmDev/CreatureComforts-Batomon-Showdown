@@ -5,6 +5,9 @@ extends RefCounted
 ## shop, then shows at most one line through the shared reminder label. Sound
 ## follows the existing reminder convention and plays once per stage change.
 ##
+## Every stage requires a Ratacomb in the team or on the bench: the strategy
+## starts with the Pipskull evolution, so a Green Stone seen earlier is ignored.
+##
 ## Stage detection (game facts):
 ## - Pipskull evolves into Ratacomb at 3 knockouts (`pipskull_ability.gd`).
 ## - Green Stone needs a tier-1 monster and, after Day 2, no permanent buffs on
@@ -16,17 +19,13 @@ const ModConfig = preload("../core/mod_config.gd")
 
 const GREEN_STONE_ID := "green_stone"
 const RATACOMB_ID := "ratacomb"
-const PIPSKULL_ID := "pipskull"
-const PIPSKULL_KO_THRESHOLD := 3  # game's pipskull_ability.gd ko_threshold
 const RULE_ID := "ratacomb_stoner"
 
-const STAGE_PREPARE := "prepare"
 const STAGE_FIND := "find"
 const STAGE_FOUND := "found"
 const STAGE_LOCKED := "locked"
 
 const STAGE_MESSAGES := {
-	STAGE_PREPARE: "Ratacomb: Prepare to roll for Green Stone.",
 	STAGE_FIND: "Ratacomb: Find Green Stone before using an item!",
 	STAGE_FOUND: "Green Stone found! Lock it before battle.",
 	STAGE_LOCKED: "Keep Green Stone locked while building Multicast.",
@@ -94,13 +93,12 @@ func _enabled() -> bool:
 ## One diagnostic line per shop poll (Debug Logging only) listing every fact the
 ## stage decision uses, so a missing reminder can be traced to its cause.
 func _debug_line(run, manager, stage: String) -> String:
-	return "RATACOMB | stage=%s target=%s stone=%s frozen=%s unbuffed=%s pipskull=%s" % [
+	return "RATACOMB | stage=%s ratacomb=%s stone=%s frozen=%s unbuffed=%s" % [
 		"none" if stage.is_empty() else stage,
-		has_stone_target(run),
+		has_ratacomb(run),
 		green_stone_in_shop(manager),
 		shop_locked(manager),
 		unbuffed_ratacomb(run),
-		pipskull_near_evolution(run),
 	]
 
 
@@ -109,10 +107,11 @@ func _debug_line(run, manager, stage: String) -> String:
 ## The single relevant stage, or "" when nothing applies. Later stages win, so
 ## the player always sees the next action.
 ##
-## The shop stages do not require the roster: the player opted in with the
-## Ratacomb Stoner checkbox, and "Green Stone visible in shop" is useful on its
-## own. FIND/PREPARE inherently need the roster check.
+## Owning a Ratacomb gates every stage: before the evolution there is no
+## Ratacomb to stone, so a Green Stone in the shop is not this rule's business.
 static func stage_for(run, manager) -> String:
+	if not has_ratacomb(run):
+		return ""
 	var stone := green_stone_in_shop(manager)
 	if stone and shop_locked(manager):
 		return STAGE_LOCKED
@@ -120,15 +119,14 @@ static func stage_for(run, manager) -> String:
 		return STAGE_FOUND
 	if unbuffed_ratacomb(run):
 		return STAGE_FIND
-	if pipskull_near_evolution(run):
-		return STAGE_PREPARE
 	return ""
 
 
-static func has_stone_target(run) -> bool:
+## A Ratacomb in the team or on the bench (a benched one can still be swapped in
+## for the transformation).
+static func has_ratacomb(run) -> bool:
 	for monster in _roster(run):
-		var id := _species_id(monster)
-		if id == PIPSKULL_ID or id == RATACOMB_ID:
+		if _species_id(monster) == RATACOMB_ID:
 			return true
 	return false
 
@@ -140,16 +138,6 @@ static func unbuffed_ratacomb(run) -> bool:
 		if not monster.has_method("has_any_permanent_buffs"):
 			continue
 		if not bool(monster.has_any_permanent_buffs()):
-			return true
-	return false
-
-
-static func pipskull_near_evolution(run) -> bool:
-	for monster in _roster(run):
-		if _species_id(monster) != PIPSKULL_ID:
-			continue
-		var blackboard = NodeUtils.get_or(monster, "blackboard", {})
-		if blackboard is Dictionary and int(blackboard.get("ko_count", 0)) >= PIPSKULL_KO_THRESHOLD - 1:
 			return true
 	return false
 

@@ -157,8 +157,7 @@ func _ensure_visible() -> void:
 
 
 func hide_panel() -> void:
-	if _popup_open:
-		_close_popup()
+	_close_popup()
 	if not visible:
 		return
 	visible = false
@@ -166,10 +165,9 @@ func hide_panel() -> void:
 	queue_redraw()
 
 
-## Ensure the popup is closed on shop entry (safety net; hide_panel already closes it).
+## Ensure the popup is closed on shop entry (hide_panel already closes it).
 func reset_for_shop() -> void:
-	if _popup_open:
-		_close_popup()
+	_close_popup()
 
 
 func _setup_styles() -> void:

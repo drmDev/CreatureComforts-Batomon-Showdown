@@ -43,8 +43,8 @@ func compare(previous, current) -> ComparisonResult:
 	
 	_detect_run_changes(previous, current, result)
 	_detect_shop_changes(previous, current, result)
-	_detect_list_changes("team", "Team", previous.team_monsters, current.team_monsters, _monsters_equal, result)
-	_detect_list_changes("bench", "Bench", previous.bench_monsters, current.bench_monsters, _monsters_equal, result)
+	_detect_list_changes("team", "Team", previous.team_monsters, current.team_monsters, result)
+	_detect_list_changes("bench", "Bench", previous.bench_monsters, current.bench_monsters, result)
 	result.event_type = _classify_event(result)
 	
 	return result
@@ -83,7 +83,7 @@ func _detect_shop_changes(previous, current, result: ComparisonResult) -> void:
 		result.changes.append(change)
 
 
-func _detect_list_changes(area: String, label_prefix: String, prev_list: Array, cur_list: Array, equal_fn: Callable, result: ComparisonResult) -> void:
+func _detect_list_changes(area: String, label_prefix: String, prev_list: Array, cur_list: Array, result: ComparisonResult) -> void:
 	var max_size: int = max(prev_list.size(), cur_list.size())
 	for i in range(max_size):
 		var old_entry: Variant = prev_list[i] if i < prev_list.size() else null
@@ -92,7 +92,7 @@ func _detect_list_changes(area: String, label_prefix: String, prev_list: Array, 
 		# Calculate visual slot (reversed from storage order)
 		var visual_slot: int = prev_list.size() - 1 - i if old_entry != null else cur_list.size() - 1 - i
 		
-		if not equal_fn.call(old_entry, new_entry):
+		if not _monsters_equal(old_entry, new_entry):
 			var change: Change = Change.new(area, "slot_%d" % i, old_entry, new_entry, "%s[%d]" % [label_prefix, visual_slot])
 			result.changes.append(change)
 

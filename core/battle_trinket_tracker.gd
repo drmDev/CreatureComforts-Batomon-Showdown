@@ -44,6 +44,11 @@ func note_non_battle(run) -> void:
 ## Drop all tracking state without reporting gains (new run / trainer change).
 func reset() -> void:
 	_pre_battle_state = null
+	_clear_battle_state()
+
+
+## Clear the battle-scoped fields, keeping the non-battle baseline.
+func _clear_battle_state() -> void:
 	_start = null
 	_end = null
 	_tracking = false
@@ -80,30 +85,36 @@ func poll(state, run) -> void:
 func finalize(run, logger, formatter, show_panel := true) -> Dictionary:
 	if not _tracking and _start == null:
 		return {}
-	var gains := {}
-	if _start != null and _end != null and _over_seen:
-		if run != null and is_instance_valid(run):
-			gains = TrinketGains.diff_states(_start, _end)
-			if not _gains_logged and (not gains["ids"].is_empty() or int(gains["counter"]) != 0):
-				_gains_logged = true
-				for tid in gains["ids"]:
-					logger.log_event("TRINKET ACQUIRED | %s" % str(tid))
-				if logger.deep_inspection:
-					logger.log_lines(formatter.format_battle_trinket_gains(gains))
-			if logger.deep_inspection:
-				# Diagnostic: changes applied after the freeze (e.g. event rewards) are excluded.
-				var live := capture_state(run)
-				var post := TrinketGains.diff_states(_end, live)
-				if not post["ids"].is_empty():
-					logger.log_message("BATTLE TRINKET GAINS | excluded post-battle additions: %s" % str(post["ids"]))
-			if show_panel and logger.deep_inspection and TrinketGains.has_gift_trinket(gains["newly_used"]):
-				logger.log_message("BATTLE TRINKET GAINS | gift pending (%s), %d trinket(s) withheld; showing %d gained" % [
-					str(gains["newly_used"]), TrinketGains.withheld_count(gains), gains["ids"].size()
-				])
-
-	_start = null
-	_end = null
-	_tracking = false
-	_over_seen = false
-	_gains_logged = false
+	var gains := _diff_and_log(run, logger, formatter, show_panel)
+	_clear_battle_state()
 	return gains
+
+
+## Diff the frozen start/end snapshots and emit the one-time diagnostics.
+func _diff_and_log(run, logger, formatter, show_panel: bool) -> Dictionary:
+	if _start == null or _end == null or not _over_seen:
+		return {}
+	if run == null or not is_instance_valid(run):
+		return {}
+	var gains: Dictionary = TrinketGains.diff_states(_start, _end)
+	_log_gains(gains, run, logger, formatter, show_panel)
+	return gains
+
+
+func _log_gains(gains: Dictionary, run, logger, formatter, show_panel: bool) -> void:
+	if not _gains_logged and (not gains["ids"].is_empty() or int(gains["counter"]) != 0):
+		_gains_logged = true
+		for tid in gains["ids"]:
+			logger.log_event("TRINKET ACQUIRED | %s" % str(tid))
+		if logger.deep_inspection:
+			logger.log_lines(formatter.format_battle_trinket_gains(gains))
+	if logger.deep_inspection:
+		# Diagnostic: changes applied after the freeze (e.g. event rewards) are excluded.
+		var live := capture_state(run)
+		var post := TrinketGains.diff_states(_end, live)
+		if not post["ids"].is_empty():
+			logger.log_message("BATTLE TRINKET GAINS | excluded post-battle additions: %s" % str(post["ids"]))
+	if show_panel and logger.deep_inspection and TrinketGains.has_gift_trinket(gains["newly_used"]):
+		logger.log_message("BATTLE TRINKET GAINS | gift pending (%s), %d trinket(s) withheld; showing %d gained" % [
+			str(gains["newly_used"]), TrinketGains.withheld_count(gains), gains["ids"].size()
+		])

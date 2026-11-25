@@ -132,14 +132,14 @@ func _active_battle_view():
 		return _replay.active_battle_view()
 	var state = _current_state()
 	if NodeUtils.script_is(state, BATTLE_SCRIPT):
-		return state.get("view") if NodeUtils.has_property(state, "view") else null
+		return NodeUtils.get_or(state, "view", null)
 	return null
 
 
 func _active_shop_view():
 	var state = _current_state()
 	if NodeUtils.script_is(state, SHOP_SCRIPT):
-		return state.get("view") if NodeUtils.has_property(state, "view") else null
+		return NodeUtils.get_or(state, "view", null)
 	return null
 
 
@@ -173,11 +173,7 @@ func _shop_modal_open(view) -> bool:
 
 
 func _get_bool(obj, property: String) -> bool:
-	if obj == null or not is_instance_valid(obj):
-		return false
-	if not NodeUtils.has_property(obj, property):
-		return false
-	return bool(obj.get(property))
+	return bool(NodeUtils.get_or(obj, property, false))
 
 
 func _text_input_focused() -> bool:

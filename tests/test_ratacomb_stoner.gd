@@ -7,7 +7,6 @@ const RatacombStoner = preload("../hud/ratacomb_stoner_controller.gd")
 class FakeMonster:
 	extends RefCounted
 	var data := {}
-	var blackboard := {}
 	var buffed := false
 
 	func has_any_permanent_buffs() -> bool:
@@ -41,11 +40,10 @@ class FakeManager:
 	var is_shop_frozen := false
 
 
-func _monster(id: String, buffed := false, ko_count := 0) -> FakeMonster:
+func _monster(id: String, buffed := false) -> FakeMonster:
 	var monster := FakeMonster.new()
 	monster.data = {"id": id}
 	monster.buffed = buffed
-	monster.blackboard = {"ko_count": ko_count}
 	return monster
 
 
@@ -64,23 +62,21 @@ func _manager(shop_ids: Array, frozen := false) -> FakeManager:
 	return manager
 
 
-func test_no_pipskull_or_ratacomb_means_no_roster_reminder() -> void:
-	var run := _run([_monster("emberpaw")])
+func test_no_ratacomb_means_no_reminder_ever() -> void:
+	# Reported bug: Day 1 Pipskull with Green Stone in the shop showed
+	# "Green Stone found! Lock it before battle."
+	var run := _run([_monster("pipskull"), _monster("emberpaw")])
 	assert_eq(RatacombStoner.stage_for(run, _manager([])), "")
-	# A visible Green Stone is still worth flagging once the player opted in.
-	assert_eq(
-		RatacombStoner.stage_for(run, _manager(["green_stone"])),
-		RatacombStoner.STAGE_FOUND)
+	assert_eq(RatacombStoner.stage_for(run, _manager(["green_stone"])), "")
+	assert_eq(RatacombStoner.stage_for(run, _manager(["green_stone"], true)), "")
+	assert_false(RatacombStoner.has_ratacomb(run))
 
 
-func test_pipskull_near_evolution_prepares() -> void:
-	assert_eq(
-		RatacombStoner.stage_for(_run([_monster("pipskull", false, 2)]), _manager([])),
-		RatacombStoner.STAGE_PREPARE)
-	# Fewer knockouts: not yet the transformation day.
-	assert_eq(
-		RatacombStoner.stage_for(_run([_monster("pipskull", false, 1)]), _manager([])),
-		"")
+func test_pipskull_is_not_a_ratacomb_stage() -> void:
+	# A near-evolution Pipskull still owns no Ratacomb, so nothing is shown.
+	var run := _run([_monster("pipskull")])
+	assert_eq(RatacombStoner.stage_for(run, _manager(["green_stone"])), "")
+	assert_eq(RatacombStoner.stage_for(_run([_monster("pipskull")]), _manager([])), "")
 
 
 func test_unbuffed_ratacomb_asks_for_green_stone() -> void:
@@ -122,12 +118,15 @@ func test_locked_stone_wins_over_found() -> void:
 		RatacombStoner.STAGE_FOUND)
 
 
-func test_roster_includes_bench_and_skips_empty_slots() -> void:
-	var run := _run([null], [_monster("pipskull", false, 2)])
-	assert_true(RatacombStoner.has_stone_target(run))
+func test_bench_counts_as_owned_and_empty_slots_are_skipped() -> void:
+	var run := _run([null], [_monster("ratacomb", false)])
+	assert_true(RatacombStoner.has_ratacomb(run), "bench Ratacomb is owned")
 	assert_eq(
 		RatacombStoner.stage_for(run, _manager([])),
-		RatacombStoner.STAGE_PREPARE)
+		RatacombStoner.STAGE_FIND)
+	assert_eq(
+		RatacombStoner.stage_for(run, _manager(["green_stone"])),
+		RatacombStoner.STAGE_FOUND)
 
 
 func test_resource_species_data_is_detected() -> void:
@@ -137,7 +136,7 @@ func test_resource_species_data_is_detected() -> void:
 	var run := FakeRun.new()
 	run.team = [monster]
 	assert_eq(RatacombStoner._species_id(monster), "ratacomb")
-	assert_true(RatacombStoner.has_stone_target(run), "Resource species is recognised")
+	assert_true(RatacombStoner.has_ratacomb(run), "Resource species is recognised")
 	assert_eq(
 		RatacombStoner.stage_for(run, _manager(["green_stone"])),
 		RatacombStoner.STAGE_FOUND)
@@ -145,12 +144,13 @@ func test_resource_species_data_is_detected() -> void:
 
 func test_each_stage_has_a_message() -> void:
 	for stage in [
-		RatacombStoner.STAGE_PREPARE,
 		RatacombStoner.STAGE_FIND,
 		RatacombStoner.STAGE_FOUND,
 		RatacombStoner.STAGE_LOCKED,
 	]:
 		assert_true(RatacombStoner.STAGE_MESSAGES.has(stage), stage)
-	# The multicast-ready stage was removed; nothing may reintroduce it silently.
-	assert_eq(RatacombStoner.STAGE_MESSAGES.size(), 4)
+	# The prepare and multicast-ready stages were removed; nothing may
+	# reintroduce a stage that fires before a Ratacomb is owned.
+	assert_eq(RatacombStoner.STAGE_MESSAGES.size(), 3)
+	assert_false(RatacombStoner.STAGE_MESSAGES.has("prepare"))
 	assert_false(RatacombStoner.STAGE_MESSAGES.has("ready"))

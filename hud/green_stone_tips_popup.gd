@@ -20,10 +20,10 @@ const HEADING_GAP := 4.0
 
 const SECTIONS := [
 	{"heading": "GREEN STONE ELIGIBILITY"},
-	{"bullet": "After Day 2: at least one Common in your team, and no Common may have permanent buffs."},
+	{"bullet": "No Commons on your team or bench can have permanent buffs."},
 	{"bullet": "Permanent buffs on higher tiers do not matter."},
 	{"heading": "RATACOMB STRATEGY"},
-	{"bullet": "Newly evolved Ratacomb has no permanent buffs. Its Multicast from knockouts counts as a permanent buff, so find Green Stone before its first knockout."},
+	{"bullet": "Newly evolved Ratacomb has no permanent buffs. Its Multicast from knockouts counts as a permanent buff, so find Green Stone before then!"},
 	{"bullet": "On Ratacomb's evolution day, avoid using items and roll until Green Stone appears, then lock the shop."},
 	{"bullet": "Keep Green Stone locked between battles while building Multicast."},
 	{"bullet": "Let's go gambling! Cash in that Green Stone when you reach the multicast amount you want."},

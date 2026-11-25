@@ -81,6 +81,22 @@ var _enemy_badge = null
 var _battle_state_id := 0
 var _replay_battle_state = null
 
+## Live settings changes: one handler per feature key (see on_feature_toggled).
+var _toggles: Dictionary = {}
+
+
+func _init() -> void:
+	_toggles = {
+		ModConfig.KEY_TRINKETS_PANEL: _on_trinkets_toggled,
+		ModConfig.KEY_ITEM_USAGE_TRACKER: _on_items_used_toggled,
+		ModConfig.KEY_SHOP_HIGHLIGHTS: _on_shop_highlights_toggled,
+		ModConfig.KEY_SELL_VALUE_INDICATORS: _on_sell_value_toggled,
+		ModConfig.KEY_BATTLE_STATUS_PANEL: _on_battle_status_toggled,
+		ModConfig.KEY_COMBAT_STATS_PANEL: _on_combat_stats_toggled,
+		ModConfig.KEY_RANK_ODDS_PREVIEW: _on_rank_odds_toggled,
+		ModConfig.KEY_BASE_HP_CHART: _on_base_hp_toggled,
+	}
+
 
 func setup(context, tree_watcher = null, is_replay_active: Callable = Callable()) -> void:
 	_context = context
@@ -122,14 +138,14 @@ func _build_reminder_layer() -> void:
 	rank_odds_panel = RankOddsPanel.new()
 	rank_odds_panel.name = "RankOddsPanel"
 	rank_odds_panel.log_line.connect(_on_panel_log_line)
-	rank_odds_panel.popup_visibility_changed.connect(_on_rank_odds_popup_visibility_changed)
+	rank_odds_panel.popup_visibility_changed.connect(_on_shop_modal_visibility_changed.bind(rank_odds_panel))
 	reminder_layer.add_child(rank_odds_panel)
 
 	# Base HP by day table, 25% across the viewport.
 	base_hp_panel = BaseHpPanel.new()
 	base_hp_panel.name = "BaseHpPanel"
 	base_hp_panel.log_line.connect(_on_panel_log_line)
-	base_hp_panel.popup_visibility_changed.connect(_on_base_hp_popup_visibility_changed)
+	base_hp_panel.popup_visibility_changed.connect(_on_shop_modal_visibility_changed.bind(base_hp_panel))
 	reminder_layer.add_child(base_hp_panel)
 
 	# Watchlist button + popup; shop-gated with the rest of the reminder layer
@@ -450,15 +466,10 @@ func reset_shop_popups_for_shop() -> void:
 	base_hp_panel.reset_for_shop()
 
 
-## True when `node` exists and has not been freed.
-func _alive(node) -> bool:
-	return node != null and is_instance_valid(node)
-
-
 ## Free a hosted button, restoring the host's layout through `restore` when the
 ## host is still the one the button was attached to.
 func _free_hosted(button, host, host_id: int, restore: Callable) -> void:
-	if not _alive(button):
+	if not is_instance_valid(button):
 		return
 	if is_instance_valid(host) and host.get_instance_id() == host_id and restore.is_valid():
 		restore.call(host)
@@ -472,12 +483,12 @@ func _free_hosted(button, host, host_id: int, restore: Callable) -> void:
 func attach_to_shop_view(view) -> void:
 	var hud_buttons = _get_shop_hud_buttons(view)
 	if hud_buttons == null:
-		if _alive(replay_button):
+		if is_instance_valid(replay_button):
 			_detach_replay_button()
 			_panel_log("REPLAY", "detached (no HudButtons)")
 		return
 	var host_id: int = hud_buttons.get_instance_id()
-	if _alive(replay_button) and _replay_button_host_id == host_id:
+	if is_instance_valid(replay_button) and _replay_button_host_id == host_id:
 		return
 	_detach_replay_button()
 	replay_button = _make_replay_button()
@@ -541,7 +552,7 @@ func _panel_log(label: String, detail: String) -> void:
 func update_replay_button(view, available: bool) -> void:
 	_replay_available = available
 	attach_to_shop_view(view)
-	if not _alive(replay_button):
+	if not is_instance_valid(replay_button):
 		return
 	replay_button.set_available(available)
 
@@ -563,12 +574,12 @@ func _attach_rank_odds_button(view) -> void:
 	var rank_ui = _get_shop_rank_ui(view)
 	var hbox = _get_rank_ui_hbox(rank_ui)
 	if hbox == null:
-		if _alive(rank_odds_button):
+		if is_instance_valid(rank_odds_button):
 			_detach_rank_odds_button()
 			_panel_log("RANK ODDS", "detached (no RankUI)")
 		return
 	var host_id: int = rank_ui.get_instance_id()
-	if _alive(rank_odds_button) and _rank_odds_button_host_id == host_id:
+	if is_instance_valid(rank_odds_button) and _rank_odds_button_host_id == host_id:
 		return
 	_detach_rank_odds_button()
 	rank_odds_button = rank_odds_panel.make_external_button()
@@ -600,7 +611,7 @@ func _get_rank_ui_hbox(rank_ui):
 
 func _detach_rank_odds_button() -> void:
 	var host = null
-	if _alive(rank_odds_button):
+	if is_instance_valid(rank_odds_button):
 		var parent = rank_odds_button.get_parent()
 		if is_instance_valid(parent):
 			host = parent.get_parent()
@@ -634,12 +645,12 @@ func update_watchlist_button(view) -> void:
 func _attach_watchlist_button(view) -> void:
 	var hbox = _get_team_hbox(view)
 	if hbox == null:
-		if _alive(watchlist_button):
+		if is_instance_valid(watchlist_button):
 			_detach_watchlist_button()
 			_panel_log("WATCHLIST", "detached (no team HBox)")
 		return
 	var host_id: int = hbox.get_instance_id()
-	if _alive(watchlist_button) and _watchlist_button_host_id == host_id:
+	if is_instance_valid(watchlist_button) and _watchlist_button_host_id == host_id:
 		return
 	_detach_watchlist_button()
 	watchlist_button = watchlist_panel.make_button()
@@ -667,7 +678,7 @@ func _get_team_hbox(view):
 
 
 func _detach_watchlist_button() -> void:
-	var host = watchlist_button.get_parent() if _alive(watchlist_button) else null
+	var host = watchlist_button.get_parent() if is_instance_valid(watchlist_button) else null
 	_free_hosted(watchlist_button, host, _watchlist_button_host_id, func(h):
 		h.offset_left += _watchlist_button_shift
 		h.offset_right += _watchlist_button_shift)
@@ -683,12 +694,12 @@ func _detach_watchlist_button() -> void:
 func _attach_base_hp_button(view) -> void:
 	var hp_ui = _get_shop_hp_ui(view)
 	if hp_ui == null:
-		if _alive(base_hp_button):
+		if is_instance_valid(base_hp_button):
 			_detach_base_hp_button()
 			_panel_log("BASE HP", "detached (no HpUI)")
 		return
 	var host_id: int = hp_ui.get_instance_id()
-	if _alive(base_hp_button) and _base_hp_button_host_id == host_id:
+	if is_instance_valid(base_hp_button) and _base_hp_button_host_id == host_id:
 		return
 	_detach_base_hp_button()
 	base_hp_button = base_hp_panel.make_external_button()
@@ -716,7 +727,7 @@ func _get_shop_hp_ui(view):
 
 
 func _detach_base_hp_button() -> void:
-	var host = base_hp_button.get_parent() if _alive(base_hp_button) else null
+	var host = base_hp_button.get_parent() if is_instance_valid(base_hp_button) else null
 	_free_hosted(base_hp_button, host, _base_hp_button_host_id, func(h): h.offset_right -= _base_hp_button_extra)
 	base_hp_button = null
 	_base_hp_button_host_id = 0
@@ -746,13 +757,13 @@ func update_player_hud(state, is_battle: bool) -> void:
 		player_hud.visible = false
 		return
 
-	var player_run = state.get("_replay_p1_data") if NodeUtils.has_property(state, "_replay_p1_data") else null
+	var player_run = NodeUtils.get_or(state, "_replay_p1_data", null)
 	if player_run == null:
 		player_hud.visible = false
 		return
 
 	player_hud.update_stats(_build_player_stats(player_run))
-	var is_active: bool = state.get("is_battle_active") if NodeUtils.has_property(state, "is_battle_active") else false
+	var is_active: bool = bool(NodeUtils.get_or(state, "is_battle_active", false))
 	player_hud.visible = is_active
 
 
@@ -835,44 +846,60 @@ func _build_player_stats(player_run) -> Dictionary:
 
 ## Apply a live settings change to the panels this UI owns.
 func on_feature_toggled(key: String, value: bool) -> void:
-	# The single Trinkets Panel setting shows/hides the whole unified panel.
-	if key == ModConfig.KEY_TRINKETS_PANEL:
-		trinkets_panel.set_enabled(value)
-		if not value:
-			_context.chimes.clear_trinket()
-		return
-	# The Items Used panel hides while disabled; tracking keeps running and the
-	# next shop poll re-shows the panel once the setting is back on.
-	if key == ModConfig.KEY_ITEM_USAGE_TRACKER:
-		if not value:
-			items_used_panel.hide_panel()
-		return
-	# Shop highlighting has no poll-driven re-show, so handle both states here.
-	# The same setting shows/hides the watchlist button and popup.
-	if key == ModConfig.KEY_SHOP_HIGHLIGHTS:
-		shop_highlight.set_enabled(value)
-		if not value:
-			watchlist_panel.close_popup()
-			_detach_watchlist_button()
-		# Restore the button row, which also respects an open Base HP popup.
-		_restore_shop_buttons(value)
-		return
-	# Sell-value badges are re-shown by the next shop poll when enabled.
-	if key == ModConfig.KEY_SELL_VALUE_INDICATORS:
-		sell_value_indicators.set_enabled(value)
-		return
-	if value:
-		return
-	if key == ModConfig.KEY_BATTLE_STATUS_PANEL:
+	if _toggles.has(key):
+		_toggles[key].call(value)
+
+
+## The single Trinkets Panel setting shows/hides the whole unified panel.
+func _on_trinkets_toggled(value: bool) -> void:
+	trinkets_panel.set_enabled(value)
+	if not value:
+		_context.chimes.clear_trinket()
+
+
+## The Items Used panel hides while disabled; tracking keeps running and the
+## next shop poll re-shows the panel once the setting is back on.
+func _on_items_used_toggled(value: bool) -> void:
+	if not value:
+		items_used_panel.hide_panel()
+
+
+## Shop highlighting has no poll-driven re-show, so handle both states here.
+## The same setting shows/hides the watchlist button and popup.
+func _on_shop_highlights_toggled(value: bool) -> void:
+	shop_highlight.set_enabled(value)
+	if not value:
+		watchlist_panel.close_popup()
+		_detach_watchlist_button()
+	# Restore the button row, which also respects an open Base HP popup.
+	_restore_shop_buttons(value)
+
+
+## Sell-value badges are re-shown by the next shop poll when enabled.
+func _on_sell_value_toggled(value: bool) -> void:
+	sell_value_indicators.set_enabled(value)
+
+
+func _on_battle_status_toggled(value: bool) -> void:
+	if not value:
 		player_hud.visible = false
 		battle_elapsed_panel.hide_panel()
 		opponent_panel.hide_panel()
-	elif key == ModConfig.KEY_COMBAT_STATS_PANEL:
+
+
+func _on_combat_stats_toggled(value: bool) -> void:
+	if not value:
 		hide_combat_stats()
-	elif key == ModConfig.KEY_RANK_ODDS_PREVIEW:
+
+
+func _on_rank_odds_toggled(value: bool) -> void:
+	if not value:
 		rank_odds_panel.hide_panel()
 		_detach_rank_odds_button()
-	elif key == ModConfig.KEY_BASE_HP_CHART:
+
+
+func _on_base_hp_toggled(value: bool) -> void:
+	if not value:
 		base_hp_panel.hide_panel()
 		_detach_base_hp_button()
 
@@ -885,15 +912,8 @@ func _on_panel_log_line(message: String) -> void:
 
 
 ## The shop popups are full-screen modals drawn by sibling panels. Hide the other
-## buttons while one is open so they do not float above its dim backdrop.
-func _on_rank_odds_popup_visibility_changed(open: bool) -> void:
-	_on_shop_modal_visibility_changed(open, rank_odds_panel)
-
-
-func _on_base_hp_popup_visibility_changed(open: bool) -> void:
-	_on_shop_modal_visibility_changed(open, base_hp_panel)
-
-
+## buttons while one is open so they do not float above its dim backdrop. Both
+## popup signals bind their panel, so one handler serves every modal.
 func _on_shop_modal_visibility_changed(open: bool, modal) -> void:
 	if not open:
 		_restore_shop_buttons()
@@ -914,5 +934,5 @@ func _restore_shop_buttons(watchlist_override = null) -> void:
 	if watchlist_override == null:
 		watchlist_override = _context.feature_enabled(ModConfig.KEY_SHOP_HIGHLIGHTS)
 	watchlist_panel.visible = bool(watchlist_override)
-	if _alive(replay_button):
+	if is_instance_valid(replay_button):
 		replay_button.set_available(_replay_available)
