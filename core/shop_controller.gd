@@ -14,6 +14,7 @@ const ShopChanges = preload("shop_changes.gd")
 const AdviceController = preload("../advice/advice_controller.gd")
 const TrinketRemindersController = preload("../hud/trinket_reminders_controller.gd")
 const PositionalTrinketsController = preload("../hud/positional_trinkets_controller.gd")
+const ItemsUsedController = preload("../hud/items_used_controller.gd")
 const ModConfig = preload("mod_config.gd")
 const PurchaseRemindersController = preload("../hud/purchase_reminders_controller.gd")
 
@@ -32,6 +33,7 @@ var _last_run_id := ""
 var _advice = null
 var _trinket_reminders = null
 var _positional_trinkets = null
+var _item_usage = null
 var _purchase_reminders = null
 
 
@@ -56,6 +58,9 @@ func setup(context, ui, shop_overlay_gate, dev_tools, battle, has_replay: Callab
 
 	_positional_trinkets = PositionalTrinketsController.new()
 	_positional_trinkets.setup(_ui.trinkets_panel.bonuses_view, _context)
+
+	_item_usage = ItemsUsedController.new()
+	_item_usage.setup(_ui.items_used_panel, _context)
 
 	_purchase_reminders = PurchaseRemindersController.new()
 	_purchase_reminders.setup(_context, _ui.purchase_reminder_hint)
@@ -113,6 +118,7 @@ func handle(state, phase_changed: bool) -> bool:
 	var current_day := int(run.get("current_round")) if NodeUtils.has_property(run, "current_round") else 1
 	_trinket_reminders.update(run, _shop_overlay_gate)
 	_positional_trinkets.update(run)
+	_item_usage.update(run, manager)
 	# Content changes already re-show the panel; this also undoes the defensive
 	# phase hide when the content itself did not change.
 	_ui.trinkets_panel.refresh_for_shop()

@@ -25,6 +25,9 @@ A blue dot marks a tab with new activity.
 ### Shop Purchase Reminders
 Hover a shop monster to see which next-purchase trinkets will affect it, such as Upgrade Disc, Speed Whistle, and Power Band.
 
+### Items Used
+A movable panel tracks your item usage: today's count against your daily allowance (including Membership Card bonuses) and every item used during the run. Usage is saved per run, so it survives Save + Quit and restarts.
+
 ### Battle Status Display
 View your current day, remaining lives, and wins during combat.
 

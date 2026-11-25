@@ -12,14 +12,16 @@ var logger = null
 var config = null
 var chimes = null
 var trinket_icons = null
+var item_icons = null
 
 
-func _init(p_formatter, p_logger, p_config, p_chimes, p_trinket_icons) -> void:
+func _init(p_formatter, p_logger, p_config, p_chimes, p_trinket_icons, p_item_icons = null) -> void:
 	formatter = p_formatter
 	logger = p_logger
 	config = p_config
 	chimes = p_chimes
 	trinket_icons = p_trinket_icons
+	item_icons = p_item_icons
 
 
 ## True when a user-facing feature is enabled. Defaults to enabled when the

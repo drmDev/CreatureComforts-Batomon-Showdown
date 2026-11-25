@@ -35,6 +35,24 @@ func test_removed_trinket_panel_settings_are_gone() -> void:
 		assert_false(ModConfig.DEFAULTS.has(key), "%s must not exist" % key)
 
 
+func test_item_usage_tracker_defaults_to_enabled() -> void:
+	var config = ModConfig.new()
+	assert_eq(ModConfig.KEY_ITEM_USAGE_TRACKER, "item_usage_tracker")
+	assert_true(config.is_enabled(ModConfig.KEY_ITEM_USAGE_TRACKER))
+
+
+func test_item_usage_tracker_is_declared_in_mod_json() -> void:
+	var path: String = str(get_script().resource_path).get_base_dir().path_join("../mod.json")
+	var manifest = JSON.parse_string(FileAccess.get_file_as_string(path))
+	assert_true(manifest is Dictionary, "mod.json readable at %s" % path)
+	if not (manifest is Dictionary):
+		return
+	var keys: Array = []
+	for setting in manifest.get("settings", []):
+		keys.append(str(setting.get("key", "")))
+	assert_true(keys.has(ModConfig.KEY_ITEM_USAGE_TRACKER), "item_usage_tracker is declared")
+
+
 func test_base_hp_chart_defaults_to_enabled() -> void:
 	var config = ModConfig.new()
 	assert_eq(ModConfig.KEY_BASE_HP_CHART, "base_hp_chart")

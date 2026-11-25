@@ -53,6 +53,9 @@ const KEY_COMBAT_STATS_PANEL := "combat_stats_panel"
 const KEY_HOTKEYS := "hotkeys"
 ## Shop monster purchase hover reminders (next-purchase trinkets).
 const KEY_PURCHASE_REMINDERS := "purchase_reminders"
+## Standalone Items Used panel: daily item usage and the run's aggregated uses.
+## Tracking continues while the panel is disabled; this only shows or hides it.
+const KEY_ITEM_USAGE_TRACKER := "item_usage_tracker"
 
 ## Every feature toggle defaults to enabled. The unified Trinkets panel replaced
 ## the old per-panel settings and defaults to on for everyone.
@@ -68,6 +71,7 @@ const DEFAULTS := {
 	KEY_COMBAT_STATS_PANEL: true,
 	KEY_HOTKEYS: true,
 	KEY_PURCHASE_REMINDERS: true,
+	KEY_ITEM_USAGE_TRACKER: true,
 }
 
 ## Last selected tab of the unified Trinkets panel. Stored in the mod's own file

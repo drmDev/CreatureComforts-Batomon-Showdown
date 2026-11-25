@@ -8,6 +8,7 @@ const Style = preload("core/style.gd")
 const ShopOverlayGate = preload("hud/shop_overlay_gate.gd")
 const ChimeQueue = preload("core/chime_queue.gd")
 const TrinketIcons = preload("core/trinket_icons.gd")
+const ItemIcons = preload("core/item_icons.gd")
 const ComfortUi = preload("hud/comfort_ui.gd")
 const BattleReplayController = preload("hud/battle_replay_controller.gd")
 const NodeUtils = preload("core/node_utils.gd")
@@ -102,7 +103,8 @@ func _initialize_mod() -> void:
 
 	var chimes = ChimeQueue.new()
 	var trinket_icons = TrinketIcons.new()
-	_context = RuntimeContext.new(formatter, logger, config, chimes, trinket_icons)
+	var item_icons = ItemIcons.new()
+	_context = RuntimeContext.new(formatter, logger, config, chimes, trinket_icons, item_icons)
 	chimes.setup(self, _context.sounds_enabled, _context.mod_volume)
 
 	_tree_watcher = TreeWatcher.new()

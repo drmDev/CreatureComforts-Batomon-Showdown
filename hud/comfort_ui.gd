@@ -13,6 +13,7 @@ const ShopHighlight = preload("shop_highlight.gd")
 const SellValueIndicators = preload("sell_value_indicators.gd")
 const ReminderLabel = preload("reminder_label.gd")
 const TrinketsPanel = preload("trinkets_panel.gd")
+const ItemsUsedPanel = preload("items_used_panel.gd")
 const RankOddsPanel = preload("rank_odds_panel.gd")
 const BaseHpPanel = preload("base_hp_panel.gd")
 const WatchlistPanel = preload("watchlist_panel.gd")
@@ -35,6 +36,8 @@ var reminder_label = null
 ## One unified Trinkets panel; its Alerts/Gained/Bonuses tabs are the content
 ## views the feature controllers update independently.
 var trinkets_panel = null
+## Standalone Items Used panel (daily + per-run item usage).
+var items_used_panel = null
 var rank_odds_panel = null
 var base_hp_panel = null
 var watchlist_panel = null
@@ -105,6 +108,12 @@ func _build_reminder_layer() -> void:
 	trinkets_panel.setup(_context.config)
 	trinkets_panel.set_enabled(_context.feature_enabled(ModConfig.KEY_TRINKETS_PANEL))
 	reminder_layer.add_child(trinkets_panel)
+
+	# Standalone Items Used panel, positioned below the Trinkets panel. The shop
+	# controller pushes its content on every poll.
+	items_used_panel = ItemsUsedPanel.new()
+	items_used_panel.name = "ItemsUsedPanel"
+	reminder_layer.add_child(items_used_panel)
 
 	rank_odds_panel = RankOddsPanel.new()
 	rank_odds_panel.name = "RankOddsPanel"
@@ -410,8 +419,9 @@ func _replay_active_now() -> bool:
 func hide_shop_panels() -> void:
 	sell_value_indicators.hide_all()
 	# Hide only; content is kept so battle gains survive the phase change and the
-	# next shop poll re-shows the panel.
+	# next shop poll re-shows the panels.
 	trinkets_panel.hide_panel()
+	items_used_panel.hide_panel()
 	rank_odds_panel.hide_panel()
 	base_hp_panel.hide_panel()
 	watchlist_panel.close_popup()
@@ -816,6 +826,12 @@ func on_feature_toggled(key: String, value: bool) -> void:
 		trinkets_panel.set_enabled(value)
 		if not value:
 			_context.chimes.clear_trinket()
+		return
+	# The Items Used panel hides while disabled; tracking keeps running and the
+	# next shop poll re-shows the panel once the setting is back on.
+	if key == ModConfig.KEY_ITEM_USAGE_TRACKER:
+		if not value:
+			items_used_panel.hide_panel()
 		return
 	# Shop highlighting has no poll-driven re-show, so handle both states here.
 	# The same setting shows/hides the watchlist button and popup.
