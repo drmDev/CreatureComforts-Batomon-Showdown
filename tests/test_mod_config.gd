@@ -16,24 +16,23 @@ class FakeLoader:
 		return values.get(key, fallback)
 
 
-const DEFAULT_OFF_KEYS := [
-	ModConfig.KEY_POSITIONAL_TRINKETS,
-]
-
-
-func test_defaults_are_enabled_except_beta_features() -> void:
+func test_all_feature_toggles_default_to_enabled() -> void:
 	var config = ModConfig.new()
 	for key in ModConfig.DEFAULTS.keys():
-		if DEFAULT_OFF_KEYS.has(key):
-			assert_false(config.is_enabled(key), "default for %s" % key)
-		else:
-			assert_true(config.is_enabled(key), "default for %s" % key)
+		assert_true(config.is_enabled(key), "default for %s" % key)
 
 
-func test_positional_trinkets_defaults_to_disabled() -> void:
+func test_trinkets_panel_defaults_to_enabled() -> void:
 	var config = ModConfig.new()
-	assert_eq(ModConfig.KEY_POSITIONAL_TRINKETS, "positional_trinkets")
-	assert_false(config.is_enabled(ModConfig.KEY_POSITIONAL_TRINKETS))
+	assert_eq(ModConfig.KEY_TRINKETS_PANEL, "trinkets_panel")
+	assert_true(config.is_enabled(ModConfig.KEY_TRINKETS_PANEL))
+
+
+## The unified panel replaced the three per-panel settings; stale keys must be
+## gone so the loader draws one row.
+func test_removed_trinket_panel_settings_are_gone() -> void:
+	for key in ["trinket_reminders", "trinkets_gained_panel", "positional_trinkets"]:
+		assert_false(ModConfig.DEFAULTS.has(key), "%s must not exist" % key)
 
 
 func test_base_hp_chart_defaults_to_enabled() -> void:
@@ -199,5 +198,37 @@ func test_missing_store_uses_default() -> void:
 	var config = ModConfig.new()
 	config.use_store(TEST_STORE)
 	assert_eq(config.mod_volume(), ModConfig.DEFAULT_MOD_VOLUME)
+	assert_eq(config.trinkets_tab(), ModConfig.DEFAULT_TRINKETS_TAB)
 	config.use_store("")
 	assert_eq(config.mod_volume(), ModConfig.DEFAULT_MOD_VOLUME)
+
+
+func test_trinkets_tab_defaults_to_alerts() -> void:
+	var config = ModConfig.new()
+	assert_eq(ModConfig.DEFAULT_TRINKETS_TAB, "alerts")
+	assert_eq(config.trinkets_tab(), "alerts")
+
+
+func test_trinkets_tab_round_trip_shares_the_volume_store() -> void:
+	_remove_test_store()
+	var writer = ModConfig.new()
+	writer.use_store(TEST_STORE)
+	writer.set_mod_volume(55)
+	writer.set_trinkets_tab("bonuses")
+	var reader = ModConfig.new()
+	reader.use_store(TEST_STORE)
+	assert_eq(reader.trinkets_tab(), "bonuses", "tab survives a restart")
+	assert_eq(reader.mod_volume(), 55, "volume in the same file is kept")
+	_remove_test_store()
+
+
+func test_setting_the_same_trinkets_tab_is_a_no_op() -> void:
+	_remove_test_store()
+	var config = ModConfig.new()
+	config.use_store(TEST_STORE)
+	config.set_trinkets_tab("gained")
+	config.set_trinkets_tab("gained")
+	assert_eq(config.trinkets_tab(), "gained")
+	config.set_trinkets_tab("")
+	assert_eq(config.trinkets_tab(), "gained", "empty values are ignored")
+	_remove_test_store()

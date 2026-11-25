@@ -40,7 +40,7 @@ func setup(context, ui) -> void:
 	_battle_completion = BattleCompletionReporter.new()
 	_replay_store = BattleReplayStore.new()
 	_trinket_gains = TrinketGainPresenter.new()
-	_trinket_gains.setup(_ui.trinket_panel, _context)
+	_trinket_gains.setup(_ui.trinkets_panel.gained_view, _context)
 
 
 ## Capture the opponent RunData from the game's battle transition signal.
@@ -68,11 +68,6 @@ func reset_completion() -> void:
 ## Reset the once-per-battle log guard (new shop visit or non-battle phase).
 func reset_log_guard() -> void:
 	_battle_logged = false
-
-
-## Hide the trinket gains panel (Trinkets Gained Panel setting turned off).
-func hide_trinket_gains() -> void:
-	_trinket_gains.hide()
 
 
 ## A new run started: drop any tracked battle and clear the gains panel so the

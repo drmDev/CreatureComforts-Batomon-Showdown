@@ -1,14 +1,13 @@
 extends RefCounted
-## Feeds the trinket summary panel.
+## Feeds the trinket summary tab.
 ##
 ## Reads the held trinket ids from the run, builds the summed positional and
-## economical summaries, and hands both to the panel. The panel itself preserves
-## the player's collapsed/expanded choice and drag position across shop visits.
+## economical summaries, and hands both to the shared Trinkets panel's Bonuses
+## view. The panel itself owns collapsing and drag position.
 
 const NodeUtils = preload("../core/node_utils.gd")
 const PositionalTrinkets = preload("../core/positional_trinkets.gd")
 const EconomicalTrinkets = preload("../core/economical_trinkets.gd")
-const ModConfig = preload("../core/mod_config.gd")
 
 var _panel = null
 var _context = null
@@ -23,9 +22,6 @@ func setup(panel, context) -> void:
 ## the panel ignores unchanged content.
 func update(run) -> void:
 	if _panel == null:
-		return
-	if not _context.feature_enabled(ModConfig.KEY_POSITIONAL_TRINKETS):
-		_panel.hide_panel()
 		return
 
 	var held = run.get("trinket_ids") if NodeUtils.has_property(run, "trinket_ids") else []
@@ -44,12 +40,4 @@ func update(run) -> void:
 
 func on_trainer_changed() -> void:
 	if _panel != null:
-		_panel.reset_collapsed()
-
-
-func on_feature_toggled(key: String, value: bool) -> void:
-	if value:
-		return
-	if key == ModConfig.KEY_POSITIONAL_TRINKETS:
-		if _panel != null:
-			_panel.hide_panel()
+		_panel.hide_panel()

@@ -204,8 +204,6 @@ func _on_feature_toggled(key: String, value: bool) -> void:
 	_shop.on_feature_toggled(key, value)
 	if key == ModConfig.KEY_NOTIFICATION_SOUNDS:
 		_context.chimes.clear()
-	elif key == ModConfig.KEY_TRINKETS_GAINED_PANEL:
-		_battle.hide_trinket_gains()
 
 
 ## Community Mod Loader hook (Settings > Mods). The loader appends custom

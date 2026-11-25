@@ -172,17 +172,14 @@ func test_presenter_summarize_sorts_by_count_desc() -> void:
 
 class FakeConfig:
 	extends RefCounted
-	var enabled := true
 
 	func is_enabled(_key: String) -> bool:
-		return enabled
+		return true
 
 
-func _presenter(panel: FakePanel, enabled := true) -> TrinketGainPresenter:
+func _presenter(panel: FakePanel) -> TrinketGainPresenter:
 	var presenter := TrinketGainPresenter.new()
-	var config := FakeConfig.new()
-	config.enabled = enabled
-	var context := RuntimeContext.new(FakeFormatter.new(), FakeLogger.new(), config, null, null)
+	var context := RuntimeContext.new(FakeFormatter.new(), FakeLogger.new(), FakeConfig.new(), null, null)
 	presenter.setup(panel, context)
 	return presenter
 
@@ -236,9 +233,11 @@ func test_on_battle_started_hides_panel() -> void:
 	assert_empty(panel.entries)
 
 
-func test_apply_finalized_respects_feature_toggle() -> void:
+## Panel visibility belongs to the unified Trinkets panel setting, so the
+## presenter always renders displayable gains.
+func test_apply_finalized_shows_gains_without_a_panel_toggle() -> void:
 	var panel := FakePanel.new()
-	var presenter := _presenter(panel, false)
+	var presenter := _presenter(panel)
 	var shown := presenter.apply_finalized({"ids": ["a"], "counter": 1, "newly_used": []})
-	assert_false(shown)
-	assert_false(panel.visible)
+	assert_true(shown)
+	assert_true(panel.visible)

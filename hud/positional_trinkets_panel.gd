@@ -1,13 +1,12 @@
 extends "collapsible_panel.gd"
-## Movable, collapsible summary of the player's trinket bonuses.
+## Bonuses tab content: the player's positional and economical trinket bonuses.
 ##
-## Renders two groups in one panel: the positional breakdown (left column, top
-## middle, right column) and the economical trinkets (sell value, income, gold
-## payouts). A group is omitted when the player holds no trinket from it.
+## Renders two groups: the positional breakdown (left column, top middle, right
+## column) and the economical trinkets (sell value, income, gold payouts). A
+## group is omitted when the player holds no trinket from it.
 ##
-## The panel is shop-gated by the reminder layer. It starts collapsed on the
-## first shop visit, anchors at 25% of the viewport width and height, and keeps
-## the player's dragged position and collapsed/expanded choice across visits.
+## Embedded in hud/trinkets_panel.gd, which owns the frame, header, tabs and
+## visibility. This view only paints rows and reports its natural size.
 
 const PositionalTrinkets = preload("../core/positional_trinkets.gd")
 const EconomicalTrinkets = preload("../core/economical_trinkets.gd")
@@ -23,8 +22,6 @@ const CATEGORY_FONT_SIZE := 9
 const POSITION_FONT_SIZE := 7
 const SECONDARY_FONT_SIZE := 7
 const TAG_FONT_SIZE := 7
-const MAX_WIDTH := 300.0
-const TAB_EXTRA_WIDTH := 30.0
 const SEPARATOR_ALPHA := 0.35
 
 ## Dimmest text, used for secondary explanations such as "No more Items".
@@ -37,134 +34,58 @@ const SECTION_LABELS := {
 }
 
 var _summary: Dictionary = {}
-var _anchored := false
-var _initialized := false
 var _layout_cache: Array = []
 var _layout_key := ""
 var _rows_cache: Array = []
 var _rows_key := ""
 
 
-func _init() -> void:
-	# Base _init sets up styles and the panel font. Without it, _draw() returns early.
-	super._init()
-	clamp_to_viewport = true
-	draw_when_empty = true
-
-
-func _ready() -> void:
-	minimized = true
-	reveal = 0.0
-	_apply_size()
-	_connect_viewport_resize(_on_viewport_resized)
-
-
-func header_text() -> String:
-	return "Trinket Bonuses"
-
-
-func header_width() -> float:
-	return _tab_width()
-
-
-## Show the current summary. The first call starts collapsed and anchors the
-## panel; later calls preserve the player's position and collapsed state.
+## Show the current summary. Unchanged content (every shop poll) is a no-op.
 func show_summary(summary: Dictionary) -> void:
 	var key := str(summary)
-	var first_show := not _initialized
+	if key == _content_key:
+		return
 	_summary = summary
-	if first_show:
-		_initialized = true
-		minimized = true
-		reveal = 0.0
-		_content_key = key
-		_apply_size()
-		if not _anchored:
-			_anchor_initial()
-			_anchored = true
-	elif key != _content_key:
-		_content_key = key
-		_apply_size()
-	visible = true
+	_content_key = key
+	_notify_layout()
 	queue_redraw()
 
 
 func hide_panel() -> void:
-	if _tween != null:
-		_tween.kill()
-		_tween = null
+	if _summary.is_empty():
+		return
 	_summary = {}
 	_content_key = ""
-	visible = false
-	queue_redraw()
-
-
-## Reset to the collapsed state on a new run/trainer. The dragged position is
-## kept, so the player does not have to move the panel again.
-func reset_collapsed() -> void:
-	if _tween != null:
-		_tween.kill()
-		_tween = null
-	_initialized = false
-	minimized = true
-	reveal = 0.0
-	_summary = {}
-	_content_key = ""
-	visible = false
-	_apply_size()
+	_notify_layout()
 	queue_redraw()
 
 
 func full_height() -> float:
-	var height := HEAD_H + BODY_TOP_PADDING + CONTENT_PADDING
+	var height := BODY_TOP_PADDING + CONTENT_PADDING
 	for row in _layout():
 		height += float(row.get("gap_before", 0.0)) + float(row.get("height", LINE_HEIGHT))
 	return height + CONTENT_PADDING
 
 
-func _apply_size() -> void:
-	var width := lerpf(_tab_width(), _content_width(), reveal)
-	size = Vector2(width, lerpf(HEAD_H + 1.0, full_height(), reveal))
-	_clamp_to_viewport()
+## True when a summary is held (drives the host panel's visibility).
+func has_content() -> bool:
+	return not _summary.is_empty()
+
+
+## Drop the wrapped-row cache when the host changes the assigned width.
+func embedded_height(width: float) -> float:
+	if not is_equal_approx(width, embedded_width):
+		_layout_cache = []
+		_layout_key = ""
+	return super.embedded_height(width)
 
 
 func _content_width() -> float:
-	if _text_font == null:
-		return MAX_WIDTH
-	var tag_col := _tag_column_width()
-	var max_width := 0.0
-	for row in _build_rows():
-		var text := str(row.get("text", ""))
-		var font_size := int(row.get("font_size", FONT_SIZE))
-		var width := _text_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-		if str(row.get("kind", "")) == "bonus":
-			width += tag_col
-		max_width = maxf(max_width, width)
-	return clampf(max_width + CONTENT_PADDING * 2.0 + 2.0, _tab_width(), MAX_WIDTH)
+	return embedded_width
 
 
-func _tab_width() -> float:
-	if _text_font == null:
-		return MAX_WIDTH
-	var title_width := _text_font.get_string_size(header_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, TITLE_FONT_SIZE).x
-	return title_width + BTN + TAB_EXTRA_WIDTH
-
-
-func _anchor_initial() -> void:
-	var viewport := get_viewport()
-	if viewport == null:
-		return
-	var bounds := viewport.get_visible_rect().size
-	position = Vector2(bounds.x * 0.25, bounds.y * 0.25)
-	_clamp_to_viewport()
-
-
-func _on_viewport_resized() -> void:
-	_clamp_to_viewport()
-
-
-## Rows are rebuilt only when the summary changes. The panel redraws every frame
-## while dragging or animating, so this avoids repeated allocations.
+## Rows are rebuilt only when the summary or assigned width changes, so repeated
+## shop polls and redraws reuse the cached rows.
 func _build_rows() -> Array:
 	if _rows_key == _content_key and not _rows_cache.is_empty():
 		return _rows_cache
@@ -315,7 +236,7 @@ func _layout() -> Array:
 
 func _draw_body(_width: float) -> void:
 	var rows := _layout()
-	var cursor_y := HEAD_H + BODY_TOP_PADDING
+	var cursor_y := BODY_TOP_PADDING
 	var tag_col := _tag_column_width()
 	var tag_box_width := tag_col - TAG_GAP
 	var right_edge := size.x - CONTENT_PADDING - 1.0
@@ -339,7 +260,7 @@ func _draw_body(_width: float) -> void:
 			var lines: Array = row.get("lines", [])
 			for i in range(lines.size()):
 				_draw_text_shadow(Vector2(x, baseline + float(i) * LINE_HEIGHT), str(lines[i]), color, font_size)
-			if kind == "bonus" and reveal >= 0.999:
+			if kind == "bonus":
 				var tag := str(row.get("tag", ""))
 				if not tag.is_empty():
 					_draw_text_shadow(

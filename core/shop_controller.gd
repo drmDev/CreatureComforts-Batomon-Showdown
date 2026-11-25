@@ -50,11 +50,12 @@ func setup(context, ui, shop_overlay_gate, dev_tools, battle, has_replay: Callab
 	_advice.setup(_context)
 	_advice.set_reminder_label(_ui.reminder_label)
 
+	# The two controllers stay independent; they feed tabs of the shared panel.
 	_trinket_reminders = TrinketRemindersController.new()
-	_trinket_reminders.setup(_ui.trinket_reminders_panel, _context)
+	_trinket_reminders.setup(_ui.trinkets_panel.alerts_view, _context)
 
 	_positional_trinkets = PositionalTrinketsController.new()
-	_positional_trinkets.setup(_ui.positional_trinkets_panel, _context)
+	_positional_trinkets.setup(_ui.trinkets_panel.bonuses_view, _context)
 
 	_purchase_reminders = PurchaseRemindersController.new()
 	_purchase_reminders.setup(_context, _ui.purchase_reminder_hint)
@@ -112,6 +113,9 @@ func handle(state, phase_changed: bool) -> bool:
 	var current_day := int(run.get("current_round")) if NodeUtils.has_property(run, "current_round") else 1
 	_trinket_reminders.update(run, _shop_overlay_gate)
 	_positional_trinkets.update(run)
+	# Content changes already re-show the panel; this also undoes the defensive
+	# phase hide when the content itself did not change.
+	_ui.trinkets_panel.refresh_for_shop()
 	var held_trinkets = run.get("trinket_ids") if NodeUtils.has_property(run, "trinket_ids") else []
 	var view = state.get("view") if NodeUtils.has_property(state, "view") else null
 	_ui.update_rank_odds(view, int(run.get("shop_rank")) if NodeUtils.has_property(run, "shop_rank") else 1, held_trinkets if held_trinkets != null else [])
@@ -137,10 +141,6 @@ func reset_transient(clear_suppression: bool, clear_reminders: bool) -> void:
 func on_feature_toggled(key: String, value: bool) -> void:
 	if key == ModConfig.KEY_DAY_REMINDERS:
 		_advice.on_feature_toggled(key, value)
-	elif key == ModConfig.KEY_TRINKET_REMINDERS:
-		_trinket_reminders.on_feature_toggled(key, value)
-	elif key == ModConfig.KEY_POSITIONAL_TRINKETS:
-		_positional_trinkets.on_feature_toggled(key, value)
 	elif key == ModConfig.KEY_PURCHASE_REMINDERS:
 		_purchase_reminders.on_feature_toggled(key, value)
 

@@ -25,10 +25,6 @@ func setup(panel, context) -> void:
 func update(run, gate) -> void:
 	if _panel == null:
 		return
-	if not _context.feature_enabled(ModConfig.KEY_TRINKET_REMINDERS):
-		_panel.hide_panel()
-		_context.chimes.clear_trinket()
-		return
 
 	# Accept any iterable (Array or PackedStringArray), matching capture_state.
 	var held = run.get("trinket_ids") if NodeUtils.has_property(run, "trinket_ids") else []
@@ -39,8 +35,8 @@ func update(run, gate) -> void:
 	TrinketGains.attach_icons(entries, _context.trinket_icons)
 
 	if entries.is_empty():
-		# Zero reminders: hide and reset to collapsed so a later regain starts collapsed.
-		_panel.reset_collapsed()
+		# Zero reminders: clear the tab so a later regain starts fresh.
+		_panel.hide_panel()
 		_alerted = false  # A later regain re-triggers the alert
 		_context.chimes.clear_trinket()  # Nothing left to announce
 		_log_changes(entries)
@@ -49,28 +45,21 @@ func update(run, gate) -> void:
 	_panel.show_reminders(entries)
 	_log_changes(entries)
 	# First appearance, or first after the list was cleared: chime once. The panel stays
-	# collapsed; the player expands it manually.
+	# collapsed; the player expands it manually. The chime follows the panel setting so
+	# a hidden panel never announces itself.
 	if not _alerted:
 		_alerted = true
-		_context.chimes.queue_trinket()
-		_context.chimes.try_play(gate)
+		if _context.feature_enabled(ModConfig.KEY_TRINKETS_PANEL):
+			_context.chimes.queue_trinket()
+			_context.chimes.try_play(gate)
 
 
 func on_trainer_changed() -> void:
 	if _panel != null:
-		_panel.reset_collapsed()
+		_panel.hide_panel()
 	_alerted = false
 	_last_entries.clear()
 	_context.chimes.clear_trinket()
-
-
-func on_feature_toggled(key: String, value: bool) -> void:
-	if value:
-		return
-	if key == ModConfig.KEY_TRINKET_REMINDERS:
-		if _panel != null:
-			_panel.hide_panel()
-		_context.chimes.clear_trinket()
 
 
 func _log_changes(entries: Array) -> void:

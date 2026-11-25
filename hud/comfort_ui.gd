@@ -12,13 +12,11 @@ const ModConfig = preload("../core/mod_config.gd")
 const ShopHighlight = preload("shop_highlight.gd")
 const SellValueIndicators = preload("sell_value_indicators.gd")
 const ReminderLabel = preload("reminder_label.gd")
-const TrinketRemindersPanel = preload("trinket_reminders_panel.gd")
-const PositionalTrinketsPanel = preload("positional_trinkets_panel.gd")
+const TrinketsPanel = preload("trinkets_panel.gd")
 const RankOddsPanel = preload("rank_odds_panel.gd")
 const BaseHpPanel = preload("base_hp_panel.gd")
 const WatchlistPanel = preload("watchlist_panel.gd")
 const PlayerHud = preload("player_hud.gd")
-const TrinketPanel = preload("trinket_panel.gd")
 const BattleElapsedPanel = preload("battle_elapsed_panel.gd")
 const OpponentPanel = preload("opponent_panel.gd")
 const CombatStatsPanel = preload("combat_stats_panel.gd")
@@ -34,8 +32,9 @@ var reminder_layer: CanvasLayer = null
 var player_hud_layer: CanvasLayer = null
 
 var reminder_label = null
-var trinket_reminders_panel = null
-var positional_trinkets_panel = null
+## One unified Trinkets panel; its Alerts/Gained/Bonuses tabs are the content
+## views the feature controllers update independently.
+var trinkets_panel = null
 var rank_odds_panel = null
 var base_hp_panel = null
 var watchlist_panel = null
@@ -43,7 +42,6 @@ var replay_button = null
 var rank_odds_button = null
 var watchlist_button = null
 var base_hp_button = null
-var trinket_panel = null
 var player_hud = null
 var battle_elapsed_panel = null
 var opponent_panel = null
@@ -98,25 +96,15 @@ func _build_reminder_layer() -> void:
 	reminder_label.name = "ReminderLabel"
 	reminder_layer.add_child(reminder_label)
 
-	# Left-aligned trinket reminders ~10% down the screen; shop-gated. Added after the label
-	# so it draws on top while visible.
-	trinket_reminders_panel = TrinketRemindersPanel.new()
-	trinket_reminders_panel.name = "TrinketRemindersPanel"
-	trinket_reminders_panel.layout_debug.connect(_on_trinket_panel_layout_debug)
-	reminder_layer.add_child(trinket_reminders_panel)
-
-	# Movable positional trinket summary. Starts collapsed at 25% of the viewport
-	# and is refreshed by the controller on every shop poll.
-	positional_trinkets_panel = PositionalTrinketsPanel.new()
-	positional_trinkets_panel.name = "PositionalTrinketsPanel"
-	reminder_layer.add_child(positional_trinkets_panel)
-
-	# Battle trinket gains. Lives here (not on a separate layer) so the shop overlay gate
-	# holds it back through the results/event/gift screens and reveals it once the shop is
-	# interactive again. The presenter keeps its content across that wait.
-	trinket_panel = TrinketPanel.new()
-	trinket_panel.name = "TrinketPanel"
-	reminder_layer.add_child(trinket_panel)
+	# Unified Trinkets panel (Alerts / Gained / Bonuses), left-aligned ~10% down the
+	# screen and shop-gated. Added after the label so it draws on top while visible.
+	# It lives on this gated layer so battle gains are held back through the
+	# results/event screens and revealed once the shop is interactive again.
+	trinkets_panel = TrinketsPanel.new()
+	trinkets_panel.name = "TrinketsPanel"
+	trinkets_panel.setup(_context.config)
+	trinkets_panel.set_enabled(_context.feature_enabled(ModConfig.KEY_TRINKETS_PANEL))
+	reminder_layer.add_child(trinkets_panel)
 
 	rank_odds_panel = RankOddsPanel.new()
 	rank_odds_panel.name = "RankOddsPanel"
@@ -421,8 +409,9 @@ func _replay_active_now() -> bool:
 ## layer and its content must survive the results/event screens until the shop returns.
 func hide_shop_panels() -> void:
 	sell_value_indicators.hide_all()
-	trinket_reminders_panel.hide_panel()
-	positional_trinkets_panel.hide_panel()
+	# Hide only; content is kept so battle gains survive the phase change and the
+	# next shop poll re-shows the panel.
+	trinkets_panel.hide_panel()
 	rank_odds_panel.hide_panel()
 	base_hp_panel.hide_panel()
 	watchlist_panel.close_popup()
@@ -822,6 +811,12 @@ func _build_player_stats(player_run) -> Dictionary:
 
 ## Apply a live settings change to the panels this UI owns.
 func on_feature_toggled(key: String, value: bool) -> void:
+	# The single Trinkets Panel setting shows/hides the whole unified panel.
+	if key == ModConfig.KEY_TRINKETS_PANEL:
+		trinkets_panel.set_enabled(value)
+		if not value:
+			_context.chimes.clear_trinket()
+		return
 	# Shop highlighting has no poll-driven re-show, so handle both states here.
 	# The same setting shows/hides the watchlist button and popup.
 	if key == ModConfig.KEY_SHOP_HIGHLIGHTS:
@@ -844,8 +839,6 @@ func on_feature_toggled(key: String, value: bool) -> void:
 		opponent_panel.hide_panel()
 	elif key == ModConfig.KEY_COMBAT_STATS_PANEL:
 		hide_combat_stats()
-	elif key == ModConfig.KEY_POSITIONAL_TRINKETS:
-		positional_trinkets_panel.hide_panel()
 	elif key == ModConfig.KEY_RANK_ODDS_PREVIEW:
 		rank_odds_panel.hide_panel()
 		_detach_rank_odds_button()
@@ -893,10 +886,3 @@ func _restore_shop_buttons(watchlist_override = null) -> void:
 	watchlist_panel.visible = bool(watchlist_override)
 	if _alive(replay_button):
 		replay_button.set_available(_replay_available)
-
-
-func _on_trinket_panel_layout_debug(message: String) -> void:
-	if not _context.logger.debug_logging:
-		return
-	for line in message.split("\n"):
-		_context.logger.log_message(line)

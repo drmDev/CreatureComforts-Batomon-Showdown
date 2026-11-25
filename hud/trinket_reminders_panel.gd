@@ -1,4 +1,8 @@
 extends "collapsible_panel.gd"
+## Alerts tab content: the player's held one-shot trinket reminders.
+##
+## Embedded in hud/trinkets_panel.gd, which owns the frame, header, tabs and
+## visibility. This view only paints rows and reports its natural size.
 
 const TrinketGains = preload("../core/trinket_gains.gd")
 
@@ -8,114 +12,40 @@ const DESC_LINE_H := 13.0
 const ROW_GAP := 5.0
 const NAME_FONT_SIZE := 8
 const DESC_FONT_SIZE := 7
-const MAX_EXPANDED_WIDTH := 320.0  # Cap for very long descriptions; the panel fits the content
-const TAB_EXTRA_WIDTH := 30.0  # Button + header insets for the collapsed tab
-const GEM_SIZE := 10.0
-const GEM_GAP := 2.0
 const ICON_SIZE := 10.0
 const ICON_GAP := 2.0
 const QTY_GAP := 2.0
 const ICON_Y_OFFSET := 2.0  # Nudge the icon down so it lines up with the text baseline
-const DEBUG_SETTLE_SEC := 0.2  # Wait past the reveal tween before logging the settled layout
-
-# Left-aligned with hud/reminder_label.gd but slightly lower
-const LEFT_MARGIN := 55.0
-const TOP_OFFSET_RATIO := 0.125
-const FALLBACK_TOP_OFFSET := 100.0
-
-## Emitted with a one-shot layout snapshot for Debug Logging (mod_main filters on _debug_logging).
-signal layout_debug(message: String)
-
-var _total_count := 0
-var _gem_texture: Texture2D = null
-
-
-func _init() -> void:
-	super._init()
-	clamp_to_viewport = true
-
-
-func _ready() -> void:
-	# Left-aligned with the reminder label, ~10% down so both can be visible at once.
-	var viewport := get_viewport()
-	var top_offset := FALLBACK_TOP_OFFSET
-	if viewport != null:
-		top_offset = viewport.get_visible_rect().size.y * TOP_OFFSET_RATIO
-	position = Vector2(LEFT_MARGIN, top_offset)
-	minimized = true
-	reveal = 0.0
-	_gem_texture = _load_texture("../assets/icons/gem.png")
-	_connect_viewport_resize(_on_viewport_resized)
-	_clamp_to_viewport()
-
-
-func _on_viewport_resized() -> void:
-	_clamp_to_viewport()
 
 
 func full_height() -> float:
+	var total := CONTENT_PADDING * 2.0
 	if _entries.is_empty():
-		return HEAD_H + CONTENT_PADDING * 2.0
-	var row_w := _content_width() - CONTENT_PADDING * 2.0 - 2.0
-	var total := HEAD_H + CONTENT_PADDING * 2.0
+		return total
+	var row_w := embedded_width - CONTENT_PADDING * 2.0 - 2.0
 	for entry in _entries:
 		total += NAME_LINE_H + DESC_LINE_H * _desc_line_count(entry, row_w) + ROW_GAP
 	return total
 
 
-func header_text() -> String:
-	return "(%d)" % _total_count
-
-
-## Does NOT reset the collapsed state: a player who collapses the panel keeps it collapsed
-## across shop visits. Only the first show anchors/sizes it from the current state.
+## Show the current reminders. Unchanged content (every shop poll) is a no-op.
 func show_reminders(entries: Array) -> void:
 	var key := _make_content_key(entries)
-	# Repeated polls with unchanged content (already visible) do nothing.
-	if visible and key == _content_key:
+	if key == _content_key:
 		return
 	_entries = entries
-	_total_count = 0
-	for entry in entries:
-		_total_count += int(entry.get("count", 1))
 	_content_key = key
-	_apply_size()
-	visible = true
+	_notify_layout()
 	queue_redraw()
-	_log_layout_after_settle("show")
 
 
 func hide_panel() -> void:
-	# Already hidden with no rows: nothing to do (called every poll outside the shop).
-	if not visible and _entries.is_empty():
+	if _entries.is_empty():
 		return
-	if _tween != null:
-		_tween.kill()
-		_tween = null
 	_entries.clear()
-	_total_count = 0
 	_content_key = ""
-	visible = false
+	_notify_layout()
 	queue_redraw()
-	_emit_layout_debug("hide")
-
-
-func reset_collapsed() -> void:
-	# Already hidden and collapsed with no rows: nothing to do (called every poll at zero).
-	if not visible and minimized and _entries.is_empty():
-		return
-	if _tween != null:
-		_tween.kill()
-		_tween = null
-	minimized = true
-	reveal = 0.0
-	_entries.clear()
-	_total_count = 0
-	_content_key = ""
-	visible = false
-	_apply_size()
-	queue_redraw()
-	_emit_layout_debug("reset")
 
 
 func _name_line(entry: Dictionary) -> String:
@@ -131,18 +61,6 @@ func _icon(entry: Dictionary) -> Texture2D:
 	return icon if icon is Texture2D else null
 
 
-## Width of the [icon] [qty] [name] row, excluding the panel padding.
-func _row_width(entry: Dictionary) -> float:
-	var w := 0.0
-	if _icon(entry) != null:
-		w += ICON_SIZE + ICON_GAP
-	var qty := _qty_text(entry)
-	if not qty.is_empty():
-		w += _text_font.get_string_size(qty, HORIZONTAL_ALIGNMENT_LEFT, -1, NAME_FONT_SIZE).x + QTY_GAP
-	w += _text_font.get_string_size(_name_line(entry), HORIZONTAL_ALIGNMENT_LEFT, -1, NAME_FONT_SIZE).x
-	return w
-
-
 func _make_content_key(entries: Array) -> String:
 	var parts: Array[String] = []
 	for entry in entries:
@@ -150,26 +68,6 @@ func _make_content_key(entries: Array) -> String:
 			int(entry.get("count", 1)), str(entry.get("name", "")),
 			str(entry.get("desc", "")), str(_icon(entry) != null)])
 	return "|".join(parts)
-
-
-func _apply_size() -> void:
-	var w := lerpf(_tab_width(), _content_width(), reveal)
-	size = Vector2(w, lerpf(HEAD_H + 1.0, full_height(), reveal))
-	_clamp_to_viewport()
-
-
-func _content_width() -> float:
-	if _text_font == null:
-		return MAX_EXPANDED_WIDTH
-	var inner := 0.0
-	for entry in _entries:
-		inner = maxf(inner, _row_width(entry))
-		inner = maxf(inner, _text_font.get_string_size(str(entry.get("desc", "")), HORIZONTAL_ALIGNMENT_LEFT, -1, DESC_FONT_SIZE).x)
-	return clampf(inner + CONTENT_PADDING * 2.0 + 2.0, _tab_width(), MAX_EXPANDED_WIDTH)
-
-
-func header_width() -> float:
-	return _tab_width()
 
 
 func _desc_line_count(entry: Dictionary, row_w: float) -> int:
@@ -206,54 +104,8 @@ func _wrap_text(font: Font, text: String, font_size: int, max_w: float) -> Array
 	return lines
 
 
-## Emit a one-shot layout snapshot for Debug Logging (mod_main filters on _debug_logging).
-func _emit_layout_debug(reason: String) -> void:
-	var parent := get_parent()
-	var parent_desc := "none"
-	if parent != null:
-		parent_desc = "%s (%s)" % [parent.name, parent.get_class()]
-	var viewport_size := Vector2.ZERO
-	if get_viewport() != null:
-		viewport_size = get_viewport().get_visible_rect().size
-	var lines: Array[String] = []
-	lines.append("TRINKET PANEL | %s | expanded=%s | reminders=%d" % [reason, str(not minimized), _entries.size()])
-	lines.append("  Panel: size=%s min=%s custom_min=%s" % [str(size), str(get_combined_minimum_size()), str(custom_minimum_size)])
-	lines.append("  Flags: h=%d v=%d anchors=(%.2f,%.2f,%.2f,%.2f)" % [size_flags_horizontal, size_flags_vertical, anchor_left, anchor_top, anchor_right, anchor_bottom])
-	lines.append("  Intended: tab_width=%.1f content_width=%.1f reveal=%.3f minimized=%s" % [_tab_width(), _content_width(), reveal, str(minimized)])
-	lines.append("  Parent: %s | canvas_scale=%s | viewport=%s" % [parent_desc, str(get_global_transform_with_canvas().get_scale()), str(viewport_size)])
-	for entry in _entries:
-		lines.append("  Entry \"%s\": desc_len=%d" % [str(entry.get("name", "")), str(entry.get("desc", "")).length()])
-	layout_debug.emit("\n".join(lines))
-
-
-func _log_layout_after_settle(reason: String) -> void:
-	await get_tree().create_timer(DEBUG_SETTLE_SEC).timeout
-	if is_inside_tree():
-		_emit_layout_debug(reason)
-
-
-func _tab_width() -> float:
-	if _text_font == null:
-		return MAX_EXPANDED_WIDTH
-	var title_w := _text_font.get_string_size(header_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, TITLE_FONT_SIZE).x
-	var icon_w := GEM_SIZE + GEM_GAP if _gem_texture != null else 0.0
-	return icon_w + title_w + BTN + TAB_EXTRA_WIDTH
-
-
-func _draw_title(r: Rect2) -> void:
-	var text := header_text()
-	var icon_w := GEM_SIZE if _gem_texture != null else 0.0
-	var gap := GEM_GAP if _gem_texture != null else 0.0
-	var start_x := r.position.x
-	if _gem_texture != null:
-		var icon_y := r.position.y + (HEAD_H - GEM_SIZE) * 0.5
-		draw_texture_rect(_gem_texture, Rect2(Vector2(start_x, icon_y), Vector2(GEM_SIZE, GEM_SIZE)), false)
-	var baseline := r.position.y + HEAD_H * 0.5 + 3.0
-	_draw_text_shadow(Vector2(start_x + icon_w + gap, baseline), text, VALUE_COLOR, TITLE_FONT_SIZE)
-
-
 func _draw_body(width: float) -> void:
-	var cursor_y := HEAD_H + CONTENT_PADDING
+	var cursor_y := CONTENT_PADDING
 	var row_w := width - CONTENT_PADDING * 2.0 - 2.0
 	for entry in _entries:
 		var name_baseline := cursor_y + NAME_LINE_H - 3.0

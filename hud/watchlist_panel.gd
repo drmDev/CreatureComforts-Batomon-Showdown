@@ -52,6 +52,8 @@ const SavedBuilds = preload("../core/saved_builds.gd")
 const SavedBuildsPanel = preload("saved_builds_panel.gd")
 const CloseButton = preload("close_button.gd")
 const UiSound = preload("../core/ui_sound.gd")
+## Shared blue activity dot; the same class marks the unified Trinkets tabs.
+const TrackedDot = preload("tracked_dot.gd")
 
 ## { "monster": { name_key: true }, "item": { id: true } }
 var selection := {"monster": {}, "item": {}}
@@ -1350,21 +1352,3 @@ static func _format_ids(ids: Dictionary) -> String:
 	return ",".join(keys)
 
 
-## Tiny solid blue dot marking a tab that has tracked entries. It is a child of
-## the tab Button, so it follows the button rect without altering its minimum
-## size; MOUSE_FILTER_IGNORE keeps it from intercepting the tab click.
-class TrackedDot extends Control:
-	const Style = preload("../core/style.gd")
-	const COLOR := Style.TRACKED_DOT_COLOR
-
-	func _ready() -> void:
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		focus_mode = Control.FOCUS_NONE
-		z_index = 2
-		resized.connect(func(): queue_redraw())
-
-	func _draw() -> void:
-		var radius := minf(size.x, size.y) * 0.5
-		if radius <= 0.0:
-			return
-		draw_circle(size * 0.5, radius, COLOR)

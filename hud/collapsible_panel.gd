@@ -12,8 +12,18 @@ const HEADER_BG := Style.HEADER_BG      # Slightly lighter navy for the header b
 var _entries: Array = []  # Array of subclass-defined row Dictionaries
 var _content_key := ""    # Cheap change detection for subclass show_*() callers
 
+## Emitted when embedded content changes, so the host panel can re-layout.
+signal layout_changed
+
 var minimized := false
 var reveal := 1.0  # 1 = expanded, 0 = minimized (animated)
+
+## When true this panel renders only its body into a host panel
+## (hud/trinkets_panel.gd) that owns dragging, collapsing, tabs, and
+## visibility. Standalone panels leave this false.
+var embedded := false
+## Width the embedded host assigned to this view (0 when standalone).
+var embedded_width := 0.0
 
 var _panel_style: StyleBoxFlat
 var _header_style: StyleBoxFlat
@@ -61,8 +71,35 @@ func header_text() -> String:
 	return ""
 
 
+## Y where body content starts. An embedded view has no header of its own.
+func body_top() -> float:
+	return 0.0 if embedded else HEAD_H
+
+
+## Body height at a given host-assigned width, used by the embedded host.
+func embedded_height(width: float) -> float:
+	embedded_width = width
+	return maxf(0.0, full_height() - body_top())
+
+
+## True when this view has content to show (drives host visibility).
+func has_content() -> bool:
+	return not _entries.is_empty()
+
+
+## Content key of the last shown content (drives the host's activity dots).
+func content_key() -> String:
+	return _content_key
+
+
+## Ask the host to re-layout after embedded content changed.
+func _notify_layout() -> void:
+	if embedded:
+		layout_changed.emit()
+
+
 func full_height() -> float:
-	return HEAD_H
+	return body_top()
 
 
 func _apply_size() -> void:
@@ -75,6 +112,8 @@ func _draw_body(_width: float) -> void:
 
 
 func set_minimized(on: bool, animate := true) -> void:
+	if embedded:
+		return  # the host panel owns collapsing
 	if on == minimized and (_tween == null or not _tween.is_running()):
 		return
 	minimized = on
@@ -112,6 +151,10 @@ func button_rect() -> Rect2:
 
 func _draw() -> void:
 	if _panel_style == null or _text_font == null:
+		return
+	if embedded:
+		# The host draws the frame, header, and tabs; this view only paints rows.
+		_draw_body(size.x)
 		return
 	if _entries.is_empty() and reveal <= 0.01 and not draw_when_empty:
 		return
@@ -168,7 +211,7 @@ func _gui_input(event) -> void:
 ## Keep the panel inside the viewport when the subclass opts in. Called after a
 ## drag and by subclasses after resizing (expand/collapse or viewport resize).
 func _clamp_to_viewport() -> void:
-	if not clamp_to_viewport:
+	if embedded or not clamp_to_viewport:
 		return
 	var viewport := get_viewport()
 	if viewport == null:

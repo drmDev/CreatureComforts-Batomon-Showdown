@@ -1,14 +1,15 @@
 extends "collapsible_panel.gd"
-## Gift content from a consumed Locked Box / Mysterious Chest is excluded upstream (it is
-## applied after the frozen battle_over snapshot), so this panel only receives legitimate gains.
+## Gained tab content: trinkets acquired during the last battle.
 ##
-## The panel is shop-gated (it lives on the reminder layer), so the overlay gate holds it back
-## through the results/event/gift screens and shows it once the shop is interactive. It stays
-## visible until the player collapses it or starts the next battle, which hides and clears it.
+## Gift content from a consumed Locked Box / Mysterious Chest is excluded
+## upstream (it is applied after the frozen battle_over snapshot), so this view
+## only receives legitimate gains.
+##
+## Embedded in hud/trinkets_panel.gd, which owns the frame, header, tabs and
+## visibility. Content is cleared when the next battle starts or the run changes.
 
 const TrinketGains = preload("../core/trinket_gains.gd")
 
-const PANEL_WIDTH := 185.0
 const CONTENT_PADDING := 5.0
 const ROW_HEIGHT := 14.0
 const ROW_GAP := 1.0
@@ -18,69 +19,28 @@ const ICON_GAP := 2.0
 const QTY_GAP := 2.0
 const ICON_Y_OFFSET := 2.0  # Nudge the icon down so it lines up with the text baseline
 
-const MARGIN_RIGHT := 10.0
-const MARGIN_BOTTOM := 130.0  # Leaves room for the shop's bottom-right controls / companion toast
-
-# Anchor only the first time the panel is shown. Later battles reuse the position the player
-# moved it to, so dragging it once is enough.
-var _anchored := false
-
-
-func _init() -> void:
-	super._init()
-	# Keep the header (and its minimize button) reachable: the panel is free-floating
-	# and can otherwise be dragged or anchored off-screen when it grows tall.
-	clamp_to_viewport = true
-
-
-func _ready() -> void:
-	_connect_viewport_resize(_on_viewport_resized)
-
-
-func _on_viewport_resized() -> void:
-	_clamp_to_viewport()
-
 
 func full_height() -> float:
-	return HEAD_H + CONTENT_PADDING + ROW_HEIGHT * float(_entries.size()) \
-		+ ROW_GAP * float(_entries.size()) + CONTENT_PADDING
+	return CONTENT_PADDING * 2.0 + (ROW_HEIGHT + ROW_GAP) * float(_entries.size())
 
 
-func header_text() -> String:
-	return "Trinkets Gained"
-
-
-## Idempotent: only the FIRST call (hidden -> visible) expands/un-minimizes the panel. Later
-## calls with the same content do nothing, which preserves any drag position and the minimize
-## animation. The panel never hides itself; see the header comment.
+## Show the non-junk gains. Unchanged content (every poll) is a no-op.
 func show_gains(entries: Array) -> void:
 	var key := _make_content_key(entries)
-	var first_show := not visible
 	_entries = entries
-	if first_show:
-		reveal = 1.0
-		minimized = false
-		_content_key = key
-		_apply_size()
-		if not _anchored:
-			_anchor_bottom_right()
-			_anchored = true
-	elif key != _content_key:
-		_content_key = key
-		_apply_size()
-	visible = true
+	if key == _content_key:
+		return
+	_content_key = key
+	_notify_layout()
 	queue_redraw()
 
 
 func hide_panel() -> void:
-	if _tween != null:
-		_tween.kill()
-		_tween = null
+	if _entries.is_empty():
+		return
 	_entries.clear()
 	_content_key = ""
-	reveal = 1.0
-	minimized = false
-	visible = false
+	_notify_layout()
 	queue_redraw()
 
 
@@ -97,45 +57,8 @@ func _icon(entry: Dictionary) -> Texture2D:
 	return icon if icon is Texture2D else null
 
 
-## Width of the [icon] [qty] [name] row, excluding the panel padding.
-func _row_width(entry: Dictionary) -> float:
-	var w := 0.0
-	if _icon(entry) != null:
-		w += ICON_SIZE + ICON_GAP
-	var qty := TrinketGains.qty_text(int(entry.get("count", 0)))
-	if not qty.is_empty():
-		w += _text_font.get_string_size(qty, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x + QTY_GAP
-	w += _text_font.get_string_size(str(entry.get("name", "")), HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
-	return w
-
-
-func _apply_size() -> void:
-	size = Vector2(_content_width(), lerpf(HEAD_H + 1.0, full_height(), reveal))
-	_clamp_to_viewport()
-
-
-func _content_width() -> float:
-	if _text_font == null:
-		return PANEL_WIDTH
-	var row_w := 0.0
-	for entry in _entries:
-		row_w = maxf(row_w, _row_width(entry))
-	var body_min := row_w + CONTENT_PADDING * 2.0 + 2.0
-	var title_w := _text_font.get_string_size(header_text(), HORIZONTAL_ALIGNMENT_LEFT, -1, TITLE_FONT_SIZE).x
-	# Base header inset: the title starts at x=12 and ends 16 px before the -/+ button
-	# (see collapsible_panel._draw), so the panel must be at least title + 39 px wide.
-	var header_min := title_w + 39.0
-	return maxf(body_min, header_min)
-
-
-func _anchor_bottom_right() -> void:
-	var viewport_size := get_viewport().get_visible_rect().size
-	position = Vector2(viewport_size.x - size.x - MARGIN_RIGHT, viewport_size.y - size.y - MARGIN_BOTTOM)
-	_clamp_to_viewport()
-
-
 func _draw_body(_width: float) -> void:
-	var cursor_y := HEAD_H + CONTENT_PADDING
+	var cursor_y := CONTENT_PADDING
 	for entry in _entries:
 		var baseline := cursor_y + ROW_HEIGHT - 2.0
 		var cursor_x := CONTENT_PADDING + 1.0
@@ -150,5 +73,3 @@ func _draw_body(_width: float) -> void:
 			cursor_x += _text_font.get_string_size(qty, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x + QTY_GAP
 		_draw_text_shadow(Vector2(cursor_x, baseline), str(entry.get("name", "")), LABEL_COLOR, FONT_SIZE)
 		cursor_y += ROW_HEIGHT + ROW_GAP
-
-

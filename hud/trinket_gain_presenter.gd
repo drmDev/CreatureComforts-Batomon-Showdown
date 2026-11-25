@@ -1,8 +1,9 @@
 extends RefCounted
-## Shows battle trinket gains on the panel.
+## Shows battle trinket gains on the shared Trinkets panel's Gained tab.
 ##
-## Extracted from mod_main.gd. Filters junk trinkets, summarizes duplicate ids
-## (highest quantity first), and respects the Trinkets Gained Panel toggle.
+## Extracted from mod_main.gd. Filters junk trinkets and summarizes duplicate
+## ids (highest quantity first). Panel visibility is owned by the unified
+## Trinkets panel setting, not this presenter.
 ##
 ## Lifecycle: `apply_finalized` is called once per battle, when the battle state ends (which may
 ## be an event or gift screen). The panel is shop-gated, so the gains wait there until the player
@@ -11,7 +12,6 @@ extends RefCounted
 
 const TrinketGains = preload("../core/trinket_gains.gd")
 const LogFormatterScript = preload("../core/log_formatter.gd")
-const ModConfig = preload("../core/mod_config.gd")
 const JUNK_TRINKET_ID := LogFormatterScript.JUNK_TRINKET_ID
 
 var _panel = null
@@ -45,9 +45,6 @@ func on_battle_started() -> void:
 ## Show the non-junk gains. Returns true when the panel was updated.
 func show_gains(gains: Dictionary) -> bool:
 	if _panel == null:
-		return false
-	if not _context.feature_enabled(ModConfig.KEY_TRINKETS_GAINED_PANEL):
-		hide()
 		return false
 	var shown_ids: Array = TrinketGains.displayable_ids(gains.get("ids", []), JUNK_TRINKET_ID)
 	if shown_ids.is_empty():

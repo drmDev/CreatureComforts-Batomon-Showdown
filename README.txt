@@ -15,17 +15,15 @@ Track Batomon and items you're looking for, with automatic highlighting in the s
 - Save, load, and manage builds.
 - Watchlist selections persist between sessions.
 
-### Trinket Reminders
-Get reminders for timing-sensitive trinkets, including Duplicators, Treasure Map, Upgrade Disc, and Greedy Gloves.
+### Trinkets Panel
+One movable, collapsible panel with three tabs:
+- Alerts: reminders for timing-sensitive trinkets, including Duplicators, Treasure Map, Upgrade Disc, and Greedy Gloves.
+- Gained: the trinkets you earned during combat, including their quantities.
+- Bonuses: positional trinket bonuses (left column, top middle, right column) and economical trinkets (sell value, income, and gold payouts).
+A blue dot marks a tab with new activity.
 
 ### Shop Purchase Reminders
 Hover a shop monster to see which next-purchase trinkets will affect it, such as Upgrade Disc, Speed Whistle, and Power Band.
-
-### Trinket Bonus Summary
-A movable panel summarizes positional trinket bonuses (left column, top middle, right column) and economical trinkets (sell value, income, and gold payouts), helping you optimize unit placement and spending.
-
-### Battle Trinket Rewards
-See which trinkets you earned during combat, including their quantities.
 
 ### Battle Status Display
 View your current day, remaining lives, and wins during combat.

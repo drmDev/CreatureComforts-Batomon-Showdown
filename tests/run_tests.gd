@@ -24,6 +24,7 @@ var _test_scripts := {
 	"mod_config": preload("test_mod_config.gd"),
 	"reminder_label": preload("test_reminder_label.gd"),
 	"watchlist": preload("test_watchlist.gd"),
+	"trinkets_panel": preload("test_trinkets_panel.gd"),
 	"saved_builds": preload("test_saved_builds.gd"),
 	"ui_sound": preload("test_ui_sound.gd"),
 	"run_region": preload("test_run_region.gd"),
