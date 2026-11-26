@@ -1,6 +1,6 @@
 extends Node
 ## Creature Comforts - QOL
-const VERSION := "7.0"
+const VERSION := "7.1"
 
 const LogFormatterScript = preload("core/log_formatter.gd")
 const UiSound = preload("core/ui_sound.gd")
