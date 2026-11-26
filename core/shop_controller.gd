@@ -136,6 +136,8 @@ func handle(state, phase_changed: bool) -> bool:
 	_ui.update_base_hp(view, current_day, total_hp)
 	var gate_allowed: bool = _shop_overlay_gate == null or _shop_overlay_gate.is_allowed()
 	_ui.update_sell_values(view, gate_allowed)
+	var blocked: bool = _ratacomb.current_stage() == RatacombStonerController.STAGE_BLOCKED
+	_ui.update_blocked_indicators(view, blocked and gate_allowed)
 	_ui.update_watchlist_button(view)
 	_purchase_reminders.update(run, view)
 	if _has_replay.is_valid():

@@ -11,6 +11,7 @@ const NodeUtils = preload("../core/node_utils.gd")
 const ModConfig = preload("../core/mod_config.gd")
 const ShopHighlight = preload("shop_highlight.gd")
 const SellValueIndicators = preload("sell_value_indicators.gd")
+const BlockedIndicators = preload("blocked_indicators.gd")
 const ReminderLabel = preload("reminder_label.gd")
 const TrinketsPanel = preload("trinkets_panel.gd")
 const ItemsUsedPanel = preload("items_used_panel.gd")
@@ -54,6 +55,7 @@ var opponent_panel = null
 var combat_stats_panel = null
 var shop_highlight = null
 var sell_value_indicators = null
+var blocked_indicators = null
 var purchase_reminder_hint = null
 
 var _context = null
@@ -105,6 +107,7 @@ func setup(context, tree_watcher = null, is_replay_active: Callable = Callable()
 	_build_reminder_layer()
 	_build_shop_highlight()
 	_build_sell_value_indicators()
+	_build_blocked_indicators()
 	_build_player_hud()
 
 
@@ -196,6 +199,16 @@ func _build_sell_value_indicators() -> void:
 	sell_value_indicators.name = "SellValueIndicators"
 	add_child(sell_value_indicators)
 	sell_value_indicators.setup(_context)
+
+
+## Red-X badges on buffed Commons while the Ratacomb blocked stage is active.
+## The controller attaches to the game's My Team slots; this node only owns its
+## lifecycle. The shop controller drives update_team/hide_all each poll.
+func _build_blocked_indicators() -> void:
+	blocked_indicators = BlockedIndicators.new()
+	blocked_indicators.name = "BlockedIndicators"
+	add_child(blocked_indicators)
+	blocked_indicators.setup(_context)
 
 
 func _build_player_hud() -> void:
@@ -411,6 +424,7 @@ func _close_shop_popups() -> void:
 	rank_odds_panel.reset_for_shop()
 	base_hp_panel.reset_for_shop()
 	sell_value_indicators.hide_all()
+	blocked_indicators.hide_all()
 
 
 ## Enter or leave the shop replay overlay. The replay's p2 template lacks the
@@ -447,6 +461,7 @@ func _replay_active_now() -> bool:
 ## layer and its content must survive the results/event screens until the shop returns.
 func hide_shop_panels() -> void:
 	sell_value_indicators.hide_all()
+	blocked_indicators.hide_all()
 	# Hide only; content is kept so battle gains survive the phase change and the
 	# next shop poll re-shows the panels.
 	trinkets_panel.hide_panel()
@@ -565,6 +580,12 @@ func update_sell_values(view, allowed: bool = true) -> void:
 		sell_value_indicators.hide_all()
 		return
 	sell_value_indicators.update_team(view)
+
+
+## Attach/refresh the red-X blocked badges for the current shop view. `active`
+## is whether the Ratacomb blocked stage is showing; when false the badges hide.
+func update_blocked_indicators(view, active: bool = false) -> void:
+	blocked_indicators.update_team(view, active)
 
 
 ## Attach the rank odds icon to the game's RankUI panel. The icon becomes the
